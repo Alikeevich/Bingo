@@ -464,8 +464,8 @@ export default function App() {
         <rect x="200" y="2950" width="600" height="120" fill="#fcd34d" opacity="0.5" rx="15" />
         <text x="500" y="3025" font-family="sans-serif" font-size="50" font-weight="bold" text-anchor="middle" fill="#854d0e">ID И ПОДВАЛ</text>
         <!-- QR Area -->
-        <rect x="1980" y="2900" width="300" height="300" fill="#93c5fd" opacity="0.5" />
-        <text x="2130" y="3070" font-family="sans-serif" font-size="60" font-weight="bold" text-anchor="middle" fill="#1e3a8a">QR КОД</text>
+        <rect x="2080" y="2900" width="200" height="200" fill="#93c5fd" opacity="0.5" rx="15" />
+        <text x="2180" y="3015" font-family="sans-serif" font-size="40" font-weight="bold" text-anchor="middle" fill="#1e3a8a">QR</text>
         <!-- Instructions -->
         <text x="1240" y="100" font-family="sans-serif" font-size="60" font-weight="bold" text-anchor="middle" fill="#374151">MuzBingo Guide: 2480x3508 px (A4, 300dpi). Сохранять в PNG/JPG.</text>
         <text x="1240" y="3400" font-family="sans-serif" font-size="40" text-anchor="middle" fill="#374151">Приложение само наложит тексты, сетку и QR код поверх вашего дизайна</text>
