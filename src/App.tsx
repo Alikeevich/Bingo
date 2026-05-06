@@ -1269,7 +1269,11 @@ export default function App() {
                 : <div className="max-h-60 overflow-y-auto pr-2 flex flex-col gap-2 custom-scrollbar">{playlists.map(p => { const isAdded = p.tracks.some(
                 t => t.id === trackToAdd.id || 
                      t.artist.toLowerCase() === trackToAdd.artist.toLowerCase()
-              ); return <button key={p.id} onClick={() => !isAdded && addTrackToPlaylist(p.id)} disabled={isAdded} className={`flex justify-between p-4 rounded-xl border text-left ${isAdded ? 'bg-gray-800/50 border-gray-800 opacity-50' : 'bg-gray-800 border-gray-700 hover:border-purple-500'}`}><span className="font-bold truncate pr-4">{p.name}</span><span className="text-xs text-gray-400 whitespace-nowrap">{isAdded ? 'Добавлен' : `${p.tracks.length} треков`}</span></button>; })}</div>}
+              ); return <button key={p.id} onClick={() => !isAdded && addTrackToPlaylist(p.id)} disabled={isAdded} className={`flex justify-between p-4 rounded-xl border text-left ${isAdded ? 'bg-gray-800/50 border-gray-800 opacity-50' : 'bg-gray-800 border-gray-700 hover:border-purple-500'}`}><span className="font-bold truncate pr-4">{p.name}</span><span className="text-xs text-gray-400 whitespace-nowrap">{p.tracks.some(t => t.id === trackToAdd.id)
+            ? 'Уже добавлен'
+            : p.tracks.some(t => t.artist.toLowerCase() === trackToAdd.artist.toLowerCase())
+              ? `Исполнитель есть`
+              : `${p.tracks.length} треков`}</span></button>; })}</div>}
             </div>
           </div>
         </div>
