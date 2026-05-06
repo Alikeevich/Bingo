@@ -8,31 +8,22 @@ interface PrintViewProps {
 }
 
 // ================================================================
-//  ЗОНЫ КАРТОЧКИ — захардкожены по дизайн-гайду
-//  Источник: SVG 2480 × 3508 px (A4 @ 300 dpi = 210 × 297 мм)
+//  ЗОНЫ КАРТОЧКИ — Выверены математически по дизайн-гайду
 //  Формула: px / total_px * mm_сторона
-//
-//  Лист A4: padding листа 10 мм → зона карточек:
-//    Layout 1 → 190 × 277 мм  → контент (−2.7 мм) → 184.6 × 271.6 мм
-//    Layout 2 → 190 × 133.5 мм → контент           → 184.6 × 128.1 мм
-//    Layout 4 →  90 × 133.5 мм → контент           →  84.6 × 128.1 мм
 // ================================================================
 const ZONES = {
-
-  // Внутренний отступ карточки:
-  //   Гайд safe margin = 150 px / 2480 px * 210 мм = 12.7 мм от края листа
-  //   Лист уже даёт 10 мм → остаток внутри карточки = 2.7 мм
+  // Внутренний отступ карточки (от края рамки до контента)
   PAD: 2.7,
 
-  // ── Layout 1 ─────────────────────────────────────────────────
+  // ── Layout 1 (1 на А4) — A4 Portrait (210×297) ───────────────
   1: {
-    headerH:  21.2,   // 250 px / 3508 * 297
-    headerGap: 4.2,   //  50 px / 3508 * 297
-    gridH:   211.7,   // 2500 px / 3508 * 297
-    footerH:  34.5,   // остаток: 271.6 − 21.2 − 4.2 − 211.7
-    qrSize:   29.6,   // 350 px / 2480 * 210  (и по H: 350/3508*297 ≈ 29.6 — квадрат ✓)
-    idH:      20.3,   // 240 px / 3508 * 297
-    idW:      25.4,   // 300 px / 2480 * 210
+    headerH:  21.2,   // 250 px
+    headerGap: 4.2,   // 50 px
+    gridH:   211.7,   // 2500 px
+    footerH:  34.5,   // остаток
+    qrSize:   29.6,   // 350 px
+    idH:      20.3,   // 240 px
+    idW:      25.4,   // 300 px
     cellGap:   1.5,
     titleFz:  13.0,
     trackFz:   3.5,
@@ -43,46 +34,47 @@ const ZONES = {
     qrPhFz:    2.5,
   },
 
-  // ── Layout 2 (H scale = 128.1 / 271.6 = 0.4717) ─────────────
+  // ── Layout 2 (2 на А4) — A4 Landscape (297×210) ───────────────
+  // Лист перевернут. Карточки стоят рядом. Масштаб ≈ 0.68 от оригинала
   2: {
-    headerH:  10.0,   // 21.2 × 0.4717
-    headerGap: 2.0,   //  4.2 × 0.4717
-    gridH:    99.8,   // 211.7 × 0.4717
-    footerH:  16.3,   // остаток: 128.1 − 10 − 2 − 99.8
-    qrSize:   14.0,   // 29.6 × 0.4717
-    idH:       9.6,   // 20.3 × 0.4717
-    idW:      25.4,   // ширина карточки та же → не масштабируем
-    cellGap:   0.8,
-    titleFz:   6.1,
-    trackFz:   1.65,
-    artistFz:  1.27,
-    centerFz:  2.36,
-    idFz:      1.4,
-    idSubFz:   1.0,
-    qrPhFz:    1.2,
+    headerH:  14.4,
+    headerGap: 2.8,
+    gridH:   143.9,
+    footerH:  23.5,
+    qrSize:   20.1,
+    idH:      13.8,
+    idW:      17.2,
+    cellGap:   1.0,
+    titleFz:   8.8,
+    trackFz:   2.4,
+    artistFz:  1.8,
+    centerFz:  3.4,
+    idFz:      1.9,
+    idSubFz:   1.4,
+    qrPhFz:    1.7,
   },
 
-  // ── Layout 4 (H scale = 0.4717, W scale = 84.6/184.6 = 0.4583) ──
+  // ── Layout 4 (4 на А4) — A4 Portrait (210×297) ────────────────
+  // Сетка 2x2. Масштаб ≈ 0.47
   4: {
     headerH:  10.0,
     headerGap: 2.0,
     gridH:    99.8,
     footerH:  16.3,
-    qrSize:   12.0,   // немного меньше — карточка уже по ширине
+    qrSize:   14.0,
     idH:       9.6,
-    idW:      11.6,   // 25.4 × 0.4583
-    cellGap:   0.5,
-    titleFz:   5.0,
-    trackFz:   1.3,
-    artistFz:  1.0,
-    centerFz:  1.8,
-    idFz:      1.1,
-    idSubFz:   0.8,
-    qrPhFz:    1.0,
+    idW:      12.0,
+    cellGap:   0.7,
+    titleFz:   6.1,
+    trackFz:   1.6,
+    artistFz:  1.2,
+    centerFz:  2.3,
+    idFz:      1.3,
+    idSubFz:   0.9,
+    qrPhFz:    1.2,
   },
 } as const;
 
-// Хелпер: число → CSS-строка в мм
 const mm = (v: number) => `${v}mm`;
 
 export default function PrintView({ printViewCards, setPrintViewCards }: PrintViewProps) {
@@ -91,29 +83,45 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
   const { cards, template } = printViewCards;
   const layoutNum = parseInt(template.config.layout || '1') as 1 | 2 | 4;
   const pages = chunkArray(cards, layoutNum);
+  
   const g = ZONES[layoutNum];
   const p = ZONES.PAD;
+  const isLandscape = layoutNum === 2;
 
-  // Стиль страницы A4 — зависит от раскладки
+  // Настройка стилей страницы А4
   const pageStyle: React.CSSProperties = {
-    width: '210mm',
-    height: '297mm',
+    width: isLandscape ? '297mm' : '210mm',
+    height: isLandscape ? '210mm' : '297mm',
     backgroundColor: 'white',
     overflow: 'hidden',
     padding: '10mm',
     gap: '10mm',
     boxSizing: 'border-box',
+    display: 'grid',
     ...(layoutNum === 1
-      ? { display: 'flex', flexDirection: 'column' }
+      ? { gridTemplateColumns: '1fr', gridTemplateRows: '1fr' }
       : layoutNum === 2
-      ? { display: 'grid', gridTemplateColumns: '1fr', gridTemplateRows: '1fr 1fr' }
-      : { display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' }),
+      ? { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr' }
+      : { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' }),
   };
 
   return (
     <div className="bg-gray-200 min-h-screen text-black print:bg-white overflow-y-auto z-[200] relative font-sans print:m-0 print:p-0">
+      
+      {/* CSS-инъекция для управления принтером */}
+      <style type="text/css">
+        {`
+          @media print {
+            @page {
+              size: ${isLandscape ? 'A4 landscape' : 'A4 portrait'};
+              margin: 0;
+            }
+            body { margin: 0; }
+          }
+        `}
+      </style>
 
-      {/* ── Панель управления (скрыта при печати) ───────────────── */}
+      {/* Панель управления */}
       <div className="fixed top-0 left-0 right-0 bg-gray-900 text-white p-4 flex justify-between items-center z-50 print:hidden shadow-lg border-b border-gray-800">
         <div className="flex items-center gap-4">
           <button
@@ -123,9 +131,9 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
             <ChevronLeft size={20} /> Назад
           </button>
           <div>
-            <div className="font-bold">Генерация карточек</div>
+            <div className="font-bold">Печать: {cards.length} шт.</div>
             <div className="text-sm text-gray-400">
-              Сгенерировано {cards.length} шт. · Шаблон: {template.name}
+              Шаблон: {template.name} · Ориентация: {isLandscape ? 'Альбомная' : 'Книжная'}
             </div>
           </div>
         </div>
@@ -137,7 +145,7 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
         </button>
       </div>
 
-      {/* ── Страницы ─────────────────────────────────────────────── */}
+      {/* Страницы */}
       <div className="pt-24 print:pt-0 pb-20 print:pb-0 flex flex-col items-center gap-8 print:block">
         {pages.map((pageCards: BingoCard[], pageIndex: number) => (
           <div
@@ -149,16 +157,11 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
               <div
                 key={card.id}
                 style={{
-                  // Layout 1: карточка растягивается на всю высоту flex-контейнера
-                  flex: layoutNum === 1 ? '1 1 auto' : undefined,
-                  // Внутренняя компоновка — строго колонка, никаких авто-размеров
                   display: 'flex',
                   flexDirection: 'column',
-                  // Отступ точно по гайду: 12.7 мм total − 10 мм листа = 2.7 мм
                   padding: mm(p),
                   boxSizing: 'border-box',
                   overflow: 'hidden',
-                  // Визуальное оформление
                   backgroundColor: template.config.bgColor,
                   color: template.config.textColor,
                   backgroundImage: template.config.backgroundImageUrl
@@ -169,14 +172,10 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
                   fontFamily: template.config.fontFamily || '"Inter", sans-serif',
                   borderRadius: '3mm',
                   border: '0.4mm dashed #9ca3af',
+                  height: '100%', // Чтобы в сетке занимала всё место
                 }}
               >
-
-                {/* ══════════════════════════════════════════════════
-                    ЗОНА 1 — ЗАГОЛОВОК
-                    Layout 1: 21.2 мм  (250 px / 3508 px * 297 мм)
-                    Layout 2/4: 10.0 мм (масштаб × 0.4717)
-                    ══════════════════════════════════════════════════ */}
+                {/* ЗОНА 1 — ЗАГОЛОВОК */}
                 <div
                   style={{
                     height:    mm(g.headerH),
@@ -199,18 +198,10 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
                   {template.config.cardTitle}
                 </div>
 
-                {/* ══════════════════════════════════════════════════
-                    ЗОНА 2 — GAP между заголовком и сеткой
-                    Layout 1: 4.2 мм  (50 px / 3508 px * 297 мм)
-                    Layout 2/4: 2.0 мм
-                    ══════════════════════════════════════════════════ */}
+                {/* ЗОНА 2 — GAP */}
                 <div style={{ height: mm(g.headerGap), flexShrink: 0 }} />
 
-                {/* ══════════════════════════════════════════════════
-                    ЗОНА 3 — СЕТКА 5 × 5
-                    Layout 1: 211.7 мм  (2500 px / 3508 px * 297 мм)
-                    Layout 2/4:  99.8 мм
-                    ══════════════════════════════════════════════════ */}
+                {/* ЗОНА 3 — СЕТКА */}
                 <div
                   style={{
                     display: 'grid',
@@ -301,15 +292,7 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
                   })}
                 </div>
 
-                {/* ══════════════════════════════════════════════════
-                    ЗОНА 4 — ПОДВАЛ
-                    Layout 1: 34.5 мм  (остаток: 271.6 − 237.1)
-                    Layout 2/4: 16.3 мм
-                    items-end: QR и ID прижаты к нижнему краю,
-                    что соответствует выравниванию в гайде:
-                      QR bottom = content bottom (y=3350)
-                      ID bottom = content bottom (y=3350)
-                    ══════════════════════════════════════════════════ */}
+                {/* ЗОНА 4 — ПОДВАЛ */}
                 <div
                   style={{
                     height:    mm(g.footerH),
@@ -320,9 +303,6 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
                     alignItems: 'flex-end',
                   }}
                 >
-                  {/* ID-блок
-                      Layout 1: 25.4 × 20.3 мм  (300 px × 240 px из гайда)
-                      Layout 4: 11.6 × 9.6 мм   (масштаб по ширине + высоте) */}
                   <div
                     style={{
                       width:     mm(g.idW),
@@ -369,10 +349,6 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
                     </div>
                   </div>
 
-                  {/* QR-блок
-                      Layout 1: 29.6 × 29.6 мм  (350 px из гайда — квадрат)
-                      Layout 2:  14.0 × 14.0 мм
-                      Layout 4:  12.0 × 12.0 мм */}
                   {template.config.showQR && (
                     <div
                       style={{
@@ -414,15 +390,12 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
                             color: '#000',
                           }}
                         >
-                          МЕСТО ДЛЯ
-                          <br />
-                          QR КОДА
+                          МЕСТО ДЛЯ<br />QR КОДА
                         </div>
                       )}
                     </div>
                   )}
                 </div>
-
               </div>
             ))}
           </div>
