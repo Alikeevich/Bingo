@@ -279,15 +279,13 @@ export default function App() {
     setActiveFilter(filterName);
     setSearchQuery('');
     setCurrentPage(page);
-    setActiveFilterRef({ name: filterName, type: 'chart', id: genreId });
+    activeQueryRef.current = { type: 'chart', id: genreId, name: filterName };
     try {
-      const res = await fetch(
-        `/api/deezer/chart/${genreId}/tracks?limit=${ITEMS_PER_PAGE}&index=${page * ITEMS_PER_PAGE}`
-      );
+      const res = await fetch(`/api/deezer/chart/${genreId}/tracks?limit=${ITEMS_PER_PAGE}&index=${page * ITEMS_PER_PAGE}`);
       const data = await res.json();
       if (data.data) {
         setSearchResults(parseDeezerTracks(data.data));
-        setTotalResults(data.total ?? data.data.length);
+        setHasNextPage(data.data.length === ITEMS_PER_PAGE);
       }
     } catch (e) { console.error(e); } finally { setIsSearching(false); }
   };
@@ -297,15 +295,13 @@ export default function App() {
     setIsSearching(true);
     setActiveFilter(filterName || '');
     setCurrentPage(page);
-    setActiveFilterRef({ name: filterName || '', type: 'search', query });
+    activeQueryRef.current = { type: 'search', query, name: filterName || '' };
     try {
-      const res = await fetch(
-        `/api/deezer/search?q=${encodeURIComponent(query)}&limit=${ITEMS_PER_PAGE}&index=${page * ITEMS_PER_PAGE}`
-      );
+      const res = await fetch(`/api/deezer/search?q=${encodeURIComponent(query)}&limit=${ITEMS_PER_PAGE}&index=${page * ITEMS_PER_PAGE}`);
       const data = await res.json();
       if (data.data) {
         setSearchResults(parseDeezerTracks(data.data));
-        setTotalResults(data.total ?? data.data.length);
+        setHasNextPage(data.data.length === ITEMS_PER_PAGE);
       }
     } catch (e) { console.error(e); } finally { setIsSearching(false); }
   };
@@ -313,13 +309,11 @@ export default function App() {
   const loadTopChart = () => loadChartByGenre('0', 'Топ Чарт', 0);
   
   const goToPage = (page: number) => {
-    if (!activeFilterRef) return;
-    if (activeFilterRef.type === 'chart') {
-      loadChartByGenre(activeFilterRef.id!, activeFilterRef.name, page);
-    } else {
-      searchDeezer(activeFilterRef.query!, activeFilterRef.name, page);
-    }
-    // прокрутить список наверх
+    const q = activeQueryRef.current;
+    if (!q) return;
+    if (q.type === 'chart') loadChartByGenre(q.id, q.name, page);
+    else searchDeezer(q.query, q.name, page);
+    // скролл наверх списка
     document.querySelector('.custom-scrollbar')?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
