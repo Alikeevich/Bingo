@@ -28,7 +28,7 @@ const mm = (v: number) => `${v}mm`;
 
 export default function PrintView({ printViewCards, setPrintViewCards }: PrintViewProps) {
   // Добавляем состояние для масштаба предпросмотра на мониторе
-  const [scale, setScale] = useState(0.6); 
+  const [scale, setScale] = useState(0.4); 
 
   if (!printViewCards) return null;
 
