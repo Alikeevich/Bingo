@@ -46,6 +46,7 @@ export interface TemplateConfig {
   bgColor: string;
   textColor: string;
   accentColor: string;
+  fontFamily?: string
   gridColor: string;
   cardTitle: string;
   showArtist: boolean;
