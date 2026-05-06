@@ -306,43 +306,61 @@ export default function App() {
   };
 
   const togglePlay = async (track: Track) => {
-    if (!track.preview) return showToast('У этого трека нет аудио-превью!');
     const audioEl = audioRef.current;
-    if (!audioEl) { console.error('audioRef.current is null!'); return; }
+    if (!audioEl) return;
 
     if (playingTrackId === track.id) {
-      if (audioEl.paused) { audioEl.play().catch(console.error); }
-      else { audioEl.pause(); setPlayingTrackId(null); }
+      if (audioEl.paused) {
+        audioEl.play().catch(console.error);
+      } else {
+        audioEl.pause();
+        setPlayingTrackId(null);
+      }
       return;
     }
 
     audioEl.pause();
     setPlayingTrackId(track.id);
-    const proxyUrl = getProxiedUrl(track.preview);
 
     try {
-      let finalUrl = proxyUrl;
-      try {
-        const cache = await caches.open('muzbingo-audio-v1');
-        const cached = await cache.match(proxyUrl);
-        if (cached) {
-          const blob = await cached.blob();
-          if (blob.size > 500) { finalUrl = URL.createObjectURL(blob); }
+      let currentUrl = track.preview;
+
+      // 1. Если это твой кастомный трек из Supabase
+      if (track.isCustom) {
+        // Генерируем чистую публичную ссылку заново, чтобы не использовать старую из БД
+        const { data } = supabase.storage.from('audio-tracks').getPublicUrl(String(track.id));
+        currentUrl = data.publicUrl;
+      } 
+      // 2. Если это трек из Deezer
+      else {
+        const isExpired = currentUrl.includes('exp=') && 
+                          Date.now() / 1000 > parseInt(currentUrl.match(/exp=(\d+)/)?.[1] || '0');
+        
+        if (isExpired) {
+          console.log("Ссылка Deezer истекла, обновляем...");
+          const res = await fetch(`/api/deezer/track/${track.id}`);
+          const data = await res.json();
+          if (data.preview) currentUrl = data.preview;
         }
-      } catch (e) { console.warn('Cache API недоступен:', e); }
+      }
+
+      // Добавляем timestamp к ссылке, чтобы обойти жесткое кэширование браузером 403 ошибки
+      const finalUrl = currentUrl.includes('?') ? `${currentUrl}&t=${Date.now()}` : `${currentUrl}?t=${Date.now()}`;
 
       audioEl.src = finalUrl;
-      audioEl.currentTime = 0;
       audioEl.load();
-      audioEl.play().catch(err => {
-        console.error('Воспроизведение заблокировано:', err);
-        setPlayingTrackId(null);
-        showToast('Не удалось воспроизвести. Нажмите ещё раз.');
-      });
+      
+      const playPromise = audioEl.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(err => {
+          console.error('Ошибка воспроизведения:', err);
+          showToast('Ошибка доступа к файлу (403). Проверьте настройки Storage.');
+          setPlayingTrackId(null);
+        });
+      }
     } catch (err) {
-      console.error('Ошибка плеера:', err);
+      console.error('Критическая ошибка плеера:', err);
       setPlayingTrackId(null);
-      showToast('Ошибка при загрузке трека.');
     }
   };
 
