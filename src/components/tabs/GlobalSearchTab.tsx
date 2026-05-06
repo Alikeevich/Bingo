@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Loader2, PauseCircle, PlayCircle, Plus, Flame, ChevronLeft } from 'lucide-react';
+import { Search, Loader2, PauseCircle, PlayCircle, Flame, ChevronLeft, Database, ListMusic } from 'lucide-react';
 import { Track } from '../../types';
 
 const FILTERS =[
@@ -19,13 +19,15 @@ interface GlobalSearchTabProps {
   playingTrackId: string | number | null;
   togglePlay: (track: Track) => void;
   setTrackToAddToDb: (track: Track) => void;
+  // ПРОПС ДЛЯ ДОБАВЛЕНИЯ В ПЛЕЙЛИСТ
+  setTrackToAdd: (track: Track) => void; 
 }
 
-export default function GlobalSearchTab({ playingTrackId, togglePlay, setTrackToAddToDb }: GlobalSearchTabProps) {
-  const[searchQuery, setSearchQuery] = useState('');
+export default function GlobalSearchTab({ playingTrackId, togglePlay, setTrackToAddToDb, setTrackToAdd }: GlobalSearchTabProps) {
+  const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Track[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [activeFilter, setActiveFilter] = useState('Топ Чарт');
+  const[activeFilter, setActiveFilter] = useState('Топ Чарт');
   
   const [currentPage, setCurrentPage] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
@@ -75,7 +77,7 @@ export default function GlobalSearchTab({ playingTrackId, togglePlay, setTrackTo
   return (
     <div className="animate-in fade-in duration-300 flex flex-col h-full">
       <h1 className="text-3xl font-bold mb-2">Глобальный поиск (API)</h1>
-      <p className="text-gray-400 mb-6">Ищите треки через API Deezer для добавления в свою Базу</p>
+      <p className="text-gray-400 mb-6">Ищите музыку для плейлистов или сохраняйте её в свою Базу с тегами.</p>
       
       <form onSubmit={handleSearchSubmit} className="flex gap-4 mb-4">
         <div className="relative flex-1">
@@ -109,8 +111,15 @@ export default function GlobalSearchTab({ playingTrackId, togglePlay, setTrackTo
                       <img src={track.cover} alt="cover" className={`w-full h-full object-cover transition-transform ${isPlaying ? 'scale-110 blur-[2px]' : ''}`} />
                       <div className={`absolute inset-0 bg-black/50 flex items-center justify-center transition ${isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>{isPlaying ? <PauseCircle size={28} className="text-purple-400" /> : <PlayCircle size={28} className="text-white" />}</div>
                     </div>
-                    <div className="flex-1 overflow-hidden"><h4 className={`font-bold truncate text-sm ${isPlaying ? 'text-purple-400' : 'text-white'}`}>{track.title}</h4><p className="text-xs text-gray-400 truncate">{track.artist}</p></div>
-                    <button onClick={() => setTrackToAddToDb(track)} className="p-2 bg-gray-800 rounded-lg hover:bg-purple-600 transition flex-shrink-0 text-gray-400 hover:text-white" title="Сохранить в Мою Базу"><Plus size={18} /></button>
+                    <div className="flex-1 overflow-hidden">
+                      <h4 className={`font-bold truncate text-sm ${isPlaying ? 'text-purple-400' : 'text-white'}`}>{track.title}</h4>
+                      <p className="text-xs text-gray-400 truncate">{track.artist}</p>
+                    </div>
+                    {/* НОВЫЙ БЛОК С ДВУМЯ КНОПКАМИ */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button onClick={() => setTrackToAdd(track)} className="p-2 bg-gray-800 rounded-lg hover:bg-purple-600 transition text-gray-400 hover:text-white" title="Сразу в плейлист"><ListMusic size={18} /></button>
+                      <button onClick={() => setTrackToAddToDb(track)} className="p-2 bg-gray-800 rounded-lg hover:bg-purple-600 transition text-gray-400 hover:text-white" title="Сохранить в Мою Базу"><Database size={18} /></button>
+                    </div>
                   </div>
                 );
               })}
