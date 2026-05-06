@@ -99,6 +99,10 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Track[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalResults, setTotalResults] = useState(0);
+  const [activeFilterRef, setActiveFilterRef] = useState<typeof FILTERS[0] | null>(null);
+  const ITEMS_PER_PAGE = 50;
   const [activeFilter, setActiveFilter] = useState('Топ Чарт');
   const [isUploadingMp3, setIsUploadingMp3] = useState(false);
   const [offlineProgress, setOfflineProgress] = useState<{ current: number; total: number } | null>(null);
