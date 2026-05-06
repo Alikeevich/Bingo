@@ -1012,29 +1012,59 @@ export default function App() {
         </button>
       ))}
     </div>
-      <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-10">
-        {isSearching && searchResults.length === 0
-          ? <div className="flex flex-col items-center justify-center h-40 text-gray-500"><Loader2 className="animate-spin mb-4" size={32} /><p>Ищем музыку...</p></div>
-          : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {searchResults.map(track => {
-                const isPlaying = playingTrackId === track.id;
-                return (
-                  <div key={track.id} className={`bg-gray-900 p-3 rounded-xl flex gap-3 items-center border transition group ${isPlaying ? 'border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.2)]' : 'border-gray-800 hover:border-gray-600'}`}>
-                    <div className="relative w-14 h-14 rounded-md overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => togglePlay(track)}>
-                      <img src={track.cover} alt="cover" className={`w-full h-full object-cover transition-transform ${isPlaying ? 'scale-110 blur-[2px]' : ''}`} />
-                      <div className={`absolute inset-0 bg-black/50 flex items-center justify-center transition ${isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>{isPlaying ? <PauseCircle size={28} className="text-purple-400" /> : <PlayCircle size={28} className="text-white" />}</div>
-                    </div>
-                    <div className="flex-1 overflow-hidden"><h4 className={`font-bold truncate text-sm ${isPlaying ? 'text-purple-400' : 'text-white'}`}>{track.title}</h4><p className="text-xs text-gray-400 truncate">{track.artist}</p></div>
-                    <button onClick={() => setTrackToAdd(track)} className="p-2 bg-gray-800 rounded-lg hover:bg-purple-600 transition flex-shrink-0 text-gray-400 hover:text-white"><Plus size={18} /></button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+<div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-4">
+  {isSearching && searchResults.length === 0
+    ? <div className="flex flex-col items-center justify-center h-40 text-gray-500">
+        <Loader2 className="animate-spin mb-4" size={32} /><p>Ищем музыку...</p>
       </div>
-    </div>
-  );
+    : (
+      <>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+          {searchResults.map(track => {
+            const isPlaying = playingTrackId === track.id;
+            return (
+              <div key={track.id} className={`bg-gray-900 p-3 rounded-xl flex gap-3 items-center border transition group ${isPlaying ? 'border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.2)]' : 'border-gray-800 hover:border-gray-600'}`}>
+                <div className="relative w-14 h-14 rounded-md overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => togglePlay(track)}>
+                  <img src={track.cover} alt="cover" className={`w-full h-full object-cover transition-transform ${isPlaying ? 'scale-110 blur-[2px]' : ''}`} />
+                  <div className={`absolute inset-0 bg-black/50 flex items-center justify-center transition ${isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>{isPlaying ? <PauseCircle size={28} className="text-purple-400" /> : <PlayCircle size={28} className="text-white" />}</div>
+                </div>
+                <div className="flex-1 overflow-hidden"><h4 className={`font-bold truncate text-sm ${isPlaying ? 'text-purple-400' : 'text-white'}`}>{track.title}</h4><p className="text-xs text-gray-400 truncate">{track.artist}</p></div>
+                <button onClick={() => setTrackToAdd(track)} className="p-2 bg-gray-800 rounded-lg hover:bg-purple-600 transition flex-shrink-0 text-gray-400 hover:text-white"><Plus size={18} /></button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ПАГИНАЦИЯ */}
+        {searchResults.length > 0 && (
+          <div className="flex items-center justify-between border-t border-gray-800 pt-6 pb-2">
+            <button
+              onClick={() => goToPage(currentPage - 1)}
+              disabled={currentPage === 0 || isSearching}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gray-800 hover:bg-gray-700 rounded-xl font-bold transition disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft size={18} /> Назад
+            </button>
+
+            <div className="text-center">
+              <div className="text-white font-bold">Страница {currentPage + 1}</div>
+              <div className="text-gray-500 text-xs">
+                {currentPage * ITEMS_PER_PAGE + 1}–{Math.min((currentPage + 1) * ITEMS_PER_PAGE, totalResults)} из {totalResults.toLocaleString()}
+              </div>
+            </div>
+
+            <button
+              onClick={() => goToPage(currentPage + 1)}
+              disabled={(currentPage + 1) * ITEMS_PER_PAGE >= totalResults || isSearching}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gray-800 hover:bg-gray-700 rounded-xl font-bold transition disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              Вперёд <ChevronLeft size={18} className="rotate-180" />
+            </button>
+          </div>
+        )}
+      </>
+    )}
+</div>
 
   const renderPlaylistsTab = () => {
     if (viewingPlaylist) {
