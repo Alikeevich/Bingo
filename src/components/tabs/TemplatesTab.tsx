@@ -93,7 +93,7 @@ export default function TemplatesTab({ templates, setTemplates, showToast }: Tem
     }
   };
 
-const layoutNum = parseInt(editingTemplate.config?.layout || '1') as 1 | 2 | 4;
+  const layoutNum = parseInt(editingTemplate.config?.layout || '1') as 1 | 2 | 4;
   const isLandscape = layoutNum === 2; // Если формат 2 -> лист альбомный
   const g = ZONES[layoutNum];
   const p = ZONES.PAD;
