@@ -9,7 +9,6 @@ interface TemplatesTabProps {
   showToast: (msg: string) => void;
 }
 
-// Список шрифтов с поддержкой кириллицы и казахских символов
 const FONTS =[
   { name: 'Inter (Стандартный)', value: '"Inter", sans-serif' },
   { name: 'Montserrat (Стильный)', value: '"Montserrat", sans-serif' },
@@ -18,9 +17,6 @@ const FONTS =[
   { name: 'Rubik (Скругленный)', value: '"Rubik", sans-serif' },
 ];
 
-// ================================================================
-//  ЗОНЫ КАРТОЧКИ — захардкожены по дизайн-гайду (Синхронизировано с PrintView)
-// ================================================================
 const ZONES = {
   PAD: 2.7,
   1: {
@@ -37,11 +33,10 @@ const ZONES = {
   },
 } as const;
 
-// Хелпер: число → CSS-строка в мм
 const mm = (v: number) => `${v}mm`;
 
 export default function TemplatesTab({ templates, setTemplates, showToast }: TemplatesTabProps) {
-  const [isCreateTemplateModalOpen, setIsCreateTemplateModalOpen] = useState(false);
+  const[isCreateTemplateModalOpen, setIsCreateTemplateModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Partial<Template>>({
     name: '',
     config: {
@@ -89,19 +84,24 @@ export default function TemplatesTab({ templates, setTemplates, showToast }: Tem
     }
   };
 
-  // Переменные для точного предпросмотра
   const layoutNum = parseInt(editingTemplate.config?.layout || '1') as 1 | 2 | 4;
   const g = ZONES[layoutNum];
   const p = ZONES.PAD;
   
+  // Жестко блокируем размеры самого А4 листа, чтобы flexbox родителя не смог его сжать
   const pageStyle: React.CSSProperties = {
     width: '210mm',
+    minWidth: '210mm',
+    maxWidth: '210mm',
     height: '297mm',
+    minHeight: '297mm',
+    maxHeight: '297mm',
     backgroundColor: 'white',
     overflow: 'hidden',
     padding: '10mm',
     gap: '10mm',
     boxSizing: 'border-box',
+    flexShrink: 0,
     ...(layoutNum === 1
       ? { display: 'flex', flexDirection: 'column' }
       : layoutNum === 2
@@ -166,6 +166,7 @@ export default function TemplatesTab({ templates, setTemplates, showToast }: Tem
       {isCreateTemplateModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex overflow-hidden">
           <div className="w-[450px] bg-gray-900 border-r border-gray-800 p-8 overflow-y-auto custom-scrollbar flex flex-col">
+            {/* Панель настроек (без изменений) */}
             <div className="flex items-center gap-3 mb-8 text-purple-400 border-b border-gray-800 pb-6">
               <Palette size={28} />
               <h2 className="text-2xl font-bold text-white">Конструктор стиля</h2>
@@ -177,7 +178,6 @@ export default function TemplatesTab({ templates, setTemplates, showToast }: Tem
                 <input type="text" value={editingTemplate.name} onChange={e => setEditingTemplate({ ...editingTemplate, name: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none" placeholder="Напр: Классика 2 на А4" />
               </div>
 
-              {/* ШРИФТЫ */}
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-2">Шрифт (с поддержкой Қазақша)</label>
                 <select 
@@ -200,7 +200,6 @@ export default function TemplatesTab({ templates, setTemplates, showToast }: Tem
                 </div>
               </div>
 
-              {/* ДИЗАЙН И РАЗМЕТКА */}
               <div className="pt-4 border-t border-gray-800">
                 <label className="block text-sm font-medium text-gray-400 mb-2">Фоновое изображение (PNG/JPG)</label>
                 {editingTemplate.config?.backgroundImageUrl && (
@@ -252,21 +251,35 @@ export default function TemplatesTab({ templates, setTemplates, showToast }: Tem
             </div>
           </div>
 
+          {/* ПРАВАЯ ЧАСТЬ С ПРЕДПРОСМОТРОМ */}
           <div className="flex-1 flex flex-col items-center justify-center p-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-800 to-black relative overflow-hidden">
-             <div className="absolute top-10 left-10 flex flex-col text-gray-400">
+             <div className="absolute top-10 left-10 flex flex-col text-gray-400 z-10">
                <span className="flex items-center gap-2 font-bold text-white mb-1"><Eye size={20} /> Предпросмотр печати</span>
-               <span className="text-sm">Точные пропорции гайда (масштабировано для экрана)</span>
+               <span className="text-sm">Точные пропорции гайда (масштабировано под экран)</span>
              </div>
              
-             {/* РЕАЛЬНЫЙ А4 ДЛЯ ПРЕДПРОСМОТРА, УМЕНЬШЕННЫЙ ЧЕРЕЗ SCALE */}
              <div className="relative w-full h-full flex items-center justify-center">
-               <div style={{ position: 'absolute', transform: 'scale(0.5)', transition: 'all 0.3s ease' }}>
+               {/* 
+                 Динамический скейл: автоматически подстраивается под высоту экрана!
+                 1122px — это примерная высота 297мм на экране, чтобы лист всегда помещался 
+                 без обрезания по краям на любых ноутбуках. 
+               */}
+               <div style={{ 
+                 position: 'absolute', 
+                 transform: 'scale(min(0.5, calc((100vh - 80px) / 1122)))', 
+                 transformOrigin: 'center center',
+                 transition: 'all 0.3s ease' 
+               }}>
                  <div style={pageStyle} className="shadow-[0_0_80px_rgba(0,0,0,0.8)]">
                    {[...Array(layoutNum)].map((_, cardIndex) => (
                      <div
                        key={cardIndex}
                        style={{
                          flex: layoutNum === 1 ? '1 1 auto' : undefined,
+                         width: '100%',      // Жёстко заставляем занимать всю ячейку
+                         height: '100%',     // Жёстко заставляем занимать всю ячейку
+                         minHeight: '100%',  // Блокируем сжатие карточки
+                         flexShrink: 0,
                          display: 'flex',
                          flexDirection: 'column',
                          padding: mm(p),
@@ -290,7 +303,7 @@ export default function TemplatesTab({ templates, setTemplates, showToast }: Tem
                            height:    mm(g.headerH),
                            minHeight: mm(g.headerH),
                            maxHeight: mm(g.headerH),
-                           flexShrink: 0,
+                           flexShrink: 0, // Запрет сжатия
                            display: 'flex',
                            alignItems: 'center',
                            justifyContent: 'center',
@@ -308,7 +321,7 @@ export default function TemplatesTab({ templates, setTemplates, showToast }: Tem
                        </div>
 
                        {/* ЗОНА 2 — GAP */}
-                       <div style={{ height: mm(g.headerGap), flexShrink: 0 }} />
+                       <div style={{ height: mm(g.headerGap), minHeight: mm(g.headerGap), flexShrink: 0 }} />
 
                        {/* ЗОНА 3 — СЕТКА */}
                        <div
@@ -320,7 +333,7 @@ export default function TemplatesTab({ templates, setTemplates, showToast }: Tem
                            height:    mm(g.gridH),
                            minHeight: mm(g.gridH),
                            maxHeight: mm(g.gridH),
-                           flexShrink: 0,
+                           flexShrink: 0, // Запрет сжатия
                          }}
                        >
                          {[...Array(25)].map((_, i) => {
@@ -339,6 +352,7 @@ export default function TemplatesTab({ templates, setTemplates, showToast }: Tem
                                  textAlign: 'center',
                                  padding: '0.5mm',
                                  overflow: 'hidden',
+                                 minHeight: 0, // Запрещаем тексту растягивать ячейку за пределы контейнера!
                                }}
                              >
                                {isFree ? (
@@ -406,7 +420,8 @@ export default function TemplatesTab({ templates, setTemplates, showToast }: Tem
                          style={{
                            height:    mm(g.footerH),
                            minHeight: mm(g.footerH),
-                           flexShrink: 0,
+                           maxHeight: mm(g.footerH),
+                           flexShrink: 0, // Запрет сжатия
                            display: 'flex',
                            justifyContent: 'space-between',
                            alignItems: 'flex-end',
