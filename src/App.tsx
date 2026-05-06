@@ -580,8 +580,8 @@ export default function App() {
                         return (
                           <div key={i} style={{ backgroundColor: template.config.gridColor }} className="rounded-lg border border-white/10 flex flex-col items-center justify-center text-center p-1.5 print:p-1 overflow-hidden backdrop-blur-sm">
                             {isFree ? <div style={{ color: template.config.accentColor }} className={`font-black uppercase leading-tight ${layoutNum === 4 ? 'text-xs' : 'text-xl'}`}>{template.config.centerText}</div> : (
-                              <div className={`font-bold leading-tight opacity-90 line-clamp-3 break-words w-full px-0.5 ${layoutNum === 4 ? 'text-[8px]' : 'text-[13px]'}`}>{cell.title}</div>
-{template.config.showArtist && <div style={{ color: template.config.accentColor }} className={`font-medium leading-tight opacity-90 italic mt-0.5 line-clamp-2 break-words w-full px-0.5 ${layoutNum === 4 ? 'text-[6px]' : 'text-[11px]'}`}>{cell.artist}</div>}
+                            <div className={`font-bold leading-tight opacity-90 line-clamp-3 break-words w-full px-0.5 ${layoutNum === 4 ? 'text-[8px]' : 'text-[13px]'}`}>{cell.title}</div>
+                            {template.config.showArtist && <div style={{ color: template.config.accentColor }} className={`font-medium leading-tight opacity-90 italic mt-0.5 line-clamp-2 break-words w-full px-0.5 ${layoutNum === 4 ? 'text-[6px]' : 'text-[11px]'}`}>{cell.artist}</div>}
                             )}
                           </div>
                         )
