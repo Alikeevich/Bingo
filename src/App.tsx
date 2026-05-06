@@ -202,59 +202,89 @@ export default function App() {
     const name = tagName.trim();
     if (!name) return;
     
-    // Если тег уже выбран, просто очищаем инпут
+    // Проверяем, не выбран ли он уже
     if (selectedTagsForNewTrack.some(t => t.toLowerCase() === name.toLowerCase())) {
       setNewTagInput('');
       return;
     }
 
-    // Ищем, есть ли он уже в БД
+    // Ищем тег в уже загруженном списке dbTags
     const existingDbTag = dbTags.find(t => t.name.toLowerCase() === name.toLowerCase());
     
     if (existingDbTag) {
-      setSelectedTagsForNewTrack([...selectedTagsForNewTrack, existingDbTag.name]);
+      // Если тег есть в БД, просто добавляем его в список выбранных
+      setSelectedTagsForNewTrack(prev => [...prev, existingDbTag.name]);
+      setNewTagInput('');
     } else {
-      // Создаем новый тег в БД на лету
-      const colors =['#ef4444', '#f97316', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#f43f5e'];
+      // Если тега нет в БД, создаем его
+      const colors = ['#ef4444', '#f97316', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#f43f5e'];
       const randomColor = colors[Math.floor(Math.random() * colors.length)];
       
-      const { data, error } = await supabase.from('tags').insert([{ name, color: randomColor }]).select();
-      if (data) {
-         setDbTags([...dbTags, data[0]]);
-         setSelectedTagsForNewTrack([...selectedTagsForNewTrack, data[0].name]);
-      } else if (error) { showToast('Ошибка создания тега'); }
+      const { data, error } = await supabase
+        .from('tags')
+        .insert([{ name, color: randomColor }])
+        .select();
+
+      if (error) {
+        console.error("Ошибка создания тега:", error);
+        showToast('Не удалось создать тег');
+      } else if (data && data.length > 0) {
+        setDbTags(prev => [...prev, data[0]]);
+        setSelectedTagsForNewTrack(prev => [...prev, data[0].name]);
+        setNewTagInput('');
+      }
     }
-    setNewTagInput(''); // очищаем поле ввода
   };
 
   const saveTrackToDb = async () => {
     if (!trackToAddToDb) return;
+
+    // Подготовка данных для Postgres (важно: tags — это массив строк)
     const newTrackRow = {
       id: String(trackToAddToDb.id),
       title: trackToAddToDb.title,
       artist: trackToAddToDb.artist,
       cover: trackToAddToDb.cover,
       preview: trackToAddToDb.preview,
-      is_custom: trackToAddToDb.isCustom || false,
-      tags: selectedTagsForNewTrack
+      is_custom: false,
+      tags: selectedTagsForNewTrack // Передаем массив ['tag1', 'tag2']
     };
-    const { data, error } = await supabase.from('tracks').upsert([newTrackRow]).select();
-    if (error) { showToast('Ошибка сохранения в базу'); return; }
-    
-    if (data) {
-       setDbTracks(prev => {
-         const filtered = prev.filter(t => String(t.id) !== String(data[0].id));
-         const addedTrack: Track = {
-           id: data[0].id, title: data[0].title, artist: data[0].artist,
-           cover: data[0].cover, preview: data[0].preview, isCustom: data[0].is_custom, tags: data[0].tags
-         };
-         return [addedTrack, ...filtered];
-       });
-       showToast('Трек сохранен в Мою Базу!');
+
+    const { data, error } = await supabase
+      .from('tracks')
+      .upsert(newTrackRow)
+      .select();
+
+    if (error) {
+      console.error("Ошибка сохранения трека:", error);
+      showToast('Ошибка БД: ' + error.message);
+      return;
     }
-    setTrackToAddToDb(null);
-    setSelectedTagsForNewTrack([]);
-    setNewTagInput('');
+
+    if (data && data.length > 0) {
+      const saved = data[0];
+      // Мапим обратно в наш формат
+      const mappedTrack: Track = {
+        id: saved.id,
+        title: saved.title,
+        artist: saved.artist,
+        cover: saved.cover,
+        preview: saved.preview,
+        isCustom: saved.is_custom,
+        tags: saved.tags || []
+      };
+
+      // Обновляем локальный список треков базы
+      setDbTracks(prev => {
+        const filtered = prev.filter(t => String(t.id) !== String(mappedTrack.id));
+        return [mappedTrack, ...filtered];
+      });
+
+      showToast('Трек сохранен в Мою Базу!');
+      setTrackToAddToDb(null);
+      setSelectedTagsForNewTrack([]);
+      setNewTagInput('');
+    }
   };
 
   const deleteTrackFromDb = async (trackId: string | number) => {
