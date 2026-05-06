@@ -16,8 +16,8 @@ export default function MyDatabaseTab({ dbTracks, dbTags, playingTrackId, toggle
   const [searchQuery, setSearchQuery] = useState('');
 
   // Фильтруем треки по активному тегу и строке поиска
-  const filteredTracks = dbTracks.filter(t => {
-    const matchesTag = activeTag ? t.tags?.includes(activeTag) : true;
+    const filteredTracks = dbTracks.filter(t => {
+    const matchesTag = activeTag ? (t.tags || []).includes(activeTag) : true;
     const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           t.artist.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesTag && matchesSearch;
