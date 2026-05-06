@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabase';
-import { Music, ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, Tag as TagIcon, X, Upload, UploadCloud, Loader2, Play, PauseCircle, SkipBack, SkipForward, MonitorPlay, EyeOff, Eye, Power, ListChecks, Shuffle, Trophy, SearchCheck, Printer, Calendar, Trash2, PlusCircle, FolderPlus, Flame, Search, Plus } from 'lucide-react';
+import { Music, ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, Loader2, X } from 'lucide-react';
 import { Track, Playlist, Game, Round, Template, BingoCard, Tag } from './types';
 
 // Вкладки
@@ -15,59 +15,42 @@ import PrintView from './components/screens/PrintView';
 import HostScreen from './components/screens/HostScreen';
 import Projector from './components/screens/Projector';
 
-// --- КОНСТАНТЫ ---
-const FILTERS =[
-  { name: 'Топ Чарт',     type: 'chart',  id: '0',   icon: 'flame' },
-  { name: 'Поп',          type: 'chart',  id: '132'                },
-  { name: 'Рок',          type: 'chart',  id: '152'                },
-  { name: 'Хип-Хоп',      type: 'chart',  id: '116'                },
-  { name: 'Электронная',  type: 'chart',  id: '106'                },
-  { name: 'R&B',          type: 'chart',  id: '165'                },
-  { name: 'Русские хиты', type: 'search', query: 'русские хиты'    },
-  { name: 'Дискотека 80х',type: 'search', query: 'disco 80s hits'  },
-];
-const ITEMS_PER_PAGE = 50;
-const COLORS = ['#ef4444', '#f97316', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#f43f5e'];
-
 export default function App() {
   const [activeTab, setActiveTab] = useState<'games' | 'playlists' | 'mydatabase' | 'global_search' | 'templates'>('games');
 
-  // Глобальные данные БД
-  const[playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [games, setGames] = useState<Game[]>([]);
-  const[templates, setTemplates] = useState<Template[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
   
-  // Моя База
-  const[dbTracks, setDbTracks] = useState<Track[]>([]);
+  const [dbTracks, setDbTracks] = useState<Track[]>([]);
   const [dbTags, setDbTags] = useState<Tag[]>([]);
 
-  // Плеер
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const[playingTrackId, setPlayingTrackId] = useState<string | number | null>(null);
+  const [playingTrackId, setPlayingTrackId] = useState<string | number | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isAutoPlay, setIsAutoPlay] = useState(false);
 
-  // Сессия ведущего
   const [hostSession, setHostSession] = useState<{ game: Game; round: Round; playlist: Playlist } | null>(null);
-  const[shuffledTracks, setShuffledTracks] = useState<Track[]>([]);
-  const[playedTrackIds, setPlayedTrackIds] = useState<Set<string | number>>(new Set());
-  const[currentHostTrackIndex, setCurrentHostTrackIndex] = useState<number>(0);
+  const [shuffledTracks, setShuffledTracks] = useState<Track[]>([]);
+  const [playedTrackIds, setPlayedTrackIds] = useState<Set<string | number>>(new Set());
+  const [currentHostTrackIndex, setCurrentHostTrackIndex] = useState<number>(0);
   const [hideTrackInfo, setHideTrackInfo] = useState(true);
   const [isProjectorMode, setIsProjectorMode] = useState(false);
   const [autoWinners, setAutoWinners] = useState<string[]>([]);
 
-  // Экраны печати и модалки
-  const[printViewCards, setPrintViewCards] = useState<{ cards: BingoCard[]; template: Template } | null>(null);
-  const [trackToAdd, setTrackToAdd] = useState<Track | null>(null); // Модалка для добавления в плейлист
+  const [printViewCards, setPrintViewCards] = useState<{ cards: BingoCard[]; template: Template } | null>(null);
+  const [trackToAdd, setTrackToAdd] = useState<Track | null>(null); 
   const [toast, setToast] = useState<string | null>(null);
 
-  // Стейты для модалки сохранения в БД
+  // Стейты модалки сохранения/редактирования
   const [trackToAddToDb, setTrackToAddToDb] = useState<Track | null>(null);
+  const [editedTitle, setEditedTitle] = useState('');
+  const [editedArtist, setEditedArtist] = useState('');
+  const [customFile, setCustomFile] = useState<File | null>(null);
   const [selectedTagsForNewTrack, setSelectedTagsForNewTrack] = useState<string[]>([]);
   const [newTagInput, setNewTagInput] = useState('');
-  const [isUploadingMp3, setIsUploadingMp3] = useState(false); // Для отслеживания загрузки MP3
-  const [offlineProgress, setOfflineProgress] = useState<{ current: number; total: number } | null>(null); // Прогресс кеширования
+  const [isUploadingMp3, setIsUploadingMp3] = useState(false);
 
   useEffect(() => {
     fetchPlaylists();
@@ -78,18 +61,28 @@ export default function App() {
     const savedSessionStr = localStorage.getItem('muzbingo_host_session');
     if (savedSessionStr) {
       try {
-        const parsed = JSON.JSON.parse(savedSessionStr);
+        const parsed = JSON.parse(savedSessionStr);
         if (parsed?.hostSession) {
           setHostSession(parsed.hostSession);
-          setShuffledTracks(parsed.shuffledTracks ||[]);
-          setPlayedTrackIds(new Set(parsed.playedTrackIds ||[]));
+          setShuffledTracks(parsed.shuffledTracks || []);
+          setPlayedTrackIds(new Set(parsed.playedTrackIds || []));
           setCurrentHostTrackIndex(parsed.currentHostTrackIndex || 0);
           setHideTrackInfo(parsed.hideTrackInfo ?? true);
           showToast('Игра восстановлена после обновления страницы!');
         }
       } catch (e) { localStorage.removeItem('muzbingo_host_session'); }
     }
-  },[]);
+  }, []);
+
+  useEffect(() => {
+    if (trackToAddToDb) {
+      setEditedTitle(trackToAddToDb.title);
+      setEditedArtist(trackToAddToDb.artist);
+    } else {
+      setEditedTitle('');
+      setEditedArtist('');
+    }
+  }, [trackToAddToDb]);
 
   useEffect(() => {
     if (hostSession) {
@@ -99,7 +92,7 @@ export default function App() {
     } else {
       localStorage.removeItem('muzbingo_host_session');
     }
-  },[hostSession, shuffledTracks, playedTrackIds, currentHostTrackIndex, hideTrackInfo]);
+  }, [hostSession, shuffledTracks, playedTrackIds, currentHostTrackIndex, hideTrackInfo]);
 
   useEffect(() => {
     if (!hostSession?.round.cards || playedTrackIds.size === 0) return setAutoWinners([]);
@@ -115,7 +108,7 @@ export default function App() {
       return false;
     });
     setAutoWinners(winners.map(w => w.id));
-  },[playedTrackIds, hostSession]);
+  }, [playedTrackIds, hostSession]);
 
   const fetchPlaylists = async () => {
     const { data } = await supabase.from('playlists').select('*').order('created_at', { ascending: false });
@@ -218,85 +211,135 @@ export default function App() {
     },
   };
 
-  // --- ЛОГИКА СОХРАНЕНИЯ В "МОЮ БАЗУ" ---
+  // --- ЛОГИКА ТЕГОВ ---
   const handleAddTag = async (tagName: string) => {
     const name = tagName.trim();
     if (!name) return;
-    
     if (selectedTagsForNewTrack.some(t => t.toLowerCase() === name.toLowerCase())) {
-      setNewTagInput(''); return; // Уже выбран
+      setNewTagInput('');
+      return;
     }
-
     const existingDbTag = dbTags.find(t => t.name.toLowerCase() === name.toLowerCase());
-    
     if (existingDbTag) {
       setSelectedTagsForNewTrack([...selectedTagsForNewTrack, existingDbTag.name]);
     } else {
-      const { data, error } = await supabase
-        .from('tags')
-        .insert([{ name, color: COLORS[Math.floor(Math.random() * COLORS.length)] }])
-        .select();
-      
-      if (error) { console.error("Ошибка создания тега:", error); showToast('Не удалось создать тег'); } 
-      else if (data && data.length > 0) {
-        setDbTags(prev => [...prev, data[0]]);
-        setSelectedTagsForNewTrack(prev => [...prev, data[0].name]);
-      }
+      const colors = ['#ef4444', '#f97316', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#f43f5e'];
+      const randomColor = colors[Math.floor(Math.random() * colors.length)];
+      const { data, error } = await supabase.from('tags').insert([{ name, color: randomColor }]).select();
+      if (data) {
+         setDbTags([...dbTags, data[0]]);
+         setSelectedTagsForNewTrack([...selectedTagsForNewTrack, data[0].name]);
+      } else if (error) { showToast('Ошибка создания тега'); }
     }
-    setNewTagInput(''); // очищаем поле ввода
+    setNewTagInput('');
   };
 
+  // --- ЗАГРУЗКА И ПАРСИНГ КАСТОМНОГО ФАЙЛА ---
+  const handleUploadCustomFile = (file: File) => {
+    const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+    const parts = nameWithoutExt.split(' - ');
+    let artist = 'Свой трек';
+    let title = nameWithoutExt;
+    
+    if (parts.length > 1) {
+      artist = parts[0].trim();
+      title = parts.slice(1).join(' - ').trim();
+    }
+
+    setCustomFile(file);
+    setTrackToAddToDb({
+      id: `custom_pending_${Date.now()}`,
+      title: title,
+      artist: artist,
+      cover: 'https://placehold.co/400x400/8b5cf6/ffffff?text=MP3',
+      preview: '',
+      isCustom: true,
+      tags: []
+    });
+    setSelectedTagsForNewTrack([]);
+    setNewTagInput('');
+  };
+
+  // --- СОХРАНЕНИЕ / ОБНОВЛЕНИЕ ТРЕКА В БАЗУ ---
   const saveTrackToDb = async () => {
     if (!trackToAddToDb) return;
 
     let finalTags = [...selectedTagsForNewTrack];
-    const pendingTag = newTagInput.trim();
 
-    // Если в инпуте есть текст, добавляем его
+    // Подхватываем недописанный тег
+    const pendingTag = newTagInput.trim();
     if (pendingTag) {
       const existing = dbTags.find(t => t.name.toLowerCase() === pendingTag.toLowerCase());
       if (existing) {
         if (!finalTags.includes(existing.name)) finalTags.push(existing.name);
       } else {
+        const colors = ['#ef4444', '#f97316', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#f43f5e'];
         const { data: newTagData } = await supabase
           .from('tags')
-          .insert([{ name: pendingTag, color: COLORS[Math.floor(Math.random() * COLORS.length)] }])
+          .insert([{ name: pendingTag, color: colors[Math.floor(Math.random() * colors.length)] }])
           .select();
-        
         if (newTagData) {
           setDbTags(prev => [...prev, newTagData[0]]);
           finalTags.push(newTagData[0].name);
-        } else { showToast('Ошибка создания тега'); }
+        }
       }
     }
 
+    let previewUrl = trackToAddToDb.preview;
+    let safeId = String(trackToAddToDb.id);
+    let isCustomTrack = trackToAddToDb.isCustom || false;
+
+    // Загрузка MP3 на Storage, если есть файл
+    if (customFile) {
+      setIsUploadingMp3(true);
+      const ext = customFile.name.split('.').pop() || 'mp3';
+      const safeName = `custom_${Date.now()}.${ext}`;
+      
+      const { data, error: uploadError } = await supabase.storage
+        .from('audio-tracks')
+        .upload(safeName, customFile, { upsert: true });
+
+      if (uploadError) {
+        console.error(uploadError);
+        showToast('Ошибка загрузки файла');
+        setIsUploadingMp3(false);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage.from('audio-tracks').getPublicUrl(data.path);
+      previewUrl = urlData.publicUrl;
+      safeId = safeName;
+      isCustomTrack = true;
+    }
+
     const newTrackRow = {
-      id: String(trackToAddToDb.id),
-      title: trackToAddToDb.title,
-      artist: trackToAddToDb.artist,
+      id: safeId,
+      title: editedTitle.trim() || trackToAddToDb.title,
+      artist: editedArtist.trim() || trackToAddToDb.artist,
       cover: trackToAddToDb.cover,
-      preview: trackToAddToDb.preview,
-      is_custom: false,
+      preview: previewUrl,
+      is_custom: isCustomTrack,
       tags: finalTags
     };
 
     const { data, error } = await supabase.from('tracks').upsert(newTrackRow).select();
-    if (error) { showToast('Ошибка сохранения: ' + error.message); return; }
+    setIsUploadingMp3(false);
+
+    if (error) { showToast('Ошибка сохранения'); return; }
     
     if (data) {
-       const saved = data[0];
-       const mappedTrack: Track = {
-         id: saved.id, title: saved.title, artist: saved.artist,
-         cover: saved.cover, preview: saved.preview, 
-         isCustom: saved.is_custom, tags: saved.tags || []
-       };
        setDbTracks(prev => {
-         const filtered = prev.filter(t => String(t.id) !== String(mappedTrack.id));
-         return [mappedTrack, ...filtered];
+         const filtered = prev.filter(t => String(t.id) !== String(data[0].id));
+         const addedTrack: Track = {
+           id: data[0].id, title: data[0].title, artist: data[0].artist,
+           cover: data[0].cover, preview: data[0].preview, isCustom: data[0].is_custom, tags: data[0].tags
+         };
+         return [addedTrack, ...filtered];
        });
-       showToast('Трек сохранен в Мою Базу!');
+       showToast('Трек сохранен!');
     }
     setTrackToAddToDb(null);
+    setCustomFile(null);
     setSelectedTagsForNewTrack([]);
     setNewTagInput('');
   };
@@ -305,40 +348,7 @@ export default function App() {
     if (!confirm('Удалить трек из вашей Базы?')) return;
     await supabase.from('tracks').delete().eq('id', String(trackId));
     setDbTracks(prev => prev.filter(t => String(t.id) !== String(trackId)));
-    showToast('Трек удален из базы');
-  };
-
-  // --- ЗАГРУЗКА MP3 ФАЙЛОВ ---
-  const uploadCustomTracks = async (e: React.ChangeEvent<HTMLInputElement>, playlistId: string) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    setIsUploadingMp3(true);
-    const playlist = playlists.find(p => p.id === playlistId);
-    if (!playlist) return;
-    let newTracks = [...playlist.tracks];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const ext = file.name.split('.').pop() || 'mp3';
-      const safeName = `custom_${Date.now()}_${i}.${ext}`;
-      try {
-        const { data, error } = await supabase.storage.from('audio-tracks').upload(safeName, file, { upsert: true });
-        if (error) throw error;
-        const { data: urlData } = supabase.storage.from('audio-tracks').getPublicUrl(data.path);
-        
-        // !!! НОВЫЙ ФУНКЦИОНАЛ: сразу открываем модалку для добавления в Базу !!!
-        setTrackToAddToDb({
-          id: safeName, title: file.name.replace(`.${ext}`, ''), artist: 'Неизвестен', 
-          cover: 'https://placehold.co/400x400/8b5cf6/ffffff?text=MP3',
-          preview: urlData.publicUrl, isCustom: true, tags: []
-        });
-        setSelectedTagsForNewTrack([]); // Сбрасываем теги для нового трека
-        setNewTagInput('');
-        // --- КОНЕЦ НОВОГО ФУНКЦИОНАЛА ---
-      } catch (err: any) { showToast(`Ошибка загрузки ${file.name}: ${err.message}`); }
-    }
-    // Сбрасываем инпут, чтобы можно было загрузить те же файлы повторно
-    e.target.value = ''; 
-    setIsUploadingMp3(false);
+    showToast('Трек удален');
   };
 
   if (printViewCards) return <PrintView printViewCards={printViewCards} setPrintViewCards={setPrintViewCards} />;
@@ -390,60 +400,117 @@ export default function App() {
 
       <main className="flex-1 overflow-hidden p-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-gray-900 via-gray-950 to-gray-950">
         {activeTab === 'games' && <GamesTab games={games} setGames={setGames} playlists={playlists} templates={templates} showToast={showToast} startHostSession={startHostSession} setPrintViewCards={setPrintViewCards} />}
-        {activeTab === 'mydatabase' && <MyDatabaseTab dbTracks={dbTracks} dbTags={dbTags} playingTrackId={playingTrackId} togglePlay={togglePlay} setTrackToAdd={setTrackToAdd} deleteTrackFromDb={deleteTrackFromDb} />}
-        {activeTab === 'global_search' && <GlobalSearchTab playingTrackId={playingTrackId} togglePlay={togglePlay} setTrackToAddToDb={(t) => { setTrackToAddToDb(t); setSelectedTagsForNewTrack([]); setNewTagInput(''); }} setTrackToAdd={setTrackToAdd} />}
+        {activeTab === 'mydatabase' && (
+          <MyDatabaseTab 
+            dbTracks={dbTracks} dbTags={dbTags} playingTrackId={playingTrackId} togglePlay={togglePlay} 
+            setTrackToAdd={setTrackToAdd} deleteTrackFromDb={deleteTrackFromDb} 
+            onUploadCustomFile={handleUploadCustomFile}
+            onEditTrack={(track) => {
+              setTrackToAddToDb(track);
+              setSelectedTagsForNewTrack(track.tags || []);
+              setNewTagInput('');
+            }}
+          />
+        )}
+        {activeTab === 'global_search' && (
+          <GlobalSearchTab 
+            playingTrackId={playingTrackId} togglePlay={togglePlay} setTrackToAdd={setTrackToAdd} 
+            setTrackToAddToDb={(t) => { setTrackToAddToDb(t); setSelectedTagsForNewTrack([]); setNewTagInput(''); }} 
+          />
+        )}
         {activeTab === 'playlists' && <PlaylistsTab playlists={playlists} setPlaylists={setPlaylists} playingTrackId={playingTrackId} togglePlay={togglePlay} showToast={showToast} />}
         {activeTab === 'templates' && <TemplatesTab templates={templates} setTemplates={setTemplates} showToast={showToast} />}
       </main>
 
-      {/* --- МОДАЛКА: СОХРАНЕНИЕ ТРЕКА В БАЗУ --- */}
+      {/* --- МОДАЛКА: СОХРАНЕНИЕ / РЕДАКТИРОВАНИЕ ТРЕКА В БАЗУ --- */}
       {trackToAddToDb && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4 animate-in fade-in">
           <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold flex items-center gap-2"><Database size={20} className="text-purple-400"/> Сохранить в Базу</h3><button onClick={() => setTrackToAddToDb(null)} className="text-gray-400"><X size={24}/></button></div>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold flex items-center gap-2">
+                <Database size={20} className="text-purple-400"/> 
+                {customFile ? 'Загрузка MP3' : 'Сохранить в Базу'}
+              </h3>
+              <button onClick={() => { setTrackToAddToDb(null); setCustomFile(null); }} className="text-gray-400"><X size={24}/></button>
+            </div>
+            
             <div className="flex items-center gap-4 mb-6 p-4 bg-gray-950 rounded-xl">
-              <img src={trackToAddToDb.cover} className="w-12 h-12 rounded-md" alt="" />
-              <div className="overflow-hidden">
-                <p className="font-bold truncate">{trackToAddToDb.title}</p>
-                <p className="text-sm text-gray-400 truncate">{trackToAddToDb.artist}</p>
+              <img src={trackToAddToDb.cover} className="w-14 h-14 rounded-md object-cover" alt="" />
+              <div className="overflow-hidden flex-1 space-y-2">
+                {/* РЕДАКТИРУЕМЫЕ ПОЛЯ */}
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest font-bold text-gray-500 mb-0.5">Название трека</label>
+                  <input 
+                    type="text" 
+                    value={editedTitle} 
+                    onChange={e => setEditedTitle(e.target.value)} 
+                    className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-sm text-white focus:border-purple-500 outline-none"
+                    placeholder="Название трека"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest font-bold text-gray-500 mb-0.5">Исполнитель</label>
+                  <input 
+                    type="text" 
+                    value={editedArtist} 
+                    onChange={e => setEditedArtist(e.target.value)} 
+                    className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-sm text-white focus:border-purple-500 outline-none"
+                    placeholder="Исполнитель"
+                  />
+                </div>
               </div>
             </div>
             
             <div className="mb-8">
-              <label className="block text-sm font-bold text-gray-400 mb-3">Жанр или категория:</label>
-              <div className="flex flex-wrap gap-2 mb-4 max-h-32 overflow-y-auto custom-scrollbar pr-1">
-                {dbTags.map(tag => {
-                  const isSelected = selectedTagsForNewTrack.includes(tag.name);
-                  return (
-                    <button key={tag.id} onClick={() => {
-                      if (isSelected) setSelectedTagsForNewTrack(prev => prev.filter(t => t !== tag.name));
-                      else setSelectedTagsForNewTrack([...selectedTagsForNewTrack, tag.name]);
-                    }} className={`px-3 py-1.5 border rounded-lg text-sm font-medium transition ${isSelected ? 'bg-purple-600 border-purple-500 text-white shadow-lg' : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'}`}>
-                      {tag.name}
-                    </button>
-                  );
-                })}
+              <label className="block text-sm font-bold text-gray-400 mb-2">Жанр или категория:</label>
+              
+              <div className="flex flex-wrap gap-2 mb-3 bg-gray-950 p-3 rounded-xl border border-gray-800 items-center min-h-[50px]">
+                {selectedTagsForNewTrack.map(tag => (
+                  <span key={tag} className="flex items-center gap-1 px-2.5 py-1 bg-purple-600 text-white rounded-lg text-xs font-medium shadow-md">
+                    {tag}
+                    <button onClick={() => setSelectedTagsForNewTrack(prev => prev.filter(t => t !== tag))} className="hover:text-red-300 transition ml-1"><X size={12} /></button>
+                  </span>
+                ))}
+                <input 
+                  type="text" 
+                  value={newTagInput} 
+                  onChange={e => setNewTagInput(e.target.value)} 
+                  placeholder={selectedTagsForNewTrack.length === 0 ? "Напишите тег и нажмите Enter..." : "Добавить еще..."}
+                  className="flex-1 bg-transparent border-none outline-none text-sm min-w-[150px] text-white" 
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(newTagInput); } }} 
+                />
               </div>
-              <div className="flex gap-2">
-                <input type="text" value={newTagInput} onChange={e => setNewTagInput(e.target.value)} placeholder={selectedTagsForNewTrack.length === 0 ? "Напишите тег и нажмите Enter..." : "Добавить еще..."} className="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm focus:border-purple-500 outline-none" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(newTagInput); } }} />
-                <button onClick={() => handleAddTag(newTagInput)} className="bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg transition" title="Создать тег"><TagIcon size={18} className="text-gray-400" /></button>
-              </div>
+
+              {dbTags.length > 0 && (
+                <>
+                  <div className="text-xs text-gray-500 mb-2 font-medium">Или выберите из существующих:</div>
+                  <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto custom-scrollbar pr-1">
+                    {dbTags.filter(t => !selectedTagsForNewTrack.includes(t.name)).map(tag => (
+                      <button key={tag.id} onClick={() => handleAddTag(tag.name)} className="px-3 py-1 bg-gray-800 border border-gray-700 rounded-lg text-xs font-medium text-gray-400 hover:border-gray-500 hover:text-gray-200 transition">
+                        + {tag.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex gap-4">
-              <button onClick={() => setTrackToAddToDb(null)} className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 transition rounded-xl font-bold">Отмена</button>
-              <button onClick={saveTrackToDb} className="flex-1 py-3 bg-purple-600 hover:bg-purple-500 transition rounded-xl font-bold shadow-lg shadow-purple-900/30">В Мою Базу</button>
+              <button onClick={() => { setTrackToAddToDb(null); setCustomFile(null); }} disabled={isUploadingMp3} className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 transition rounded-xl font-bold disabled:opacity-50">Отмена</button>
+              <button onClick={saveTrackToDb} disabled={isUploadingMp3 || !editedTitle.trim() || !editedArtist.trim()} className="flex-1 py-3 bg-purple-600 hover:bg-purple-500 transition rounded-xl font-bold shadow-lg shadow-purple-900/30 flex items-center justify-center gap-2 disabled:opacity-50">
+                {isUploadingMp3 ? <Loader2 size={18} className="animate-spin" /> : 'В Мою Базу'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* --- МОДАЛКА ДОБАВЛЕНИЯ В ПЛЕЙЛИСТ (Вызывается из Глобального поиска или Моей Базы) --- */}
+      {/* --- МОДАЛКА ДОБАВЛЕНИЯ В ПЛЕЙЛИСТ --- */}
       {trackToAdd && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[50] p-4">
           <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6">
             <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold">Добавить в плейлист</h3><button onClick={() => setTrackToAdd(null)} className="text-gray-400 hover:text-white"><X size={24}/></button></div>
-            <div className="flex items-center gap-4 mb-6 p-4 bg-gray-950 rounded-xl"><img src={trackToAdd.cover} className="w-12 h-12 rounded-md" alt="" /><div className="overflow-hidden"><p className="font-bold truncate">{trackToAdd.title}</p><p className="text-sm text-gray-400">{trackToAdd.artist}</p></div></div>
+            <div className="flex items-center gap-4 mb-6 p-4 bg-gray-950 rounded-xl"><img src={trackToAdd.cover} className="w-12 h-12 rounded-md object-cover" alt="" /><div className="overflow-hidden"><p className="font-bold truncate">{trackToAdd.title}</p><p className="text-sm text-gray-400">{trackToAdd.artist}</p></div></div>
             {playlists.length === 0 ? (
                <div className="text-center py-6 text-gray-500">Нет плейлистов. Создайте их во вкладке "Плейлисты".</div>
             ) : (
@@ -452,12 +519,12 @@ export default function App() {
                 return (
                   <button key={p.id} onClick={async () => {
                     if (isAdded) return;
-                    const newTracks =[...p.tracks, trackToAdd];
+                    const newTracks = [...p.tracks, trackToAdd];
                     setPlaylists(playlists.map(pl => pl.id === p.id ? { ...pl, tracks: newTracks } : pl));
                     await supabase.from('playlists').update({ tracks: newTracks }).eq('id', p.id);
                     showToast('Трек добавлен!');
                     setTrackToAdd(null);
-                  }} disabled={isAdded} className={`flex justify-between p-4 rounded-xl border text-left ${isAdded ? 'bg-gray-800/50 border-gray-800 opacity-50' : 'bg-gray-800 hover:border-purple-500'}`}>
+                  }} disabled={isAdded} className={`flex justify-between p-4 rounded-xl border text-left ${isAdded ? 'bg-gray-800/50 border-gray-800 opacity-50' : 'bg-gray-800 border-gray-700 hover:border-purple-500'}`}>
                     <span className="font-bold truncate pr-4">{p.name}</span>
                     <span className="text-xs text-gray-400 whitespace-nowrap">
                       {p.tracks.some(t => t.id === trackToAdd.id) ? 'Уже добавлен' : p.tracks.some(t => t.artist.toLowerCase() === trackToAdd.artist.toLowerCase()) ? `Исполнитель есть` : `${p.tracks.length} треков`}
@@ -469,6 +536,7 @@ export default function App() {
           </div>
         </div>
       )}
+
     </div>
   );
 }
