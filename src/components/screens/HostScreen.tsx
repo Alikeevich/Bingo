@@ -134,8 +134,11 @@ export default function HostScreen(props: HostScreenProps) {
                   <button onClick={() => props.playHostTrack(props.currentHostTrackIndex - 1)} disabled={props.currentHostTrackIndex === 0} className="w-14 h-14 bg-gray-800 rounded-full flex items-center justify-center text-white hover:bg-gray-700 disabled:opacity-30 transition"><SkipBack size={28} /></button>
                   <button
                     onClick={() => {
-                      if (isPlaying) { props.audioRef.current?.pause(); props.togglePlay(currentTrack); } // Trigger pause in App
-                      else { props.playHostTrack(props.currentHostTrackIndex); }
+                      if (isPlaying) { 
+                        props.togglePlay(currentTrack); 
+                      } else { 
+                        props.playHostTrack(props.currentHostTrackIndex); 
+                      }
                     }}
                     className={`w-20 h-20 rounded-full flex items-center justify-center text-white transition transform hover:scale-105 shadow-2xl ${isPlaying ? 'bg-orange-600 shadow-orange-900/40' : 'bg-purple-600 shadow-purple-900/40'}`}
                   >
