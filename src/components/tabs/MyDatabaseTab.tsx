@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Track, Tag } from '../../types';
-import { PlayCircle, PauseCircle, Plus, Trash2, Tags, Music, Search } from 'lucide-react';
+import { PlayCircle, PauseCircle, Plus, Trash2, Tags, Search, Edit3, UploadCloud } from 'lucide-react';
 
 interface MyDatabaseTabProps {
   dbTracks: Track[];
@@ -9,14 +9,18 @@ interface MyDatabaseTabProps {
   togglePlay: (track: Track) => void;
   setTrackToAdd: (track: Track) => void; // Добавляет в плейлист
   deleteTrackFromDb: (id: string | number) => void;
+  onUploadCustomFile: (file: File) => void; // Клик по загрузке файла
+  onEditTrack: (track: Track) => void;       // Клик по редактированию
 }
 
-export default function MyDatabaseTab({ dbTracks, dbTags, playingTrackId, togglePlay, setTrackToAdd, deleteTrackFromDb }: MyDatabaseTabProps) {
+export default function MyDatabaseTab({ 
+  dbTracks, dbTags, playingTrackId, togglePlay, setTrackToAdd, deleteTrackFromDb, onUploadCustomFile, onEditTrack 
+}: MyDatabaseTabProps) {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Фильтруем треки по активному тегу и строке поиска
-    const filteredTracks = dbTracks.filter(t => {
+  const filteredTracks = dbTracks.filter(t => {
     const matchesTag = activeTag ? (t.tags || []).includes(activeTag) : true;
     const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           t.artist.toLowerCase().includes(searchQuery.toLowerCase());
@@ -30,9 +34,27 @@ export default function MyDatabaseTab({ dbTracks, dbTags, playingTrackId, toggle
           <h1 className="text-3xl font-bold mb-2">Моя База Музыки</h1>
           <p className="text-gray-400">Сохранённые вами треки. Выбирайте их для создания плейлистов.</p>
         </div>
-        <div className="text-right">
-          <div className="text-2xl font-black text-purple-400">{dbTracks.length}</div>
-          <div className="text-xs text-gray-500 uppercase tracking-widest font-bold">Всего треков</div>
+        
+        {/* КНОПКА ЗАГРУЗКИ MP3 И СЧЕТЧИК */}
+        <div className="flex items-center gap-4">
+          <label className="bg-purple-600 hover:bg-purple-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 cursor-pointer transition shadow-lg shrink-0">
+            <UploadCloud size={20} />
+            <span>Загрузить свой MP3</span>
+            <input 
+              type="file" 
+              accept="audio/mpeg,audio/mp3,audio/wav" 
+              className="hidden" 
+              onChange={e => {
+                const file = e.target.files?.[0];
+                if (file) onUploadCustomFile(file);
+                e.target.value = ''; // сброс инпута
+              }} 
+            />
+          </label>
+          <div className="text-right shrink-0">
+            <div className="text-2xl font-black text-purple-400">{dbTracks.length}</div>
+            <div className="text-xs text-gray-500 uppercase tracking-widest font-bold">Всего треков</div>
+          </div>
         </div>
       </div>
 
@@ -60,7 +82,7 @@ export default function MyDatabaseTab({ dbTracks, dbTags, playingTrackId, toggle
           <div className="flex flex-col items-center justify-center py-20 text-gray-500 bg-gray-900/30 rounded-3xl border border-dashed border-gray-800">
             <Tags size={48} className="mb-4 opacity-30" />
             <p className="text-lg font-medium">Ваша база пуста</p>
-            <p className="text-sm">Используйте Глобальный Поиск, чтобы найти и сохранить треки.</p>
+            <p className="text-sm">Загрузите свои MP3 файлы или найдите треки через Глобальный Поиск.</p>
           </div>
         ) : filteredTracks.length === 0 ? (
           <div className="text-center py-10 text-gray-500">По вашему запросу ничего не найдено.</div>
@@ -77,16 +99,17 @@ export default function MyDatabaseTab({ dbTracks, dbTags, playingTrackId, toggle
                   <div className="flex-1 overflow-hidden">
                     <h4 className={`font-bold truncate text-sm ${isPlaying ? 'text-purple-400' : 'text-white'}`}>{track.title}</h4>
                     <p className="text-xs text-gray-400 truncate mb-1">{track.artist}</p>
-                    {/* Бейджики тегов */}
                     <div className="flex flex-wrap gap-1">
-                      {track.tags?.slice(0, 2).map((t, i) => (
+                      {track.isCustom && <span className="text-[8px] bg-purple-500/20 text-purple-400 px-1 rounded uppercase font-bold tracking-wider">MP3</span>}
+                      {track.tags?.slice(0, 1).map((t, i) => (
                         <span key={i} className="text-[9px] bg-gray-800 text-gray-300 px-1.5 py-0.5 rounded truncate max-w-[60px]">{t}</span>
                       ))}
-                      {(track.tags?.length || 0) > 2 && <span className="text-[9px] bg-gray-800 text-gray-500 px-1 rounded">+{track.tags!.length - 2}</span>}
+                      {(track.tags?.length || 0) > 1 && <span className="text-[9px] bg-gray-800 text-gray-500 px-1 rounded">+{track.tags!.length - 1}</span>}
                     </div>
                   </div>
                   <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => setTrackToAdd(track)} className="p-1.5 bg-purple-600 rounded-lg hover:bg-purple-500 transition text-white" title="Добавить в плейлист"><Plus size={16} /></button>
+                    <button onClick={() => onEditTrack(track)} className="p-1.5 bg-gray-800 rounded-lg hover:bg-purple-500 hover:text-white transition text-gray-400" title="Редактировать"><Edit3 size={16} /></button>
                     <button onClick={() => deleteTrackFromDb(track.id)} className="p-1.5 bg-gray-800 rounded-lg hover:bg-red-500/20 hover:text-red-400 transition text-gray-400" title="Удалить из Базы"><Trash2 size={16} /></button>
                   </div>
                 </div>
