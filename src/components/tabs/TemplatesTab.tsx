@@ -93,28 +93,26 @@ export default function TemplatesTab({ templates, setTemplates, showToast }: Tem
     }
   };
 
-  const layoutNum = parseInt(editingTemplate.config?.layout || '1') as 1 | 2 | 4;
+const layoutNum = parseInt(editingTemplate.config?.layout || '1') as 1 | 2 | 4;
+  const isLandscape = layoutNum === 2; // Если формат 2 -> лист альбомный
   const g = ZONES[layoutNum];
   const p = ZONES.PAD;
   
-  // Жестко блокируем размеры самого А4 листа, чтобы flexbox родителя не смог его сжать
   const pageStyle: React.CSSProperties = {
-    width: '210mm',
-    minWidth: '210mm',
-    maxWidth: '210mm',
-    height: '297mm',
-    minHeight: '297mm',
-    maxHeight: '297mm',
+    // Размеры листа меняются местами для Landscape
+    width: isLandscape ? '297mm' : '210mm',
+    height: isLandscape ? '210mm' : '297mm',
     backgroundColor: 'white',
     overflow: 'hidden',
     padding: '10mm',
     gap: '10mm',
     boxSizing: 'border-box',
-    flexShrink: 0,
     ...(layoutNum === 1
       ? { display: 'flex', flexDirection: 'column' }
       : layoutNum === 2
-      ? { display: 'grid', gridTemplateColumns: '1fr', gridTemplateRows: '1fr 1fr' }
+      // Две колонки, одна строка
+      ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr' }
+      // Две колонки, две строки
       : { display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' }),
   };
 
