@@ -449,26 +449,35 @@ export default function App() {
     return urlData.publicUrl;
   };
 
-  const downloadDesignGuide = () => {
+const downloadDesignGuide = () => {
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="2480" height="3508" viewBox="0 0 2480 3508">
-        <rect width="2480" height="3508" fill="#e5e7eb" />
-        <!-- Title Area -->
-        <rect x="200" y="200" width="2080" height="300" fill="#fca5a5" opacity="0.5" />
-        <text x="1240" y="380" font-family="sans-serif" font-size="100" font-weight="bold" text-anchor="middle" fill="#991b1b">ЗОНА ЗАГОЛОВКА</text>
-        <!-- Grid Area -->
-        <rect x="200" y="700" width="2080" height="2080" fill="#86efac" opacity="0.5" />
-        <text x="1240" y="1680" font-family="sans-serif" font-size="100" font-weight="bold" text-anchor="middle" fill="#166534">СЕТКА ДЛЯ ТРЕКОВ</text>
-        <text x="1240" y="1820" font-family="sans-serif" font-size="70" font-weight="bold" text-anchor="middle" fill="#166534">(ОСТАВЬТЕ ЗОНУ СВЕТЛОЙ)</text>
-        <!-- Footer / ID Area -->
-        <rect x="200" y="2950" width="600" height="120" fill="#fcd34d" opacity="0.5" rx="15" />
-        <text x="500" y="3025" font-family="sans-serif" font-size="50" font-weight="bold" text-anchor="middle" fill="#854d0e">ID И ПОДВАЛ</text>
-        <!-- QR Area -->
-        <rect x="2080" y="2900" width="200" height="200" fill="#93c5fd" opacity="0.5" rx="15" />
-        <text x="2180" y="3015" font-family="sans-serif" font-size="40" font-weight="bold" text-anchor="middle" fill="#1e3a8a">QR</text>
-        <!-- Instructions -->
-        <text x="1240" y="100" font-family="sans-serif" font-size="60" font-weight="bold" text-anchor="middle" fill="#374151">MuzBingo Guide: 2480x3508 px (A4, 300dpi). Сохранять в PNG/JPG.</text>
-        <text x="1240" y="3400" font-family="sans-serif" font-size="40" text-anchor="middle" fill="#374151">Приложение само наложит тексты, сетку и QR код поверх вашего дизайна</text>
+        <!-- Paper Background -->
+        <rect width="2480" height="3508" fill="#f3f4f6" />
+        
+        <!-- Print Margins (Суммарный отступ 14.2mm = 170px) -->
+        <rect x="170" y="170" width="2140" height="3168" fill="none" stroke="#9ca3af" stroke-width="4" stroke-dasharray="20,20" />
+        <text x="1240" y="140" font-family="sans-serif" font-size="40" font-weight="bold" text-anchor="middle" fill="#6b7280">ГРАНИЦА КОНТЕНТА (ЗА НЕЕ НИЧЕГО НЕ ВЫЛЕЗЕТ)</text>
+
+        <!-- Title Area (text-5xl + pb-4) -->
+        <rect x="170" y="170" width="2140" height="200" fill="#fca5a5" opacity="0.6" rx="20" />
+        <text x="1240" y="295" font-family="sans-serif" font-size="90" font-weight="black" font-style="italic" text-anchor="middle" fill="#991b1b">ЗАГОЛОВОК (TITLE)</text>
+
+        <!-- Grid Area (flex-1) -->
+        <rect x="170" y="450" width="2140" height="2638" fill="#86efac" opacity="0.6" rx="20" />
+        <text x="1240" y="1700" font-family="sans-serif" font-size="120" font-weight="black" text-anchor="middle" fill="#166534">СЕТКА ТРЕКОВ (5x5)</text>
+        <text x="1240" y="1820" font-family="sans-serif" font-size="70" font-weight="bold" text-anchor="middle" fill="#166534">(Оставьте эту зону нейтральной/читаемой)</text>
+
+        <!-- ID & Footer Text Area (items-end) -->
+        <rect x="170" y="3218" width="450" height="120" fill="#fcd34d" opacity="0.6" rx="15" />
+        <text x="395" y="3295" font-family="sans-serif" font-size="50" font-weight="bold" text-anchor="middle" fill="#854d0e">ID И ПОДВАЛ</text>
+
+        <!-- QR Code Area (w-16 h-16) -->
+        <rect x="2110" y="3138" width="200" height="200" fill="#93c5fd" opacity="0.6" rx="20" />
+        <text x="2210" y="3255" font-family="sans-serif" font-size="50" font-weight="bold" text-anchor="middle" fill="#1e3a8a">QR</text>
+
+        <!-- Instructions overlay -->
+        <text x="1240" y="3460" font-family="sans-serif" font-size="50" font-weight="bold" text-anchor="middle" fill="#374151">Размер холста: 2480x3508 px (A4, 300dpi). Дизайнер рисует только фон.</text>
       </svg>
     `;
     const blob = new Blob([svg], { type: 'image/svg+xml' });
