@@ -103,6 +103,7 @@ export default function App() {
   const [totalResults, setTotalResults] = useState(0);
   const [activeFilterRef, setActiveFilterRef] = useState<typeof FILTERS[0] | null>(null);
   const ITEMS_PER_PAGE = 50;
+  const activeQueryRef = useRef<{ type: 'chart'; id: string; name: string } | { type: 'search'; query: string; name: string } | null>(null);
   const [activeFilter, setActiveFilter] = useState('Топ Чарт');
   const [isUploadingMp3, setIsUploadingMp3] = useState(false);
   const [offlineProgress, setOfflineProgress] = useState<{ current: number; total: number } | null>(null);
