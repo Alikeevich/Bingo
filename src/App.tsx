@@ -245,7 +245,7 @@ export default function App() {
         {activeTab === 'templates' && <TemplatesTab templates={templates} setTemplates={setTemplates} showToast={showToast} />}
       </main>
 
-      {/* Модалка добавления трека в плейлист (Глобальная для поиска и базы) */}
+      {/* Модалка добавления трека в плейлист (Глобальная) */}
       {trackToAdd && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6">
@@ -255,22 +255,30 @@ export default function App() {
                <div className="text-center py-6">Нет плейлистов. Создайте их во вкладке "Плейлисты".</div>
             ) : (
               <div className="max-h-60 overflow-y-auto pr-2 flex flex-col gap-2">{playlists.map(p => { 
-                const isAdded = p.tracks.some(t => t.id === trackToAdd.id); 
+                const isAdded = p.tracks.some(
+                  t => t.id === trackToAdd.id || t.artist.toLowerCase() === trackToAdd.artist.toLowerCase()
+                ); 
                 return (
                   <button key={p.id} onClick={async () => {
                     if (isAdded) return;
-                    const newTracks =[...p.tracks, trackToAdd];
+                    const newTracks = [...p.tracks, trackToAdd];
                     setPlaylists(playlists.map(pl => pl.id === p.id ? { ...pl, tracks: newTracks } : pl));
                     await supabase.from('playlists').update({ tracks: newTracks }).eq('id', p.id);
                     showToast('Трек добавлен!');
                     setTrackToAdd(null);
-                  }} disabled={isAdded} className={`flex justify-between p-4 rounded-xl border text-left ${isAdded ? 'bg-gray-800/50 opacity-50' : 'bg-gray-800 hover:border-purple-500'}`}><span className="font-bold truncate pr-4">{p.name}</span><span className="text-xs text-gray-400">{isAdded ? 'Добавлен' : `${p.tracks.length} треков`}</span></button>
+                  }} disabled={isAdded} className={`flex justify-between p-4 rounded-xl border text-left ${isAdded ? 'bg-gray-800/50 border-gray-800 opacity-50' : 'bg-gray-800 hover:border-purple-500'}`}>
+                    <span className="font-bold truncate pr-4">{p.name}</span>
+                    <span className="text-xs text-gray-400 whitespace-nowrap">
+                      {p.tracks.some(t => t.id === trackToAdd.id)
+                        ? 'Уже добавлен'
+                        : p.tracks.some(t => t.artist.toLowerCase() === trackToAdd.artist.toLowerCase())
+                          ? `Исполнитель есть`
+                          : `${p.tracks.length} треков`}
+                    </span>
+                  </button>
                 ); 
               })}</div>
             )}
           </div>
         </div>
       )}
-    </div>
-  );
-}
