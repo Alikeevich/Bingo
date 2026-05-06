@@ -101,7 +101,6 @@ export default function App() {
   const [isSearching, setIsSearching] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalResults, setTotalResults] = useState(0);
-  const [activeFilterRef, setActiveFilterRef] = useState<typeof FILTERS[0] | null>(null);
   const ITEMS_PER_PAGE = 50;
   const activeQueryRef = useRef<{ type: 'chart'; id: string; name: string } | { type: 'search'; query: string; name: string } | null>(null);
   const [activeFilter, setActiveFilter] = useState('Топ Чарт');
