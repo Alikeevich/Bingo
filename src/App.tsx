@@ -470,7 +470,7 @@ export default function App() {
         <!-- БЛОК ID И ПОДВАЛ (Слева внизу, две строки текста) -->
         <rect x="150" y="3150" width="450" height="200" fill="#fcd34d" opacity="0.6" rx="15" />
         <text x="375" y="3240" font-family="sans-serif" font-size="60" font-weight="bold" text-anchor="middle" fill="#854d0e">ID: #1042</text>
-        <text x="375" y="3310" font-family="sans-serif" font-size="45" font-weight="bold" opacity="0.8" text-anchor="middle" fill="#854d0e">MuzBingo (Подвал)</text>
+        <text x="375" y="3310" font-family="sans-serif" font-size="45" font-weight="bold" opacity="0.8" text-anchor="middle" fill="#854d0e">MuzBingo</text>
 
         <!-- QR КОД (Справа внизу, прижат к той же нижней линии) -->
         <rect x="1980" y="3000" width="350" height="350" fill="#93c5fd" opacity="0.6" rx="20" />
