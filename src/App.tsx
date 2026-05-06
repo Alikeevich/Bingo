@@ -498,6 +498,10 @@ export default function App() {
     if (!trackToAdd) return;
     const playlist = playlists.find(p => p.id === playlistId);
     if (!playlist) return;
+    const artistExists = playlist.tracks.some(
+      t => t.artist.toLowerCase() === trackToAdd.artist.toLowerCase()
+    );
+    if (artistExists) return showToast(`Исполнитель "${trackToAdd.artist}" уже есть в плейлисте!`);
     const newTracks = [...playlist.tracks, trackToAdd];
     setPlaylists(playlists.map(p => p.id === playlistId ? { ...p, tracks: newTracks } : p));
     setTrackToAdd(null);
