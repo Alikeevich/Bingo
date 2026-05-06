@@ -635,7 +635,7 @@ export default function App() {
   }
 
   // ================= РЕНДЕР: ЭКРАН ВЕДУЩЕГО =================
-if (hostSession) {
+  if (hostSession) {
     const currentTrack = shuffledTracks[currentHostTrackIndex];
     const isPlaying = playingTrackId === currentTrack?.id;
 
@@ -659,112 +659,143 @@ if (hostSession) {
     }
 
     return (
-      <div className="fixed inset-0 bg-gray-950 text-white z-50 flex flex-col font-sans">
-        {/* Хедер */}
-        <div className="h-20 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-8 shrink-0">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-black">{hostSession.game.name} / {hostSession.round.name}</h2>
+      <div className="fixed inset-0 bg-gray-950 text-white z-50 flex flex-col font-sans animate-in zoom-in-95 duration-300">
+        {/* АУДИО ЭЛЕМЕНТ — обязателен в каждой ветке раннего return */}
+        <audio ref={audioRef} preload="auto" crossOrigin="anonymous" {...audioHandlers} />
+
+        {autoWinners.length > 0 && (
+          <div className="absolute top-24 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-green-500 text-white px-8 py-3 rounded-full font-black text-2xl shadow-[0_0_50px_rgba(34,197,94,0.5)] z-[150] animate-bounce cursor-pointer hover:scale-105 transition" onClick={() => setAutoWinners([])}>
+            <PartyPopper size={28} /> ЕСТЬ БИНГО: {autoWinners.join(', ')}!
           </div>
-          <div className="flex gap-4">
-             <button onClick={() => setIsProjectorMode(true)} className="bg-blue-600 px-6 py-2.5 rounded-xl font-bold flex items-center gap-2"><MonitorPlay size={20}/> Проектор</button>
-             <button onClick={() => setIsBingoVerifyModalOpen(true)} className="bg-green-600 px-6 py-2.5 rounded-xl font-bold flex items-center gap-2"><CheckCircle2 size={20}/> Проверка Бинго</button>
-             <button onClick={() => setHostSession(null)} className="p-2 text-gray-500 hover:text-red-500"><Power size={28}/></button>
+        )}
+
+        <div className="h-20 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-8 shadow-xl relative z-10">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg"><PartyPopper size={28} className="text-white" /></div>
+            <div>
+              <h2 className="text-xl font-black uppercase tracking-wider">{hostSession.game.name}</h2>
+              <p className="text-gray-400 text-sm font-medium">{hostSession.round.name} • {hostSession.round.winCondition === 'full' ? 'Бинго' : hostSession.round.winCondition === '2_lines' ? '2 Линии' : '1 Линия'}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="text-center mr-4">
+              <div className="text-3xl font-black text-purple-400">{playedTrackIds.size} <span className="text-gray-600 text-xl">/ {shuffledTracks.length}</span></div>
+              <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Сыграно</div>
+            </div>
+            <div className="h-10 w-px bg-gray-800 mr-2" />
+            <button onClick={() => setIsProjectorMode(true)} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition"><MonitorPlay size={20} /> Проектор</button>
+            <button onClick={() => { setVerifyCardId(''); setVerifyResult(null); setIsBingoVerifyModalOpen(true); }} className="bg-green-600 hover:bg-green-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition"><CheckCircle2 size={20} /> БИНГО!</button>
+            <button onClick={endHostSession} className="p-3 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition ml-2"><Power size={24} /></button>
           </div>
         </div>
 
-        <div className="flex-1 flex overflow-hidden">
-          {/* ЛЕВАЯ ЧАСТЬ: ИНФО О ТРЕКЕ (ЦЕНТР) */}
-          <div className="flex-1 flex flex-col relative">
-            
-            {/* БАННЕР ПОБЕДИТЕЛЕЙ (ПОКАЗЫВАЕТСЯ АВТОМАТИЧЕСКИ) */}
-            {autoWinners.length > 0 && (
-              <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 bg-green-500 text-white px-8 py-3 rounded-full font-black text-2xl shadow-2xl animate-pulse">
-                🎉 ЕСТЬ БИНГО: {autoWinners.join(', ')}
+        <div className="flex-1 flex overflow-hidden relative">
+          <div className="flex-1 p-10 flex flex-col items-center justify-center bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-900 to-gray-950">
+            {currentTrack && (
+              <div className="w-full max-w-2xl flex flex-col items-center">
+                <div className={`relative w-80 h-80 rounded-3xl overflow-hidden shadow-2xl mb-8 transition-all duration-700 ${isPlaying ? 'scale-105 shadow-purple-900/50' : ''}`}>
+                  <img src={currentTrack.cover} alt="cover" className={`w-full h-full object-cover transition-all duration-500 ${hideTrackInfo ? 'blur-2xl scale-110 brightness-50' : ''}`} />
+                  {hideTrackInfo && <div className="absolute inset-0 flex items-center justify-center"><Music size={100} className="text-white/20" /></div>}
+                </div>
+                <div className="text-center mb-6 h-20">
+                  <h1 className={`text-4xl font-black mb-2 transition-all duration-300 ${hideTrackInfo ? 'text-gray-600 blur-sm select-none' : 'text-white'}`}>{hideTrackInfo ? '???????? ???????' : currentTrack.title}</h1>
+                  <p className={`text-xl transition-all duration-300 ${hideTrackInfo ? 'text-gray-700 blur-sm select-none' : 'text-purple-400 font-medium'}`}>{hideTrackInfo ? '?????????' : currentTrack.artist}</p>
+                </div>
+                <div className="w-full bg-gray-900/80 p-6 rounded-3xl backdrop-blur-md border border-gray-800 shadow-2xl flex flex-col gap-5">
+                  <div className="flex justify-end w-full">
+                    <label className="flex items-center gap-3 cursor-pointer group" title="Автоматически включать следующий трек">
+                      <span className={`text-sm font-bold transition-colors ${isAutoPlay ? 'text-purple-400' : 'text-gray-500'}`}>Авто-переход</span>
+                      <div className={`relative w-12 h-6 transition-all duration-300 rounded-full ${isAutoPlay ? 'bg-purple-600' : 'bg-gray-800 border border-gray-700'}`}>
+                        <div className={`absolute top-[3px] w-4 h-4 bg-white rounded-full transition-transform duration-300 shadow-md ${isAutoPlay ? 'translate-x-7' : 'translate-x-1'}`} />
+                      </div>
+                      <input type="checkbox" checked={isAutoPlay} onChange={e => setIsAutoPlay(e.target.checked)} className="hidden" />
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm font-medium text-gray-400">
+                    <span className="w-10 text-right">{formatTime(currentTime)}</span>
+                    <div className="flex-1 h-3 bg-gray-800 rounded-full overflow-hidden relative">
+                      <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-purple-600 to-pink-500 transition-all duration-300 ease-linear" style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }} />
+                    </div>
+                    <span className="w-10">{formatTime(duration)}</span>
+                  </div>
+                  <div className="flex items-center justify-center gap-4 sm:gap-8">
+                    <button onClick={() => setHideTrackInfo(!hideTrackInfo)} className={`w-14 h-14 rounded-full flex items-center justify-center transition ${hideTrackInfo ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/50' : 'bg-gray-800 text-gray-400 hover:text-white'}`}>
+                      {hideTrackInfo ? <EyeOff size={24} /> : <Eye size={24} />}
+                    </button>
+                    <button onClick={() => playHostTrack(currentHostTrackIndex - 1)} disabled={currentHostTrackIndex === 0} className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center text-white hover:bg-gray-700 disabled:opacity-50 transition"><SkipBack size={28} /></button>
+                    <button
+                      onClick={() => {
+                        if (isPlaying) { audioRef.current?.pause(); setPlayingTrackId(null); }
+                        else { playHostTrack(currentHostTrackIndex); }
+                      }}
+                      className={`w-24 h-24 rounded-full flex items-center justify-center text-white transition transform hover:scale-105 shadow-2xl flex-shrink-0 ${isPlaying ? 'bg-orange-600 shadow-orange-900/50' : 'bg-purple-600 shadow-purple-900/50'}`}
+                    >
+                      {isPlaying ? <PauseCircle size={48} /> : <Play size={48} className="ml-2" />}
+                    </button>
+                    <button onClick={() => { playHostTrack(currentHostTrackIndex + 1); setHideTrackInfo(true); }} disabled={currentHostTrackIndex === shuffledTracks.length - 1} className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center text-white hover:bg-gray-700 disabled:opacity-50 transition"><SkipForward size={28} /></button>
+                    <div className="w-14 h-14 hidden sm:block" />
+                  </div>
+                </div>
               </div>
             )}
-
-            {/* ЦЕНТРАЛЬНАЯ ЧАСТЬ: ОБЛОЖКА */}
-            <div className="flex-1 flex flex-col items-center justify-center p-10">
-               <div className="relative">
-                 <img 
-                   src={currentTrack?.cover} 
-                   className={`w-96 h-96 rounded-[3rem] shadow-[0_0_100px_rgba(0,0,0,0.5)] transition-all duration-700 ${hideTrackInfo ? 'blur-3xl scale-90 opacity-50' : 'scale-105'}`} 
-                 />
-                 {hideTrackInfo && <div className="absolute inset-0 flex items-center justify-center text-8?xl font-black opacity-20">?</div>}
-               </div>
-               <div className="mt-10 text-center">
-                 <h1 className="text-5xl font-black mb-2">{hideTrackInfo ? 'Угадай песню...' : currentTrack?.title}</h1>
-                 <p className="text-2xl text-purple-500 font-bold">{hideTrackInfo ? 'Исполнитель' : currentTrack?.artist}</p>
-               </div>
-            </div>
-
-            {/* НИЖНЯЯ ПАНЕЛЬ: ПЛЕЕР (ТЕПЕРЬ ВНИЗУ) */}
-            <div className="bg-gray-900/50 border-t border-gray-800 p-8 backdrop-blur-xl">
-               <div className="max-w-4xl mx-auto">
-                  {/* Прогресс */}
-                  <div className="flex items-center gap-4 mb-6">
-                    <span className="text-xs font-mono text-gray-500">{formatTime(currentTime)}</span>
-                    <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-purple-500" style={{width: `${(currentTime/duration)*100}%`}}></div>
-                    </div>
-                    <span className="text-xs font-mono text-gray-500">{formatTime(duration)}</span>
-                  </div>
-
-                  {/* Кнопки управления */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-6">
-                      <label className="flex items-center gap-3 cursor-pointer">
-                        <div className={`w-12 h-6 rounded-full transition-all relative ${isAutoPlay ? 'bg-purple-600' : 'bg-gray-700'}`}>
-                          <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isAutoPlay ? 'left-7' : 'left-1'}`} />
-                        </div>
-                        <input type="checkbox" className="hidden" checked={isAutoPlay} onChange={e => setIsAutoPlay(e.target.checked)} />
-                        <span className="text-sm font-bold text-gray-400">Авто-переход</span>
-                      </label>
-                    </div>
-
-                    <div className="flex items-center gap-8">
-                      <button onClick={() => setHideTrackInfo(!hideTrackInfo)} className={`p-4 rounded-full transition ${hideTrackInfo ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-400'}`}>
-                        {hideTrackInfo ? <Eye size={28}/> : <EyeOff size={28}/>}
-                      </button>
-                      <button onClick={() => playHostTrack(currentHostTrackIndex - 1)} className="p-4 hover:text-purple-400 transition"><SkipBack size={32}/></button>
-                      <button 
-                        onClick={() => togglePlay(currentTrack)} 
-                        className="w-20 h-20 bg-white text-black rounded-full flex items-center justify-center hover:scale-110 transition shadow-xl"
-                      >
-                        {playingTrackId === currentTrack?.id ? <PauseCircle size={40} fill="currentColor"/> : <Play size={40} className="ml-1" fill="currentColor"/>}
-                      </button>
-                      <button onClick={() => playHostTrack(currentHostTrackIndex + 1)} className="p-4 hover:text-purple-400 transition"><SkipForward size={32}/></button>
-                    </div>
-
-                    <div className="w-40 flex justify-end">
-                      <div className="text-right">
-                        <p className="text-xs text-gray-500 uppercase font-bold">Сыграно</p>
-                        <p className="text-2xl font-black text-purple-400">{playedTrackIds.size} / {shuffledTracks.length}</p>
-                      </div>
-                    </div>
-                  </div>
-               </div>
-            </div>
           </div>
 
-          {/* ПРАВАЯ ЧАСТЬ: СПИСОК (ОСТАВЛЯЕМ БЕЗ ИЗМЕНЕНИЙ) */}
-          <div className="w-96 bg-gray-900 border-l border-gray-800 overflow-y-auto p-4 space-y-2">
-             <h3 className="text-sm font-bold text-gray-500 mb-4 px-2 uppercase tracking-widest">Очередь треков</h3>
-             {shuffledTracks.map((t, i) => (
-               <button key={t.id} onClick={() => playHostTrack(i)} className={`w-full p-3 rounded-2xl text-left flex gap-4 items-center transition ${currentHostTrackIndex === i ? 'bg-purple-600/20 ring-1 ring-purple-500' : 'bg-gray-800/30 hover:bg-gray-800'}`}>
-                 <span className="text-xs font-bold text-gray-600 w-4">{i+1}</span>
-                 <img src={t.cover} className="w-10 h-10 rounded-lg object-cover" />
-                 <div className="overflow-hidden">
-                   <p className={`font-bold text-sm truncate ${currentHostTrackIndex === i ? 'text-purple-400' : ''}`}>{t.title}</p>
-                   <p className="text-xs text-gray-500 truncate">{t.artist}</p>
-                 </div>
-               </button>
-             ))}
+          <div className="w-[450px] bg-gray-900 border-l border-gray-800 flex flex-col z-10">
+            <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+              <div className="flex items-center gap-3"><ListChecks className="text-purple-400" /><h3 className="text-lg font-bold">Очередь треков</h3></div>
+              <button onClick={reshuffleTracks} className="p-2 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white rounded-lg transition"><Shuffle size={18} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-2">
+              {shuffledTracks.map((track, index) => {
+                const isPlayed = playedTrackIds.has(track.id);
+                const isCurrent = currentHostTrackIndex === index;
+                return (
+                  <button key={track.id} onClick={() => { setCurrentHostTrackIndex(index); setHideTrackInfo(true); }} className={`w-full text-left p-3 rounded-xl flex items-center gap-4 transition border ${isCurrent ? 'bg-purple-900/30 border-purple-500 shadow-lg' : isPlayed ? 'bg-gray-900 border-gray-800 opacity-50 grayscale' : 'bg-gray-800 border-gray-700 hover:bg-gray-700'}`}>
+                    <div className="w-8 font-bold text-center text-sm text-gray-500">{index + 1}</div>
+                    <img src={track.cover} className="w-10 h-10 rounded-lg object-cover" alt="" />
+                    <div className="flex-1 overflow-hidden">
+                      <div className={`font-bold truncate text-sm ${isCurrent ? 'text-purple-400' : 'text-white'}`}>{track.title}</div>
+                      <div className="text-xs text-gray-500 truncate">{track.artist}</div>
+                    </div>
+                    {isCurrent && isPlaying && <Loader2 size={16} className="text-purple-400 animate-spin" />}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
-      </div>
-    );
-  }
+
+        {isBingoVerifyModalOpen && (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[110] p-4">
+            <div className={`bg-gray-900 p-8 rounded-3xl w-full border border-gray-800 text-center animate-in zoom-in-95 ${verifyResult ? 'max-w-xl' : 'max-w-md'}`}>
+              {!verifyResult ? (
+                <>
+                  <Trophy size={64} className="mx-auto text-yellow-500 mb-6" />
+                  <h2 className="text-3xl font-black mb-2">ПРОВЕРКА БИНГО</h2>
+                  <p className="text-gray-400 mb-8">Введите ID карточки ({hostSession.round.winCondition === 'full' ? 'Вся карточка' : hostSession.round.winCondition === '2_lines' ? 'Две линии' : 'Одна линия'})</p>
+                  <input autoFocus type="text" value={verifyCardId} onChange={e => setVerifyCardId(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleVerifyCard()} placeholder="#ID (напр. 1042)" className="w-full bg-gray-950 border-2 border-gray-800 rounded-2xl py-4 px-6 text-2xl font-black text-center text-white mb-6 focus:border-purple-500 outline-none uppercase tracking-widest" />
+                  <div className="flex gap-4">
+                    <button onClick={() => setIsBingoVerifyModalOpen(false)} className="flex-1 py-4 bg-gray-800 rounded-xl font-bold hover:bg-gray-700 transition">Отмена</button>
+                    <button onClick={handleVerifyCard} className="flex-1 py-4 bg-green-600 rounded-xl font-bold hover:bg-green-500 transition text-white flex items-center justify-center gap-2"><SearchCheck size={24} /> Проверить</button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center">
+                  <div className="flex items-center justify-between w-full mb-6 pb-6 border-b border-gray-800">
+                    <div className="text-left">
+                      <div className="text-gray-400 font-bold uppercase tracking-widest text-sm mb-1">Карточка #{verifyResult.card.id}</div>
+                      <div className="text-xl font-black">Линий: <span className={verifyResult.linesCount > 0 ? 'text-purple-400' : 'text-gray-500'}>{verifyResult.linesCount}</span></div>
+                    </div>
+                    {verifyResult.isWinner
+                      ? <div className="px-4 py-2 bg-green-500/20 text-green-400 rounded-xl font-black text-2xl flex items-center gap-2 animate-pulse"><CheckCircle2 /> БИНГО!</div>
+                      : <div className="px-4 py-2 bg-red-500/10 text-red-400 rounded-xl font-bold text-lg">Нет Бинго</div>}
+                  </div>
+                  <div className="grid grid-cols-5 gap-2 mb-8 w-full max-w-[400px]">
+                    {verifyResult.card.cells.map((cell: any, i: number) => (
+                      <div key={i} className={`aspect-square rounded-xl flex flex-col items-center justify-center p-1 border-2 ${verifyResult.matches[i] ? 'bg-green-600/20 border-green-500 text-green-400' : 'bg-gray-800 border-gray-700 text-gray-500'}`}>
+                        {'isFreeSpace' in cell ? <span className="font-black text-xs uppercase">FREE</span> : <span className="font-bold text-[8px] leading-tight text-center line-clamp-3">{(cell as Track).title}</span>}
+                      </div>
+                    ))}
                   </div>
                   <div className="flex gap-4 w-full">
                     <button onClick={() => setIsBingoVerifyModalOpen(false)} className="flex-1 py-4 bg-gray-800 rounded-xl font-bold hover:bg-gray-700 transition">Закрыть</button>
