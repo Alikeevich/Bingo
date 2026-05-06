@@ -54,7 +54,6 @@ interface TemplateConfig {
   layout: '1' | '2' | '4';
   backgroundImageUrl?: string;
   qrUrl?: string;
-  fontFamily?: string;
 }
 interface Template {
   id: string;
@@ -79,17 +78,6 @@ const getProxiedUrl = (url: string): string => {
   return url.replace('http://', 'https://');
 };
 
-const FILTERS = [
-  { name: 'Топ Чарт',     type: 'chart',  id: '0',   icon: 'flame' },
-  { name: 'Поп',           type: 'chart',  id: '132'               },
-  { name: 'Рок',           type: 'chart',  id: '152'               },
-  { name: 'Хип-Хоп',      type: 'chart',  id: '116'               },
-  { name: 'Электронная',   type: 'chart',  id: '106'               },
-  { name: 'R&B',           type: 'chart',  id: '165'               },
-  { name: 'Русские хиты',  type: 'search', query: 'русские хиты'   },
-  { name: 'Дискотека 80х', type: 'search', query: 'disco 80s hits' },
-];
-
 export default function App() {
   const [activeTab, setActiveTab] = useState<'games' | 'playlists' | 'database' | 'templates'>('games');
 
@@ -100,10 +88,6 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Track[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const ITEMS_PER_PAGE = 50;
-  const activeQueryRef = useRef<{ type: 'chart'; id: string; name: string } | { type: 'search'; query: string; name: string } | null>(null);
   const [activeFilter, setActiveFilter] = useState('Топ Чарт');
   const [isUploadingMp3, setIsUploadingMp3] = useState(false);
   const [offlineProgress, setOfflineProgress] = useState<{ current: number; total: number } | null>(null);
@@ -154,7 +138,6 @@ export default function App() {
       bgColor: '#1e1b4b', textColor: '#ffffff', accentColor: '#8b5cf6',
       gridColor: '#2e1065', cardTitle: 'MUZ BINGO', showArtist: true,
       centerText: 'FREE SPACE', footerText: 'MuzBingo', showQR: true, layout: '2',
-      fontFamily: '"Inter", sans-serif',
     },
   });
 
@@ -164,7 +147,7 @@ export default function App() {
     fetchPlaylists();
     fetchGames();
     fetchTemplates();
-    loadChartByGenre('0', 'Топ Чарт', 0);
+    loadTopChart();
 
     const savedSessionStr = localStorage.getItem('muzbingo_host_session');
     if (savedSessionStr) {
@@ -275,47 +258,23 @@ export default function App() {
       preview: t.preview, isCustom: false,
     }));
 
-  const loadChartByGenre = async (genreId: string, filterName: string, page = 0) => {
-    setIsSearching(true);
-    setActiveFilter(filterName);
-    setSearchQuery('');
-    setCurrentPage(page);
-    activeQueryRef.current = { type: 'chart', id: genreId, name: filterName };
+  const loadTopChart = async () => {
+    setIsSearching(true); setActiveFilter('Топ Чарт'); setSearchQuery('');
     try {
-      const res = await fetch(`/api/deezer/chart/${genreId}/tracks?limit=${ITEMS_PER_PAGE}&index=${page * ITEMS_PER_PAGE}`);
+      const res = await fetch('/api/deezer/chart/0/tracks?limit=50');
       const data = await res.json();
-      if (data.data) {
-        setSearchResults(parseDeezerTracks(data.data));
-        setHasNextPage(data.data.length === ITEMS_PER_PAGE);
-      }
+      if (data.data) setSearchResults(parseDeezerTracks(data.data));
     } catch (e) { console.error(e); } finally { setIsSearching(false); }
   };
-  
-  const searchDeezer = async (query: string, filterName?: string, page = 0) => {
+
+  const searchDeezer = async (query: string, filterName?: string) => {
     if (!query) return;
-    setIsSearching(true);
-    setActiveFilter(filterName || '');
-    setCurrentPage(page);
-    activeQueryRef.current = { type: 'search', query, name: filterName || '' };
+    setIsSearching(true); setActiveFilter(filterName || '');
     try {
-      const res = await fetch(`/api/deezer/search?q=${encodeURIComponent(query)}&limit=${ITEMS_PER_PAGE}&index=${page * ITEMS_PER_PAGE}`);
+      const res = await fetch(`/api/deezer/search?q=${encodeURIComponent(query)}&limit=50`);
       const data = await res.json();
-      if (data.data) {
-        setSearchResults(parseDeezerTracks(data.data));
-        setHasNextPage(data.data.length === ITEMS_PER_PAGE);
-      }
+      if (data.data) setSearchResults(parseDeezerTracks(data.data));
     } catch (e) { console.error(e); } finally { setIsSearching(false); }
-  };
-  
-  const loadTopChart = () => loadChartByGenre('0', 'Топ Чарт', 0);
-  
-  const goToPage = (page: number) => {
-    const q = activeQueryRef.current;
-    if (!q) return;
-    if (q.type === 'chart') loadChartByGenre(q.id, q.name, page);
-    else searchDeezer(q.query, q.name, page);
-    // скролл наверх списка
-    document.querySelector('.custom-scrollbar')?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => { e.preventDefault(); searchDeezer(searchQuery); };
@@ -500,10 +459,6 @@ export default function App() {
     if (!trackToAdd) return;
     const playlist = playlists.find(p => p.id === playlistId);
     if (!playlist) return;
-    const artistExists = playlist.tracks.some(
-      t => t.artist.toLowerCase() === trackToAdd.artist.toLowerCase()
-    );
-    if (artistExists) return showToast(`Исполнитель "${trackToAdd.artist}" уже есть в плейлисте!`);
     const newTracks = [...playlist.tracks, trackToAdd];
     setPlaylists(playlists.map(p => p.id === playlistId ? { ...p, tracks: newTracks } : p));
     setTrackToAdd(null);
@@ -665,7 +620,7 @@ export default function App() {
             <div key={pageIndex} className="w-[210mm] h-[297mm] bg-white shadow-2xl print:shadow-none print:w-full print:h-screen print:page-break-after-always overflow-hidden">
               <div className={`w-full h-full p-[10mm] gap-[10mm] ${layoutNum === 1 ? 'flex flex-col' : layoutNum === 2 ? 'grid grid-cols-1 grid-rows-2' : 'grid grid-cols-2 grid-rows-2'}`}>
                 {pageCards.map((card) => (
-                  <div key={card.id} style={{ backgroundColor: template.config.bgColor, color: template.config.textColor, backgroundImage: template.config.backgroundImageUrl ? `url(${template.config.backgroundImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', fontFamily: template.config.fontFamily || '"Inter", sans-serif' }} className="relative flex flex-col rounded-xl overflow-hidden p-6 print:p-4 border-2 border-dashed border-gray-300">
+                  <div key={card.id} style={{ backgroundColor: template.config.bgColor, color: template.config.textColor, backgroundImage: template.config.backgroundImageUrl ? `url(${template.config.backgroundImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }} className="relative flex flex-col rounded-xl overflow-hidden p-6 print:p-4 border-2 border-dashed border-gray-300">
                     <div style={{ color: template.config.accentColor, borderColor: `${template.config.accentColor}44` }} className={`text-center font-black border-b-4 uppercase italic tracking-tighter ${layoutNum === 4 ? 'text-2xl mb-2 pb-2 border-b-2' : 'text-5xl mb-6 pb-4'}`}>{template.config.cardTitle}</div>
                     <div className="grid grid-cols-5 gap-1.5 print:gap-1 flex-1">
                       {card.cells.map((cell, i) => {
@@ -988,38 +943,16 @@ export default function App() {
         <button type="submit" disabled={isSearching} className="bg-purple-600 hover:bg-purple-500 px-8 rounded-xl font-bold transition disabled:opacity-50 min-w-[120px] flex items-center justify-center">{isSearching ? <Loader2 className="animate-spin" size={20} /> : 'Найти'}</button>
       </form>
       <div className="flex flex-wrap gap-2 mb-8">
-      {FILTERS.map(f => (
-        <button
-          key={f.name}
-          onClick={() => {
-            if (f.type === 'chart') {
-              loadChartByGenre(f.id!, f.name);
-            } else {
-              setSearchQuery(f.query!);
-              searchDeezer(f.query!, f.name);
-            }
-          }}
-          className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition ${
-            activeFilter === f.name
-              ? f.name === 'Топ Чарт'
-                ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
-                : 'bg-purple-600 text-white'
-              : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-          }`}
-        >
-          {f.name === 'Топ Чарт' && <Flame size={16} />}
-          {f.name}
-        </button>
-      ))}
-    </div>
-    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-4">
-      {isSearching && searchResults.length === 0
-        ? <div className="flex flex-col items-center justify-center h-40 text-gray-500">
-            <Loader2 className="animate-spin mb-4" size={32} /><p>Ищем музыку...</p>
-          </div>
-        : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+        <button onClick={loadTopChart} className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition ${activeFilter === 'Топ Чарт' ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}><Flame size={16} /> Топ Чарт</button>
+        {['Русские хиты', 'Поп', 'Рок', 'Хип-Хоп', 'Дискотека 80х'].map(f => (
+          <button key={f} onClick={() => { setSearchQuery(f); searchDeezer(f, f); }} className={`px-4 py-2 rounded-full font-medium transition ${activeFilter === f ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>{f}</button>
+        ))}
+      </div>
+      <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-10">
+        {isSearching && searchResults.length === 0
+          ? <div className="flex flex-col items-center justify-center h-40 text-gray-500"><Loader2 className="animate-spin mb-4" size={32} /><p>Ищем музыку...</p></div>
+          : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {searchResults.map(track => {
                 const isPlaying = playingTrackId === track.id;
                 return (
@@ -1034,37 +967,8 @@ export default function App() {
                 );
               })}
             </div>
-    
-            {/* ПАГИНАЦИЯ */}
-            {searchResults.length > 0 && (
-              <div className="flex items-center justify-between border-t border-gray-800 pt-6 pb-2 mt-2">
-                <button
-                  onClick={() => goToPage(currentPage - 1)}
-                  disabled={currentPage === 0 || isSearching}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-gray-800 hover:bg-gray-700 rounded-xl font-bold transition disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <ChevronLeft size={18} /> Назад
-                </button>
-            
-                <div className="text-center">
-                  <span className="text-white font-bold">Страница {currentPage + 1}</span>
-                  <div className="text-gray-500 text-xs mt-0.5">
-                    треки {currentPage * ITEMS_PER_PAGE + 1}–{currentPage * ITEMS_PER_PAGE + searchResults.length}
-                  </div>
-                </div>
-            
-                <button
-                  onClick={() => goToPage(currentPage + 1)}
-                  disabled={!hasNextPage || isSearching}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-gray-800 hover:bg-gray-700 rounded-xl font-bold transition disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  Вперёд <ChevronLeft size={18} className="rotate-180" />
-                </button>
-              </div>
-            )}
-          </>
-        )}
-    </div>
+          )}
+      </div>
     </div>
   );
 
@@ -1147,7 +1051,7 @@ export default function App() {
     <div className="animate-in fade-in duration-300 h-full flex flex-col">
       <div className="flex justify-between items-end mb-8">
         <div><h1 className="text-3xl font-bold mb-2">Шаблоны карточек</h1><p className="text-gray-400">Настройте внешний вид бинго-карточек.</p></div>
-        <button onClick={() => { setEditingTemplate({ name: '', config: { bgColor: '#1e1b4b', textColor: '#ffffff', accentColor: '#8b5cf6', gridColor: '#2e1065', cardTitle: 'MUZ BINGO', showArtist: true, centerText: 'FREE SPACE', footerText: 'MuzBingo', showQR: true, layout: '2', fontFamily: '"Inter", sans-serif' } }); setIsCreateTemplateModalOpen(true); }} className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition flex items-center gap-2"><Palette size={20} /> Создать шаблон</button>
+        <button onClick={() => { setEditingTemplate({ name: '', config: { bgColor: '#1e1b4b', textColor: '#ffffff', accentColor: '#8b5cf6', gridColor: '#2e1065', cardTitle: 'MUZ BINGO', showArtist: true, centerText: 'FREE SPACE', footerText: 'MuzBingo', showQR: true, layout: '2' } }); setIsCreateTemplateModalOpen(true); }} className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition flex items-center gap-2"><Palette size={20} /> Создать шаблон</button>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 overflow-y-auto pr-2 custom-scrollbar pb-10">
         {templates.map(template => (
@@ -1268,14 +1172,7 @@ export default function App() {
               <div className="flex items-center gap-4 mb-6 p-4 bg-gray-950 rounded-xl border border-gray-800"><img src={trackToAdd.cover} className="w-12 h-12 rounded-md" alt="" /><div className="overflow-hidden"><p className="font-bold truncate">{trackToAdd.title}</p><p className="text-sm text-gray-400 truncate">{trackToAdd.artist}</p></div></div>
               {playlists.length === 0
                 ? <div className="text-center py-6"><button onClick={() => { setTrackToAdd(null); setIsCreatePlaylistModalOpen(true); }} className="px-6 py-2 bg-purple-600 rounded-lg font-bold">Создать плейлист</button></div>
-                : <div className="max-h-60 overflow-y-auto pr-2 flex flex-col gap-2 custom-scrollbar">{playlists.map(p => { const isAdded = p.tracks.some(
-                t => t.id === trackToAdd.id || 
-                     t.artist.toLowerCase() === trackToAdd.artist.toLowerCase()
-              ); return <button key={p.id} onClick={() => !isAdded && addTrackToPlaylist(p.id)} disabled={isAdded} className={`flex justify-between p-4 rounded-xl border text-left ${isAdded ? 'bg-gray-800/50 border-gray-800 opacity-50' : 'bg-gray-800 border-gray-700 hover:border-purple-500'}`}><span className="font-bold truncate pr-4">{p.name}</span><span className="text-xs text-gray-400 whitespace-nowrap">{p.tracks.some(t => t.id === trackToAdd.id)
-            ? 'Уже добавлен'
-            : p.tracks.some(t => t.artist.toLowerCase() === trackToAdd.artist.toLowerCase())
-              ? `Исполнитель есть`
-              : `${p.tracks.length} треков`}</span></button>; })}</div>}
+                : <div className="max-h-60 overflow-y-auto pr-2 flex flex-col gap-2 custom-scrollbar">{playlists.map(p => { const isAdded = p.tracks.some(t => t.id === trackToAdd.id); return <button key={p.id} onClick={() => !isAdded && addTrackToPlaylist(p.id)} disabled={isAdded} className={`flex justify-between p-4 rounded-xl border text-left ${isAdded ? 'bg-gray-800/50 border-gray-800 opacity-50' : 'bg-gray-800 border-gray-700 hover:border-purple-500'}`}><span className="font-bold truncate pr-4">{p.name}</span><span className="text-xs text-gray-400 whitespace-nowrap">{isAdded ? 'Добавлен' : `${p.tracks.length} треков`}</span></button>; })}</div>}
             </div>
           </div>
         </div>
@@ -1345,20 +1242,6 @@ export default function App() {
                   ))}
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">Шрифт (с поддержкой Қазақша)</label>
-                <select 
-                  value={editingTemplate.config?.fontFamily || '"Inter", sans-serif'} 
-                  onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, fontFamily: e.target.value } })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none"
-                >
-                  <option value='"Inter", sans-serif'>Inter (Стандартный)</option>
-                  <option value='"Montserrat", sans-serif'>Montserrat (Широкий, стильный)</option>
-                  <option value='"Golos Text", sans-serif'>Golos Text (Современный)</option>
-                  <option value='"Roboto", sans-serif'>Roboto (Классика)</option>
-                  <option value='"Rubik", sans-serif'>Rubik (Скругленный)</option>
-                </select>
-              </div>
               <div className="grid grid-cols-3 gap-4">
                 <div className="flex flex-col"><label className="text-xs font-medium text-gray-400 mb-2 text-center">Цвет Фона</label><input type="color" value={editingTemplate.config?.bgColor} onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, bgColor: e.target.value } })} className="w-full h-12 bg-gray-800 border border-gray-700 rounded-xl cursor-pointer" /></div>
                 <div className="flex flex-col"><label className="text-xs font-medium text-gray-400 mb-2 text-center">Акцент</label><input type="color" value={editingTemplate.config?.accentColor} onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, accentColor: e.target.value } })} className="w-full h-12 bg-gray-800 border border-gray-700 rounded-xl cursor-pointer" /></div>
@@ -1385,7 +1268,7 @@ export default function App() {
             <div className="absolute top-10 left-10 flex flex-col text-gray-400"><span className="flex items-center gap-2 font-bold text-white mb-1"><Eye size={20} /> Предпросмотр печати</span><span className="text-sm">Пример генерации на листе бумаги</span></div>
             <div className={`bg-white shadow-[0_0_60px_rgba(0,0,0,0.8)] flex items-center justify-center gap-4 p-4 transition-all duration-500 ${editingTemplate.config?.layout === '1' ? 'w-[400px] aspect-[1/1.414]' : editingTemplate.config?.layout === '2' ? 'w-[600px] aspect-[1.414/1] flex-row' : 'w-[450px] aspect-[1/1.414] grid grid-cols-2 grid-rows-2'}`}>
               {[...Array(Number(editingTemplate.config?.layout || 1))].map((_, cardIndex) => (
-                <div key={cardIndex} style={{ backgroundColor: editingTemplate.config?.bgColor, color: editingTemplate.config?.textColor, backgroundImage: editingTemplate.config?.backgroundImageUrl ? `url(${editingTemplate.config?.backgroundImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', fontFamily: editingTemplate.config?.fontFamily || '"Inter", sans-serif' }} className={`relative flex flex-col rounded shadow-md overflow-hidden ${editingTemplate.config?.layout === '1' ? 'w-full h-full p-8 border-2 border-dashed border-gray-300' : editingTemplate.config?.layout === '2' ? 'w-1/2 h-full p-6 border border-dashed border-gray-300' : 'w-full h-full p-3 border border-dashed border-gray-300'}`}>
+                <div key={cardIndex} style={{ backgroundColor: editingTemplate.config?.bgColor, color: editingTemplate.config?.textColor, backgroundImage: editingTemplate.config?.backgroundImageUrl ? `url(${editingTemplate.config?.backgroundImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }} className={`relative flex flex-col rounded shadow-md overflow-hidden ${editingTemplate.config?.layout === '1' ? 'w-full h-full p-8 border-2 border-dashed border-gray-300' : editingTemplate.config?.layout === '2' ? 'w-1/2 h-full p-6 border border-dashed border-gray-300' : 'w-full h-full p-3 border border-dashed border-gray-300'}`}>
                   <div style={{ color: editingTemplate.config?.accentColor, borderColor: `${editingTemplate.config?.accentColor}44` }} className={`text-center font-black border-b-4 uppercase italic tracking-tighter ${editingTemplate.config?.layout === '4' ? 'text-xl mb-2 pb-1 border-b-2' : 'text-3xl mb-4 pb-3'}`}>{editingTemplate.config?.cardTitle}</div>
                   <div className="grid grid-cols-5 gap-1 flex-1">
                     {[...Array(25)].map((_, i) => (
