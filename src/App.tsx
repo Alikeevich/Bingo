@@ -449,35 +449,34 @@ export default function App() {
     return urlData.publicUrl;
   };
 
-const downloadDesignGuide = () => {
+  const downloadDesignGuide = () => {
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="2480" height="3508" viewBox="0 0 2480 3508">
-        <!-- Paper Background -->
+        <!-- ФОН (БУМАГА) -->
         <rect width="2480" height="3508" fill="#f3f4f6" />
         
-        <!-- Print Margins (Суммарный отступ 14.2mm = 170px) -->
-        <rect x="170" y="170" width="2140" height="3168" fill="none" stroke="#9ca3af" stroke-width="4" stroke-dasharray="20,20" />
-        <text x="1240" y="140" font-family="sans-serif" font-size="40" font-weight="bold" text-anchor="middle" fill="#6b7280">ГРАНИЦА КОНТЕНТА (ЗА НЕЕ НИЧЕГО НЕ ВЫЛЕЗЕТ)</text>
+        <!-- ГРАНИЦЫ КОНТЕНТА (Симметричные отступы 150px) -->
+        <rect x="150" y="150" width="2180" height="3200" fill="none" stroke="#9ca3af" stroke-width="4" stroke-dasharray="20,20" />
+        
+        <!-- ЗАГОЛОВОК -->
+        <rect x="150" y="150" width="2180" height="250" fill="#fca5a5" opacity="0.6" rx="20" />
+        <text x="1240" y="310" font-family="sans-serif" font-size="90" font-weight="black" font-style="italic" text-anchor="middle" fill="#991b1b">ЗАГОЛОВОК (TITLE)</text>
 
-        <!-- Title Area (text-5xl + pb-4) -->
-        <rect x="170" y="170" width="2140" height="200" fill="#fca5a5" opacity="0.6" rx="20" />
-        <text x="1240" y="295" font-family="sans-serif" font-size="90" font-weight="black" font-style="italic" text-anchor="middle" fill="#991b1b">ЗАГОЛОВОК (TITLE)</text>
+        <!-- СЕТКА С ТРЕКАМИ -->
+        <rect x="150" y="450" width="2180" height="2500" fill="#86efac" opacity="0.6" rx="20" />
+        <text x="1240" y="1660" font-family="sans-serif" font-size="140" font-weight="black" text-anchor="middle" fill="#166534">СЕТКА ТРЕКОВ (5x5)</text>
+        <text x="1240" y="1800" font-family="sans-serif" font-size="70" font-weight="bold" text-anchor="middle" fill="#166534">(Оставьте эту зону нейтральной/читаемой)</text>
 
-        <!-- Grid Area (flex-1) -->
-        <rect x="170" y="450" width="2140" height="2638" fill="#86efac" opacity="0.6" rx="20" />
-        <text x="1240" y="1700" font-family="sans-serif" font-size="120" font-weight="black" text-anchor="middle" fill="#166534">СЕТКА ТРЕКОВ (5x5)</text>
-        <text x="1240" y="1820" font-family="sans-serif" font-size="70" font-weight="bold" text-anchor="middle" fill="#166534">(Оставьте эту зону нейтральной/читаемой)</text>
+        <!-- ID И ПОДВАЛ (Слева внизу, компактный прямоугольник) -->
+        <rect x="150" y="3200" width="350" height="150" fill="#fcd34d" opacity="0.6" rx="15" />
+        <text x="325" y="3290" font-family="sans-serif" font-size="50" font-weight="bold" text-anchor="middle" fill="#854d0e">ID И ПОДВАЛ</text>
 
-        <!-- ID & Footer Text Area (items-end) -->
-        <rect x="170" y="3218" width="450" height="120" fill="#fcd34d" opacity="0.6" rx="15" />
-        <text x="395" y="3295" font-family="sans-serif" font-size="50" font-weight="bold" text-anchor="middle" fill="#854d0e">ID И ПОДВАЛ</text>
+        <!-- QR КОД (Справа внизу, крупный квадрат) -->
+        <rect x="1980" y="3000" width="350" height="350" fill="#93c5fd" opacity="0.6" rx="20" />
+        <text x="2155" y="3190" font-family="sans-serif" font-size="60" font-weight="bold" text-anchor="middle" fill="#1e3a8a">QR-КОД</text>
 
-        <!-- QR Code Area (w-16 h-16) -->
-        <rect x="2110" y="3138" width="200" height="200" fill="#93c5fd" opacity="0.6" rx="20" />
-        <text x="2210" y="3255" font-family="sans-serif" font-size="50" font-weight="bold" text-anchor="middle" fill="#1e3a8a">QR</text>
-
-        <!-- Instructions overlay -->
-        <text x="1240" y="3460" font-family="sans-serif" font-size="50" font-weight="bold" text-anchor="middle" fill="#374151">Размер холста: 2480x3508 px (A4, 300dpi). Дизайнер рисует только фон.</text>
+        <!-- ИНСТРУКЦИЯ (По центру внизу) -->
+        <text x="1240" y="3470" font-family="sans-serif" font-size="50" font-weight="bold" text-anchor="middle" fill="#374151">Размер холста: 2480x3508 px (A4, 300dpi). Дизайнер рисует только фон.</text>
       </svg>
     `;
     const blob = new Blob([svg], { type: 'image/svg+xml' });
