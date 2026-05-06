@@ -314,7 +314,18 @@ export default function App() {
       <main className="flex-1 overflow-hidden p-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-gray-900 via-gray-950 to-gray-950">
         {activeTab === 'games' && <GamesTab games={games} setGames={setGames} playlists={playlists} templates={templates} showToast={showToast} startHostSession={startHostSession} setPrintViewCards={setPrintViewCards} />}
         {activeTab === 'mydatabase' && <MyDatabaseTab dbTracks={dbTracks} dbTags={dbTags} playingTrackId={playingTrackId} togglePlay={togglePlay} setTrackToAdd={setTrackToAdd} deleteTrackFromDb={deleteTrackFromDb} />}
-        {activeTab === 'global_search' && <GlobalSearchTab playingTrackId={playingTrackId} togglePlay={togglePlay} setTrackToAddToDb={(t) => { setTrackToAddToDb(t); setSelectedTagsForNewTrack([]); setNewTagInput(''); }} />}
+        {activeTab === 'global_search' && (
+          <GlobalSearchTab 
+            playingTrackId={playingTrackId} 
+            togglePlay={togglePlay} 
+            setTrackToAdd={setTrackToAdd} 
+            setTrackToAddToDb={(t) => { 
+              setTrackToAddToDb(t); 
+              setSelectedTagsForNewTrack([]); 
+              setNewTagInput(''); 
+            }} 
+          />
+        )}
         {activeTab === 'playlists' && <PlaylistsTab playlists={playlists} setPlaylists={setPlaylists} playingTrackId={playingTrackId} togglePlay={togglePlay} showToast={showToast} />}
         {activeTab === 'templates' && <TemplatesTab templates={templates} setTemplates={setTemplates} showToast={showToast} />}
       </main>
