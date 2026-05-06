@@ -74,9 +74,8 @@ const formatTime = (time: number) => {
 
 const getProxiedUrl = (url: string): string => {
   if (!url) return url;
-  const https = url.replace('http://', 'https://');
-  if (https.includes('supabase.co') || https.includes('supabase.in')) return https;
-  return `/api/audio?url=${encodeURIComponent(https)}`;
+  // Просто заменяем http на https и возвращаем прямую ссылку
+  return url.replace('http://', 'https://');
 };
 
 export default function App() {
