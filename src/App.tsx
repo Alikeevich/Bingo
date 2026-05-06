@@ -78,6 +78,17 @@ const getProxiedUrl = (url: string): string => {
   return url.replace('http://', 'https://');
 };
 
+const FILTERS = [
+  { name: 'Топ Чарт',     type: 'chart',  id: '0',   icon: 'flame' },
+  { name: 'Поп',           type: 'chart',  id: '132'               },
+  { name: 'Рок',           type: 'chart',  id: '152'               },
+  { name: 'Хип-Хоп',      type: 'chart',  id: '116'               },
+  { name: 'Электронная',   type: 'chart',  id: '106'               },
+  { name: 'R&B',           type: 'chart',  id: '165'               },
+  { name: 'Русские хиты',  type: 'search', query: 'русские хиты'   },
+  { name: 'Дискотека 80х', type: 'search', query: 'disco 80s hits' },
+];
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<'games' | 'playlists' | 'database' | 'templates'>('games');
 
@@ -147,7 +158,7 @@ export default function App() {
     fetchPlaylists();
     fetchGames();
     fetchTemplates();
-    loadTopChart();
+    loadChartByGenre();
 
     const savedSessionStr = localStorage.getItem('muzbingo_host_session');
     if (savedSessionStr) {
@@ -258,24 +269,30 @@ export default function App() {
       preview: t.preview, isCustom: false,
     }));
 
-  const loadTopChart = async () => {
-    setIsSearching(true); setActiveFilter('Топ Чарт'); setSearchQuery('');
+  const loadChartByGenre = async (genreId: string, filterName: string) => {
+    setIsSearching(true);
+    setActiveFilter(filterName);
+    setSearchQuery('');
     try {
-      const res = await fetch('/api/deezer/chart/0/tracks?limit=50');
+      const res = await fetch(`/api/deezer/chart/${genreId}/tracks?limit=50`);
       const data = await res.json();
       if (data.data) setSearchResults(parseDeezerTracks(data.data));
     } catch (e) { console.error(e); } finally { setIsSearching(false); }
   };
-
+  
   const searchDeezer = async (query: string, filterName?: string) => {
     if (!query) return;
-    setIsSearching(true); setActiveFilter(filterName || '');
+    setIsSearching(true);
+    setActiveFilter(filterName || '');
     try {
       const res = await fetch(`/api/deezer/search?q=${encodeURIComponent(query)}&limit=50`);
       const data = await res.json();
       if (data.data) setSearchResults(parseDeezerTracks(data.data));
     } catch (e) { console.error(e); } finally { setIsSearching(false); }
   };
+  
+  // Заменяем loadTopChart:
+  const loadTopChart = () => loadChartByGenre('0', 'Топ Чарт');
 
   const handleSearchSubmit = (e: React.FormEvent) => { e.preventDefault(); searchDeezer(searchQuery); };
 
