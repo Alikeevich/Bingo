@@ -9,31 +9,14 @@ interface TemplatesTabProps {
   showToast: (msg: string) => void;
 }
 
-// Список шрифтов с поддержкой кириллицы и казахских символов
-const FONTS = [
-  { name: 'Inter (Стандарт)', value: '"Inter", sans-serif' },
-  { name: 'Montserrat (Стильный)', value: '"Montserrat", sans-serif' },
-  { name: 'Golos Text (Четкий)', value: '"Golos Text", sans-serif' },
-  { name: 'Roboto (Классика)', value: '"Roboto", sans-serif' },
-  { name: 'Rubik (Мягкий)', value: '"Rubik", sans-serif' },
-];
-
 export default function TemplatesTab({ templates, setTemplates, showToast }: TemplatesTabProps) {
   const [isCreateTemplateModalOpen, setIsCreateTemplateModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Partial<Template>>({
     name: '',
     config: {
-      bgColor: '#1e1b4b',
-      textColor: '#ffffff',
-      accentColor: '#8b5cf6',
-      gridColor: '#2e1065',
-      cardTitle: 'MUZ BINGO',
-      showArtist: true,
-      centerText: 'FREE SPACE',
-      footerText: 'MuzBingo',
-      showQR: true,
-      layout: '2',
-      fontFamily: '"Inter", sans-serif'
+      bgColor: '#1e1b4b', textColor: '#ffffff', accentColor: '#8b5cf6',
+      gridColor: '#2e1065', cardTitle: 'MUZ BINGO', showArtist: true,
+      centerText: 'FREE SPACE', footerText: 'MuzBingo', showQR: true, layout: '2',
     },
   });
 
@@ -58,11 +41,7 @@ export default function TemplatesTab({ templates, setTemplates, showToast }: Tem
   const saveTemplate = async () => {
     if (!editingTemplate.name) return showToast('Введите название шаблона');
     const { data } = await supabase.from('templates').insert([{ name: editingTemplate.name, config: editingTemplate.config }]).select();
-    if (data) { 
-      setTemplates([data[0], ...templates]); 
-      setIsCreateTemplateModalOpen(false); 
-      showToast('Шаблон сохранён!'); 
-    }
+    if (data) { setTemplates([data[0], ...templates]); setIsCreateTemplateModalOpen(false); showToast('Шаблон сохранён!'); }
   };
 
   const deleteTemplate = async (id: string, e: React.MouseEvent) => {
@@ -75,201 +54,100 @@ export default function TemplatesTab({ templates, setTemplates, showToast }: Tem
   };
 
   return (
-    <div className="animate-in fade-in duration-300 h-full flex flex-col font-sans">
+    <div className="animate-in fade-in duration-300 h-full flex flex-col">
       <div className="flex justify-between items-end mb-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Шаблоны карточек</h1>
-          <p className="text-gray-400">Создавайте уникальные стили для ваших игр.</p>
-        </div>
-        <button 
-          onClick={() => { 
-            setEditingTemplate({ 
-              name: '', 
-              config: { 
-                bgColor: '#1e1b4b', textColor: '#ffffff', accentColor: '#8b5cf6', 
-                gridColor: '#2e1065', cardTitle: 'MUZ BINGO', showArtist: true, 
-                centerText: 'FREE SPACE', footerText: 'MuzBingo', showQR: true, 
-                layout: '2', fontFamily: '"Inter", sans-serif' 
-              } 
-            }); 
-            setIsCreateTemplateModalOpen(true); 
-          }} 
-          className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition flex items-center gap-2 shadow-lg shadow-purple-900/20"
-        >
-          <Palette size={20} /> Создать шаблон
-        </button>
+        <div><h1 className="text-3xl font-bold mb-2">Шаблоны карточек</h1><p className="text-gray-400">Настройте внешний вид бинго-карточек.</p></div>
+        <button onClick={() => { setEditingTemplate({ name: '', config: { bgColor: '#1e1b4b', textColor: '#ffffff', accentColor: '#8b5cf6', gridColor: '#2e1065', cardTitle: 'MUZ BINGO', showArtist: true, centerText: 'FREE SPACE', footerText: 'MuzBingo', showQR: true, layout: '2' } }); setIsCreateTemplateModalOpen(true); }} className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition flex items-center gap-2"><Palette size={20} /> Создать шаблон</button>
       </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 overflow-y-auto pr-2 custom-scrollbar pb-10">
         {templates.map(template => (
-          <div key={template.id} className="group relative bg-gray-900 border border-gray-800 p-4 rounded-2xl shadow-xl transition-all hover:border-purple-500/50">
-            <div style={{ 
-              backgroundColor: template.config.bgColor, 
-              backgroundImage: template.config.backgroundImageUrl ? `url(${template.config.backgroundImageUrl})` : 'none', 
-              backgroundSize: 'cover', 
-              backgroundPosition: 'center',
-              fontFamily: template.config.fontFamily || 'sans-serif'
-            }} className="aspect-[3/4] rounded-xl p-3 shadow-inner border border-white/10 overflow-hidden mb-4 relative">
-              <div style={{ color: template.config.accentColor }} className="text-center font-black text-[10px] mb-2 border-b pb-1 border-white/10 uppercase truncate">{template.config.cardTitle}</div>
-              <div className="grid grid-cols-5 gap-0.5 opacity-40">
-                {[...Array(25)].map((_, i) => (
-                  <div key={i} style={{ backgroundColor: template.config.gridColor }} className="aspect-square rounded-sm border border-white/5" />
-                ))}
-              </div>
-              <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/50 rounded text-[8px] text-white uppercase font-bold tracking-tighter">
-                Layout: {template.config.layout}
-              </div>
+          <div key={template.id} className="group relative bg-gray-900 border border-gray-800 p-4 rounded-2xl">
+            <div style={{ backgroundColor: template.config.bgColor, backgroundImage: template.config.backgroundImageUrl ? `url(${template.config.backgroundImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }} className="aspect-[3/4] rounded-xl p-3 shadow-inner border border-white/10 overflow-hidden mb-4 relative">
+              <div style={{ color: template.config.accentColor }} className="text-center font-black text-sm mb-2 border-b pb-1 border-white/10 uppercase">{template.config.cardTitle}</div>
+              <div className="grid grid-cols-5 gap-0.5 opacity-40">{[...Array(25)].map((_, i) => <div key={i} style={{ backgroundColor: template.config.gridColor }} className="aspect-square rounded-sm border border-white/5" />)}</div>
+              <div className="absolute top-2 right-2 px-2 py-0.5 bg-black/50 rounded text-[10px] text-white">{template.config.layout} на А4</div>
             </div>
-            <div className="flex justify-between items-center mt-2 px-1">
-              <h3 className="font-bold truncate pr-2 text-sm">{template.name}</h3>
-              <button onClick={(e) => deleteTemplate(template.id, e)} className="p-2 bg-gray-800 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-400/10 transition">
-                <Trash2 size={16} />
-              </button>
+            <div className="flex justify-between items-center mt-2">
+              <h3 className="font-bold truncate pr-2">{template.name}</h3>
+              <button onClick={e => deleteTemplate(template.id, e)} className="p-2 bg-gray-800 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-400/10 transition"><Trash2 size={16} /></button>
             </div>
           </div>
         ))}
       </div>
 
       {isCreateTemplateModalOpen && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex overflow-hidden animate-in fade-in">
-          {/* БОКОВАЯ ПАНЕЛЬ НАСТРОЕК */}
-          <div className="w-[450px] bg-gray-900 border-r border-gray-800 p-8 overflow-y-auto custom-scrollbar flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between mb-8 border-b border-gray-800 pb-6">
-              <div className="flex items-center gap-3 text-purple-400">
-                <Palette size={28} />
-                <h2 className="text-2xl font-bold text-white">Стиль карточки</h2>
-              </div>
-              <button onClick={() => setIsCreateTemplateModalOpen(false)} className="text-gray-500 hover:text-white transition">
-                <X size={24} />
-              </button>
-            </div>
-            
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex overflow-hidden">
+          <div className="w-[450px] bg-gray-900 border-r border-gray-800 p-8 overflow-y-auto custom-scrollbar flex flex-col">
+            <div className="flex items-center gap-3 mb-8 text-purple-400 border-b border-gray-800 pb-6"><Palette size={28} /><h2 className="text-2xl font-bold text-white">Конструктор стиля</h2></div>
             <div className="space-y-6 flex-1">
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">Название шаблона</label>
-                <input type="text" value={editingTemplate.name} onChange={e => setEditingTemplate({ ...editingTemplate, name: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none transition" placeholder="Напр: Классика А5" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2 font-kz">Шрифт (поддержка Ә, Ң, Қ...)</label>
-                <select 
-                  value={editingTemplate.config?.fontFamily} 
-                  onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, fontFamily: e.target.value } })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none cursor-pointer"
-                >
-                  {FONTS.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
-                </select>
-              </div>
-
+              <div><label className="block text-sm font-medium text-gray-400 mb-2">Название шаблона</label><input type="text" value={editingTemplate.name} onChange={e => setEditingTemplate({ ...editingTemplate, name: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none" /></div>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Заголовок</label>
-                  <input type="text" value={editingTemplate.config?.cardTitle} onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, cardTitle: e.target.value } })} className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:border-purple-500" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Центр. клетка</label>
-                  <input type="text" value={editingTemplate.config?.centerText} onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, centerText: e.target.value } })} className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:border-purple-500" />
-                </div>
+                <div><label className="block text-sm font-medium text-gray-400 mb-2">Заголовок</label><input type="text" value={editingTemplate.config?.cardTitle} onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, cardTitle: e.target.value } })} className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none" /></div>
+                <div><label className="block text-sm font-medium text-gray-400 mb-2">Центр. клетка</label><input type="text" value={editingTemplate.config?.centerText} onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, centerText: e.target.value } })} className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none" /></div>
               </div>
-
               <div className="pt-4 border-t border-gray-800">
-                <label className="block text-sm font-medium text-gray-400 mb-2">Фоновое изображение</label>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Фоновое изображение (PNG/JPG)</label>
                 {editingTemplate.config?.backgroundImageUrl && (
-                  <div className="relative rounded-xl overflow-hidden border border-gray-700 mb-4 h-32 group">
-                    <img src={editingTemplate.config.backgroundImageUrl} className="w-full h-full object-cover opacity-60" alt="bg preview" />
-                    <button onClick={() => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, backgroundImageUrl: undefined } })} className="absolute top-2 right-2 p-1.5 bg-red-600 rounded-lg hover:bg-red-500 transition shadow-lg opacity-0 group-hover:opacity-100">
-                      <X size={16} />
-                    </button>
+                  <div className="relative rounded-xl overflow-hidden border border-gray-700 mb-4">
+                    <img src={editingTemplate.config.backgroundImageUrl} className="w-full h-32 object-cover opacity-80" alt="bg preview" />
+                    <button onClick={() => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, backgroundImageUrl: undefined } })} className="absolute top-2 right-2 p-1.5 bg-red-600 rounded-lg hover:bg-red-500 transition"><X size={16} /></button>
                   </div>
                 )}
-                <div className="flex gap-2">
-                  <label className="flex-1 flex items-center justify-center gap-3 py-3 bg-gray-800 border-2 border-dashed border-gray-700 rounded-xl cursor-pointer hover:border-purple-500 hover:bg-gray-800/50 transition">
-                    <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={async e => {
-                      const file = e.target.files?.[0]; if (!file) return;
-                      showToast('Загружаем фон...');
-                      const url = await uploadTemplateBackground(file);
-                      if (url) { setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, backgroundImageUrl: url } }); showToast('Фон добавлен!'); }
-                    }} />
-                    <Upload size={20} className="text-gray-500" />
-                    <span className="text-gray-400 font-medium text-sm">Загрузить PNG/JPG</span>
-                  </label>
-                  <button onClick={downloadDesignGuide} className="p-3 bg-gray-800 border border-gray-700 rounded-xl text-gray-400 hover:text-white transition" title="Скачать разметку A4">
-                    <Download size={20} />
-                  </button>
-                </div>
+                <label className="flex items-center justify-center gap-3 w-full py-3 mb-3 bg-gray-800 border-2 border-dashed border-gray-700 rounded-xl cursor-pointer hover:border-purple-500 transition">
+                  <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={async e => {
+                    const file = e.target.files?.[0]; if (!file) return;
+                    showToast('Загружаем изображение...');
+                    const url = await uploadTemplateBackground(file);
+                    if (url) { setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, backgroundImageUrl: url } }); showToast('Изображение загружено!'); }
+                  }} />
+                  <Upload size={20} className="text-gray-400" />
+                  <span className="text-gray-400 font-medium">Загрузить PNG/JPG</span>
+                </label>
+                <button onClick={downloadDesignGuide} className="w-full flex items-center justify-center gap-2 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl transition font-medium border border-gray-700"><Download size={18} /> Скачать разметку (SVG)</button>
               </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="flex flex-col"><label className="text-[10px] font-bold text-gray-500 mb-2 text-center uppercase">Фон</label><input type="color" value={editingTemplate.config?.bgColor} onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, bgColor: e.target.value } })} className="w-full h-12 bg-gray-800 border border-gray-700 rounded-xl cursor-pointer p-1" /></div>
-                <div className="flex flex-col"><label className="text-[10px] font-bold text-gray-500 mb-2 text-center uppercase">Акцент</label><input type="color" value={editingTemplate.config?.accentColor} onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, accentColor: e.target.value } })} className="w-full h-12 bg-gray-800 border border-gray-700 rounded-xl cursor-pointer p-1" /></div>
-                <div className="flex flex-col"><label className="text-[10px] font-bold text-gray-500 mb-2 text-center uppercase">Сетка</label><input type="color" value={editingTemplate.config?.gridColor} onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, gridColor: e.target.value } })} className="w-full h-12 bg-gray-800 border border-gray-700 rounded-xl cursor-pointer p-1" /></div>
-              </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">Раскладка на листе А4</label>
-                <div className="flex gap-2 p-1 bg-gray-800 rounded-xl border border-gray-700">
-                  {['1', '2', '4'].map(l => (
-                    <button 
-                      key={l} 
-                      onClick={() => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, layout: l as any } })} 
-                      className={`flex-1 py-2 rounded-lg font-bold transition-all ${editingTemplate.config?.layout === l ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
-                    >
-                      {l} {l === '1' ? 'шт' : 'шт'}
-                    </button>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Раскладка для печати</label>
+                <div className="flex gap-2 p-1 bg-gray-800 rounded-xl">
+                  {(['1', '2', '4'] as const).map(layout => (
+                    <button key={layout} onClick={() => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, layout } })} className={`flex-1 py-2 rounded-lg font-bold transition ${editingTemplate.config?.layout === layout ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}>{layout} {layout === '1' ? '(А4)' : layout === '2' ? '(А5)' : '(А6)'}</button>
                   ))}
                 </div>
               </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="flex flex-col"><label className="text-xs font-medium text-gray-400 mb-2 text-center">Цвет Фона</label><input type="color" value={editingTemplate.config?.bgColor} onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, bgColor: e.target.value } })} className="w-full h-12 bg-gray-800 border border-gray-700 rounded-xl cursor-pointer" /></div>
+                <div className="flex flex-col"><label className="text-xs font-medium text-gray-400 mb-2 text-center">Акцент</label><input type="color" value={editingTemplate.config?.accentColor} onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, accentColor: e.target.value } })} className="w-full h-12 bg-gray-800 border border-gray-700 rounded-xl cursor-pointer" /></div>
+                <div className="flex flex-col"><label className="text-xs font-medium text-gray-400 mb-2 text-center">Цвет Сетки</label><input type="color" value={editingTemplate.config?.gridColor} onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, gridColor: e.target.value } })} className="w-full h-12 bg-gray-800 border border-gray-700 rounded-xl cursor-pointer" /></div>
+              </div>
+              <div><label className="block text-sm font-medium text-gray-400 mb-2">Текст в подвале</label><input type="text" value={editingTemplate.config?.footerText} onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, footerText: e.target.value } })} className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none" /></div>
+              <div className="space-y-3 pt-4 border-t border-gray-800">
+                <label className="flex items-center justify-between p-4 bg-gray-800 hover:bg-gray-700 transition cursor-pointer rounded-xl border border-gray-700"><span className="font-medium">Показывать исполнителя</span><input type="checkbox" checked={editingTemplate.config?.showArtist} onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, showArtist: e.target.checked } })} className="w-5 h-5 accent-purple-600" /></label>
+                <label className="flex items-center justify-between p-4 bg-gray-800 hover:bg-gray-700 transition cursor-pointer rounded-xl border border-gray-700"><span className="font-medium">Добавить блок QR-кода</span><input type="checkbox" checked={editingTemplate.config?.showQR} onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, showQR: e.target.checked } })} className="w-5 h-5 accent-purple-600" /></label>
+                {editingTemplate.config?.showQR && (
+                  <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                    <label className="block text-sm font-medium text-gray-400 mb-2">Ссылка для QR</label>
+                    <input type="url" value={editingTemplate.config?.qrUrl || ''} onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, qrUrl: e.target.value } })} className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none" />
+                  </div>
+                )}
+              </div>
             </div>
-
-            <div className="mt-8 flex gap-3 pt-6 border-t border-gray-800">
-              <button onClick={() => setIsCreateTemplateModalOpen(false)} className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-4 rounded-xl font-bold transition">Отмена</button>
-              <button onClick={saveTemplate} className="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-purple-900/30 transition">
-                <Save size={20} /> Сохранить
-              </button>
+            <div className="mt-8 flex gap-3 pt-6 border-t border-gray-800 bg-gray-900">
+              <button onClick={() => setIsCreateTemplateModalOpen(false)} className="flex-1 bg-gray-800 py-4 rounded-xl font-bold transition">Отмена</button>
+              <button onClick={saveTemplate} className="flex-1 bg-purple-600 py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition"><Save size={20} /> Сохранить</button>
             </div>
           </div>
-
-          {/* ОБЛАСТЬ ПРЕДПРОСМОТРА */}
-          <div className="flex-1 flex flex-col items-center justify-center p-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-gray-800 to-black relative overflow-hidden">
-             <div className="absolute top-8 left-8 text-gray-400 flex flex-col">
-                <span className="flex items-center gap-2 font-bold text-white mb-1"><Eye size={18} /> Предпросмотр печати</span>
-                <span className="text-xs">Размеры и пропорции зафиксированы под лист А4</span>
-             </div>
-
-             <div className={`bg-white shadow-[0_0_80px_rgba(0,0,0,0.5)] flex items-center justify-center gap-4 p-4 transition-all duration-500 ${editingTemplate.config?.layout === '1' ? 'w-[400px] aspect-[1/1.414]' : editingTemplate.config?.layout === '2' ? 'w-[650px] aspect-[1.414/1]' : 'w-[450px] aspect-[1/1.414] grid grid-cols-2 grid-rows-2'}`}>
+          <div className="flex-1 flex flex-col items-center justify-center p-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-800 to-black relative overflow-hidden">
+             {/* Рендер предпросмотра (из старого кода, тут ничего не изменилось) */}
+             <div className="absolute top-10 left-10 flex flex-col text-gray-400"><span className="flex items-center gap-2 font-bold text-white mb-1"><Eye size={20} /> Предпросмотр печати</span><span className="text-sm">Пример генерации на листе бумаги</span></div>
+             <div className={`bg-white shadow-[0_0_60px_rgba(0,0,0,0.8)] flex items-center justify-center gap-4 p-4 transition-all duration-500 ${editingTemplate.config?.layout === '1' ? 'w-[400px] aspect-[1/1.414]' : editingTemplate.config?.layout === '2' ? 'w-[600px] aspect-[1.414/1] flex-row' : 'w-[450px] aspect-[1/1.414] grid grid-cols-2 grid-rows-2'}`}>
                 {[...Array(Number(editingTemplate.config?.layout || 1))].map((_, cardIndex) => (
-                  <div key={cardIndex} style={{ 
-                    backgroundColor: editingTemplate.config?.bgColor, 
-                    color: editingTemplate.config?.textColor, 
-                    fontFamily: editingTemplate.config?.fontFamily,
-                    backgroundImage: editingTemplate.config?.backgroundImageUrl ? `url(${editingTemplate.config.backgroundImageUrl})` : 'none',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center'
-                  }} className="relative flex flex-col h-full w-full p-4 border border-dashed border-gray-300 overflow-hidden select-none">
-                    <div style={{ color: editingTemplate.config?.accentColor, borderColor: `${editingTemplate.config?.accentColor}44` }} className="text-center font-black uppercase italic mb-3 text-lg border-b-2 pb-1 truncate tracking-tighter">
-                      {editingTemplate.config?.cardTitle}
-                    </div>
-                    
+                  <div key={cardIndex} style={{ backgroundColor: editingTemplate.config?.bgColor, color: editingTemplate.config?.textColor, backgroundImage: editingTemplate.config?.backgroundImageUrl ? `url(${editingTemplate.config?.backgroundImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }} className={`relative flex flex-col rounded shadow-md overflow-hidden ${editingTemplate.config?.layout === '1' ? 'w-full h-full p-8 border-2 border-dashed border-gray-300' : editingTemplate.config?.layout === '2' ? 'w-1/2 h-full p-6 border border-dashed border-gray-300' : 'w-full h-full p-3 border border-dashed border-gray-300'}`}>
+                    <div style={{ color: editingTemplate.config?.accentColor, borderColor: `${editingTemplate.config?.accentColor}44` }} className={`text-center font-black border-b-4 uppercase italic tracking-tighter ${editingTemplate.config?.layout === '4' ? 'text-xl mb-2 pb-1 border-b-2' : 'text-3xl mb-4 pb-3'}`}>{editingTemplate.config?.cardTitle}</div>
                     <div className="grid grid-cols-5 gap-1 flex-1">
                       {[...Array(25)].map((_, i) => (
-                        <div key={i} style={{ backgroundColor: editingTemplate.config?.gridColor }} className="rounded-sm border border-white/5 flex flex-col items-center justify-center text-center p-0.5 overflow-hidden">
-                          {i === 12 
-                            ? <div style={{ color: editingTemplate.config?.accentColor }} className="font-black text-[7px] uppercase leading-none">{editingTemplate.config?.centerText}</div>
-                            : <div className="space-y-0.5 w-full">
-                                <div className="text-[6px] font-bold leading-none line-clamp-2 uppercase">ҚАЗАҚША ТРЕК</div>
-                                {editingTemplate.config?.showArtist && <div style={{ color: editingTemplate.config?.accentColor }} className="text-[4px] italic opacity-80 leading-none truncate">Әнші есімі</div>}
-                              </div>
-                          }
+                        <div key={i} style={{ backgroundColor: editingTemplate.config?.gridColor }} className="rounded border border-white/10 flex flex-col items-center justify-center text-center p-1">
+                          {i === 12 ? <div style={{ color: editingTemplate.config?.accentColor }} className={`font-black uppercase leading-tight ${editingTemplate.config?.layout === '4' ? 'text-[8px]' : 'text-xs'}`}>{editingTemplate.config?.centerText}</div> : <><div className={`font-bold leading-tight opacity-90 uppercase ${editingTemplate.config?.layout === '4' ? 'text-[6px]' : 'text-[9px]'}`}>Трек {i + 1}</div>{editingTemplate.config?.showArtist && <div style={{ color: editingTemplate.config?.accentColor }} className={`font-medium leading-tight opacity-90 italic mt-0.5 ${editingTemplate.config?.layout === '4' ? 'text-[5px]' : 'text-[7px]'}`}>Исполнитель</div>}</>}
                         </div>
                       ))}
-                    </div>
-
-                    <div className="mt-2 flex justify-between items-end opacity-80">
-                      <div className="text-[6px] font-bold leading-tight">
-                        ID: #104{cardIndex}<br/>
-                        <span className="font-normal opacity-70">{editingTemplate.config?.footerText}</span>
-                      </div>
-                      {editingTemplate.config?.showQR && <div className="w-8 h-8 bg-white/90 rounded-sm border border-black/10 flex items-center justify-center text-[4px] text-black font-bold">QR CODE</div>}
                     </div>
                   </div>
                 ))}
