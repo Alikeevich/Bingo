@@ -6,7 +6,8 @@ import {
   X, FolderPlus, Trash2, ChevronLeft, CheckCircle2, Loader2, Flame,
   Calendar, Trophy, PlusCircle, Palette, Eye, Save, 
   Play, SkipForward, SkipBack, EyeOff, ListChecks, Power,
-  PartyPopper, Shuffle, MonitorPlay, Minimize, Printer, SearchCheck
+  PartyPopper, Shuffle, MonitorPlay, Minimize, Printer, SearchCheck,
+  Upload, Download // НОВЫЕ ИКОНКИ
 } from 'lucide-react';
 
 // --- ТИПЫ ДАННЫХ ---
@@ -56,6 +57,8 @@ interface TemplateConfig {
   footerText: string;
   showQR: boolean;
   layout: '1' | '2' | '4';
+  backgroundImageUrl?: string; // НОВОЕ ПОЛЕ: ФОН
+  qrUrl?: string;              // НОВОЕ ПОЛЕ: ССЫЛКА ДЛЯ QR
 }
 
 interface Template {
@@ -80,7 +83,7 @@ export default function App() {
   // --- СОСТОЯНИЯ БАЗЫ ПЕСЕН ---
   const[searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Track[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const[isSearching, setIsSearching] = useState(false);
   const[activeFilter, setActiveFilter] = useState('Топ Чарт');
 
   // --- СОСТОЯНИЯ АУДИО ПЛЕЕРА ---
@@ -89,7 +92,7 @@ export default function App() {
 
   // --- РЕЖИМ ВЕДУЩЕГО (HOST MODE) ---
   const[hostSession, setHostSession] = useState<{ game: Game, round: Round, playlist: Playlist } | null>(null);
-  const [shuffledTracks, setShuffledTracks] = useState<Track[]>([]);
+  const[shuffledTracks, setShuffledTracks] = useState<Track[]>([]);
   const[playedTrackIds, setPlayedTrackIds] = useState<Set<string | number>>(new Set());
   const[currentHostTrackIndex, setCurrentHostTrackIndex] = useState<number>(0);
   const[hideTrackInfo, setHideTrackInfo] = useState(true);
@@ -119,7 +122,7 @@ export default function App() {
   
   const[viewingGame, setViewingGame] = useState<Game | null>(null);
   const[isCreateGameModalOpen, setIsCreateGameModalOpen] = useState(false);
-  const [newGameName, setNewGameName] = useState('');
+  const[newGameName, setNewGameName] = useState('');
   const[isAddRoundModalOpen, setIsAddRoundModalOpen] = useState(false);
   const[newRound, setNewRound] = useState<Partial<Round>>({ winCondition: '1_line' });
 
@@ -129,7 +132,7 @@ export default function App() {
     config: { bgColor: '#1e1b4b', textColor: '#ffffff', accentColor: '#8b5cf6', gridColor: '#2e1065', cardTitle: 'MUZ BINGO', showArtist: true, centerText: 'FREE SPACE', footerText: 'MuzBingo', showQR: true, layout: '2' }
   });
 
-  const [toast, setToast] = useState<string | null>(null);
+  const[toast, setToast] = useState<string | null>(null);
 
   // --- ИНИЦИАЛИЗАЦИЯ И ЗАГРУЗКА ---
   useEffect(() => {
@@ -138,14 +141,13 @@ export default function App() {
     fetchTemplates();
     loadTopChart();
 
-    // ВОССТАНОВЛЕНИЕ ПРОГРЕССА ИГРЫ (ЗАЩИТА ОТ F5)
     const savedSessionStr = localStorage.getItem('muzbingo_host_session');
     if (savedSessionStr) {
       try {
         const parsed = JSON.parse(savedSessionStr);
         if (parsed && parsed.hostSession) {
           setHostSession(parsed.hostSession);
-          setShuffledTracks(parsed.shuffledTracks || []);
+          setShuffledTracks(parsed.shuffledTracks ||[]);
           setPlayedTrackIds(new Set(parsed.playedTrackIds ||[]));
           setCurrentHostTrackIndex(parsed.currentHostTrackIndex || 0);
           setHideTrackInfo(parsed.hideTrackInfo ?? true);
@@ -162,7 +164,6 @@ export default function App() {
     };
   },[]);
 
-  // --- АВТО-СОХРАНЕНИЕ ПРОГРЕССА В LOCALSTORAGE ---
   useEffect(() => {
     if (hostSession) {
       const stateToSave = {
@@ -180,21 +181,17 @@ export default function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Работает только если включен режим проектора
       if (isProjectorMode) {
-        if (e.key === 'Escape') {
-          setIsProjectorMode(false);
-        }
+        if (e.key === 'Escape') setIsProjectorMode(false);
         if (e.code === 'Space') {
-          e.preventDefault(); // Блокируем прокрутку страницы по пробелу
-          setHideTrackInfo(prev => !prev); // Переключаем видимость ответа
+          e.preventDefault();
+          setHideTrackInfo(prev => !prev);
         }
       }
     };
-    
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  },[isProjectorMode]); // Важно добавить зависимость
+  },[isProjectorMode]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -252,7 +249,6 @@ export default function App() {
     searchDeezer(searchQuery);
   };
 
-  // --- ВОСПРОИЗВЕДЕНИЕ С УМНЫМ ОБНОВЛЕНИЕМ ССЫЛКИ ---
   const togglePlay = async (track: Track) => {
     if (!track.preview) return showToast('Ошибка: у этого трека нет аудио-превью!');
 
@@ -293,7 +289,6 @@ export default function App() {
     audio.onended = () => setPlayingTrackId(null);
   };
 
-  // --- ФУНКЦИИ ГЕНЕРАЦИИ КАРТОЧЕК ---
   const generateCards = async () => {
     if (!cardGeneratorSetup || !selectedTemplateId) return;
     const { game, round } = cardGeneratorSetup;
@@ -329,7 +324,6 @@ export default function App() {
     setPrintViewCards({ cards: newCards, template });
   };
 
-  // --- ЛОГИКА ПРОВЕРКИ БИНГО ---
   const handleVerifyCard = () => {
     if (!verifyCardId.trim()) return;
     if (!hostSession?.round.cards || hostSession.round.cards.length === 0) {
@@ -344,8 +338,9 @@ export default function App() {
       return playedTrackIds.has(cell.id);
     });
 
-    const linesIndices = [[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24], // Горизонтали[0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24], // Вертикали[0,6,12,18,24], [4,8,12,16,20] // Две диагонали
-    ];
+    const linesIndices = [[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24], 
+                        [0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24],
+                        [0,6,12,18,24],[4,8,12,16,20]];
 
     let linesCount = 0;
     linesIndices.forEach(line => {
@@ -361,7 +356,6 @@ export default function App() {
     setVerifyResult({ card, matches, linesCount, isWinner });
   };
 
-  // --- ОСТАЛЬНЫЕ ФУНКЦИИ CRUD ---
   const createPlaylist = async () => {
     if (!newPlaylistName.trim()) return;
     setIsCreatePlaylistModalOpen(false);
@@ -375,10 +369,7 @@ export default function App() {
     if (confirm('Точно удалить плейлист?')) {
       setPlaylists(playlists.filter(p => p.id !== id));
       if (viewingPlaylist?.id === id) setViewingPlaylist(null);
-      
-      // Защита: если удаляем плейлист, в который сейчас играем, прерываем игру
       if (hostSession?.playlist.id === id) setHostSession(null);
-
       await supabase.from('playlists').delete().eq('id', id);
       showToast('Плейлист успешно удален');
     }
@@ -417,10 +408,7 @@ export default function App() {
     if (confirm('Удалить мероприятие со всеми его турами и карточками?')) {
       setGames(games.filter(g => g.id !== id));
       if (viewingGame?.id === id) setViewingGame(null);
-
-      // Защита: если мы сейчас ведем это мероприятие, прерываем игру
       if (hostSession?.game.id === id) setHostSession(null);
-
       await supabase.from('games').delete().eq('id', id);
       showToast('Мероприятие успешно удалено');
     }
@@ -445,13 +433,50 @@ export default function App() {
       const updatedGame = { ...viewingGame, rounds: updatedRounds };
       setGames(games.map(g => g.id === viewingGame.id ? updatedGame : g));
       setViewingGame(updatedGame);
-
-      // Защита: если мы сейчас ведем этот тур, прерываем игру
       if (hostSession?.round.id === roundId) setHostSession(null);
-
       await supabase.from('games').update({ rounds: updatedRounds }).eq('id', viewingGame.id);
       showToast('Тур успешно удален');
     }
+  };
+
+  // --- НОВЫЕ ФУНКЦИИ ДЛЯ ДИЗАЙНА ---
+  const uploadTemplateBackground = async (file: File): Promise<string | null> => {
+    const ext = file.name.split('.').pop();
+    const fileName = `template_bg_${Date.now()}.${ext}`;
+    const { data, error } = await supabase.storage.from('template-backgrounds').upload(fileName, file, { upsert: true });
+    if (error) { showToast('Ошибка загрузки: ' + error.message); return null; }
+    const { data: urlData } = supabase.storage.from('template-backgrounds').getPublicUrl(data.path);
+    return urlData.publicUrl;
+  };
+
+  const downloadDesignGuide = () => {
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="2480" height="3508" viewBox="0 0 2480 3508">
+        <rect width="2480" height="3508" fill="#e5e7eb" />
+        <!-- Title Area -->
+        <rect x="200" y="200" width="2080" height="300" fill="#fca5a5" opacity="0.5" />
+        <text x="1240" y="380" font-family="sans-serif" font-size="100" font-weight="bold" text-anchor="middle" fill="#991b1b">ЗОНА ЗАГОЛОВКА</text>
+        <!-- Grid Area -->
+        <rect x="200" y="700" width="2080" height="2080" fill="#86efac" opacity="0.5" />
+        <text x="1240" y="1740" font-family="sans-serif" font-size="120" font-weight="bold" text-anchor="middle" fill="#166534">СЕТКА (ОСТАВИТЬ НЕЙТРАЛЬНЫМ/СВЕТЛЫМ)</text>
+        <!-- Footer / ID Area -->
+        <rect x="200" y="3000" width="1000" height="200" fill="#fcd34d" opacity="0.5" />
+        <text x="700" y="3120" font-family="sans-serif" font-size="80" font-weight="bold" text-anchor="middle" fill="#854d0e">ID И ПОДВАЛ</text>
+        <!-- QR Area -->
+        <rect x="1980" y="2900" width="300" height="300" fill="#93c5fd" opacity="0.5" />
+        <text x="2130" y="3070" font-family="sans-serif" font-size="60" font-weight="bold" text-anchor="middle" fill="#1e3a8a">QR КОД</text>
+        <!-- Instructions -->
+        <text x="1240" y="100" font-family="sans-serif" font-size="60" font-weight="bold" text-anchor="middle" fill="#374151">MuzBingo Guide: 2480x3508 px (A4, 300dpi). Сохранять в PNG/JPG.</text>
+        <text x="1240" y="3400" font-family="sans-serif" font-size="40" text-anchor="middle" fill="#374151">Приложение само наложит тексты, сетку и QR код поверх вашего дизайна</text>
+      </svg>
+    `;
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'MuzBingo_Design_Guide_A4.svg';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const saveTemplate = async () => {
@@ -536,13 +561,23 @@ export default function App() {
             <div key={pageIndex} className="w-[210mm] h-[297mm] bg-white shadow-2xl print:shadow-none print:w-full print:h-screen print:page-break-after-always overflow-hidden">
               <div className={`w-full h-full p-[10mm] gap-[10mm] ${layoutNum === 1 ? 'flex flex-col' : layoutNum === 2 ? 'grid grid-cols-1 grid-rows-2' : 'grid grid-cols-2 grid-rows-2'}`}>
                 {pageCards.map((card) => (
-                  <div key={card.id} style={{ backgroundColor: template.config.bgColor, color: template.config.textColor }} className="relative flex flex-col rounded-xl overflow-hidden p-6 print:p-4 border-2 border-dashed border-gray-300">
+                  <div 
+                    key={card.id} 
+                    style={{ 
+                      backgroundColor: template.config.bgColor, 
+                      color: template.config.textColor,
+                      backgroundImage: template.config.backgroundImageUrl ? `url(${template.config.backgroundImageUrl})` : 'none',
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }} 
+                    className="relative flex flex-col rounded-xl overflow-hidden p-6 print:p-4 border-2 border-dashed border-gray-300"
+                  >
                     <div style={{ color: template.config.accentColor, borderColor: `${template.config.accentColor}44` }} className={`text-center font-black border-b-4 uppercase italic tracking-tighter ${layoutNum === 4 ? 'text-2xl mb-2 pb-2 border-b-2' : 'text-5xl mb-6 pb-4'}`}>{template.config.cardTitle}</div>
                     <div className="grid grid-cols-5 gap-1.5 print:gap-1 flex-1">
                       {card.cells.map((cell, i) => {
                         const isFree = 'isFreeSpace' in cell;
                         return (
-                          <div key={i} style={{ backgroundColor: template.config.gridColor }} className="rounded-lg border border-white/10 flex flex-col items-center justify-center text-center p-1.5 print:p-1 overflow-hidden">
+                          <div key={i} style={{ backgroundColor: template.config.gridColor }} className="rounded-lg border border-white/10 flex flex-col items-center justify-center text-center p-1.5 print:p-1 overflow-hidden backdrop-blur-sm">
                             {isFree ? <div style={{ color: template.config.accentColor }} className={`font-black uppercase leading-tight ${layoutNum === 4 ? 'text-xs' : 'text-xl'}`}>{template.config.centerText}</div> : (
                               <><div className={`font-bold leading-tight opacity-90 ${layoutNum === 4 ? 'text-[8px]' : 'text-sm'}`}>{cell.title}</div>{template.config.showArtist && <div style={{ color: template.config.accentColor }} className={`font-medium leading-tight opacity-90 italic mt-1 ${layoutNum === 4 ? 'text-[6px]' : 'text-xs'}`}>{cell.artist}</div>}</>
                             )}
@@ -551,8 +586,19 @@ export default function App() {
                       })}
                     </div>
                     <div className={`mt-4 flex justify-between items-end ${layoutNum === 4 ? 'mt-2' : ''}`}>
-                      <div className="flex flex-col"><div className={`opacity-60 uppercase font-bold tracking-widest ${layoutNum === 4 ? 'text-[8px]' : 'text-sm'}`}>ID: #{card.id}</div><div className={`opacity-40 font-medium ${layoutNum === 4 ? 'text-[6px]' : 'text-xs'}`}>{template.config.footerText}</div></div>
-                      {template.config.showQR && <div className={`bg-white/10 border border-white/20 flex flex-col items-center justify-center ${layoutNum === 4 ? 'w-10 h-10 rounded-md' : 'w-16 h-16 rounded-xl'}`}><div className={`font-bold opacity-50 text-center leading-none ${layoutNum === 4 ? 'text-[5px]' : 'text-[8px]'}`}>МЕСТО ДЛЯ<br/>QR КОДА</div></div>}
+                      <div className="flex flex-col bg-white/50 backdrop-blur-sm p-1 rounded-md"><div className={`opacity-80 uppercase font-bold tracking-widest ${layoutNum === 4 ? 'text-[8px]' : 'text-sm'}`}>ID: #{card.id}</div><div className={`opacity-70 font-medium ${layoutNum === 4 ? 'text-[6px]' : 'text-xs'}`}>{template.config.footerText}</div></div>
+                      
+                      {/* БЛОК С НАСТОЯЩИМ QR КОДОМ */}
+                      {template.config.showQR && (
+                        <div className={`bg-white/90 border border-white/20 flex flex-col items-center justify-center p-1 shadow-sm ${layoutNum === 4 ? 'w-10 h-10 rounded-md' : 'w-16 h-16 rounded-xl'}`}>
+                          {template.config.qrUrl ? (
+                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(template.config.qrUrl)}`} className="w-full h-full object-contain mix-blend-multiply" alt="QR" />
+                          ) : (
+                            <div className={`font-bold opacity-50 text-center leading-none text-black ${layoutNum === 4 ? 'text-[5px]' : 'text-[8px]'}`}>МЕСТО ДЛЯ<br/>QR КОДА</div>
+                          )}
+                        </div>
+                      )}
+                      
                     </div>
                   </div>
                 ))}
@@ -578,10 +624,7 @@ export default function App() {
           </button>
           
           {currentTrack && (
-            /* pb-28 поднимает контент чуть выше, чтобы оставить место для кнопок снизу */
             <div className="flex flex-col items-center justify-center max-w-5xl w-full px-10 pb-28 h-full">
-              
-              {/* Адаптивная обложка (зависит от высоты экрана: 45vh) */}
               <div className={`relative w-[45vh] h-[45vh] min-w-[250px] min-h-[250px] max-w-[600px] max-h-[600px] rounded-[3rem] overflow-hidden shadow-[0_0_150px_rgba(168,85,247,0.2)] mb-8 transition-all duration-1000 flex-shrink-0 ${isPlaying ? 'scale-105' : 'scale-100'}`}>
                 <img src={currentTrack.cover} className={`w-full h-full object-cover transition-all duration-1000 ${hideTrackInfo ? 'blur-[50px] scale-125 brightness-50' : 'blur-0 scale-100'}`} alt="" />
                 {hideTrackInfo && <div className="absolute inset-0 flex items-center justify-center"><Music size={100} className="text-white/10 md:w-[150px] md:h-[150px]" /></div>}
@@ -594,7 +637,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Панель кнопок с эффектом стекла (размытия) */}
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-50 bg-black/60 p-3 rounded-[2.5rem] backdrop-blur-md border border-white/10 shadow-2xl">
             <button 
               onClick={() => setHideTrackInfo(!hideTrackInfo)} 
@@ -751,7 +793,6 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* Отрисовка сетки карточки */}
                   <div className="grid grid-cols-5 gap-2 mb-8 w-full max-w-[400px]">
                     {verifyResult.card.cells.map((cell, i) => {
                       const isMatch = verifyResult.matches[i];
@@ -799,7 +840,6 @@ export default function App() {
               </div>
             </div>
             
-            {/* НОВАЯ КНОПКА УДАЛЕНИЯ */}
             <button 
               onClick={(e) => deleteGame(currentGame.id, e)} 
               className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition font-bold"
@@ -985,7 +1025,15 @@ export default function App() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 overflow-y-auto pr-2 custom-scrollbar pb-10">
         {templates.map(template => (
           <div key={template.id} className="group relative bg-gray-900 border border-gray-800 p-4 rounded-2xl">
-             <div style={{ backgroundColor: template.config.bgColor }} className="aspect-[3/4] rounded-xl p-3 shadow-inner border border-white/10 overflow-hidden mb-4 relative">
+             <div 
+               style={{ 
+                 backgroundColor: template.config.bgColor,
+                 backgroundImage: template.config.backgroundImageUrl ? `url(${template.config.backgroundImageUrl})` : 'none',
+                 backgroundSize: 'cover',
+                 backgroundPosition: 'center',
+               }} 
+               className="aspect-[3/4] rounded-xl p-3 shadow-inner border border-white/10 overflow-hidden mb-4 relative"
+             >
                 <div style={{ color: template.config.accentColor }} className="text-center font-black text-sm mb-2 border-b pb-1 border-white/10 uppercase">{template.config.cardTitle}</div>
                 <div className="grid grid-cols-5 gap-0.5 opacity-40">
                   {[...Array(25)].map((_, i) => <div key={i} style={{ backgroundColor: template.config.gridColor }} className="aspect-square rounded-sm border border-white/5" />)}
@@ -1150,6 +1198,7 @@ export default function App() {
         </div>
       )}
 
+      {/* --- МОДАЛКА СОЗДАНИЯ ШАБЛОНА --- */}
       {isCreateTemplateModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex overflow-hidden">
           <div className="w-[450px] bg-gray-900 border-r border-gray-800 p-8 overflow-y-auto custom-scrollbar flex flex-col">
@@ -1160,8 +1209,48 @@ export default function App() {
                 <div><label className="block text-sm font-medium text-gray-400 mb-2">Заголовок</label><input type="text" value={editingTemplate.config?.cardTitle} onChange={e => setEditingTemplate({...editingTemplate, config: {...editingTemplate.config!, cardTitle: e.target.value}})} className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none" /></div>
                 <div><label className="block text-sm font-medium text-gray-400 mb-2">Центр. клетка</label><input type="text" value={editingTemplate.config?.centerText} onChange={e => setEditingTemplate({...editingTemplate, config: {...editingTemplate.config!, centerText: e.target.value}})} className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none" /></div>
               </div>
+              
+              {/* НАСТРОЙКИ ФОНА (НОВОЕ) */}
+              <div className="pt-4 border-t border-gray-800">
+                <label className="block text-sm font-medium text-gray-400 mb-2">Фоновое изображение (PNG/JPG)</label>
+                
+                {editingTemplate.config?.backgroundImageUrl ? (
+                  <div className="relative rounded-xl overflow-hidden border border-gray-700 mb-4">
+                    <img src={editingTemplate.config.backgroundImageUrl} className="w-full h-32 object-cover opacity-80" alt="bg preview" />
+                    <button onClick={() => setEditingTemplate({...editingTemplate, config: {...editingTemplate.config!, backgroundImageUrl: undefined}})} className="absolute top-2 right-2 p-1.5 bg-red-600 rounded-lg hover:bg-red-500 transition shadow-lg">
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : null}
+                
+                <label className="flex items-center justify-center gap-3 w-full py-3 mb-3 bg-gray-800 border-2 border-dashed border-gray-700 rounded-xl cursor-pointer hover:border-purple-500 hover:bg-gray-700/50 transition">
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 10 * 1024 * 1024) return showToast('Файл слишком большой (макс. 10 МБ)');
+                      showToast('Загружаем изображение...');
+                      const url = await uploadTemplateBackground(file);
+                      if (url) {
+                        setEditingTemplate({...editingTemplate, config: {...editingTemplate.config!, backgroundImageUrl: url}});
+                        showToast('Изображение загружено!');
+                      }
+                    }}
+                  />
+                  <Upload size={20} className="text-gray-400" />
+                  <span className="text-gray-400 font-medium">{editingTemplate.config?.backgroundImageUrl ? 'Заменить изображение' : 'Загрузить PNG/JPG'}</span>
+                </label>
+
+                <button onClick={downloadDesignGuide} className="w-full flex items-center justify-center gap-2 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl transition font-medium border border-gray-700">
+                  <Download size={18} /> Скачать разметку для дизайнера (SVG)
+                </button>
+              </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">Раскладка для печати (формат А4)</label>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Раскладка для печати</label>
                 <div className="flex gap-2 p-1 bg-gray-800 rounded-xl">
                   {(['1', '2', '4'] as const).map(layout => (
                     <button key={layout} onClick={() => setEditingTemplate({...editingTemplate, config: {...editingTemplate.config!, layout}})} className={`flex-1 py-2 rounded-lg font-bold transition ${editingTemplate.config?.layout === layout ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}>{layout} {layout === '1' ? '(А4)' : layout === '2' ? '(А5)' : '(А6)'}</button>
@@ -1169,15 +1258,31 @@ export default function App() {
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <div className="flex flex-col"><label className="text-xs font-medium text-gray-400 mb-2 text-center">Фон</label><input type="color" value={editingTemplate.config?.bgColor} onChange={e => setEditingTemplate({...editingTemplate, config: {...editingTemplate.config!, bgColor: e.target.value}})} className="w-full h-12 bg-gray-800 border border-gray-700 rounded-xl cursor-pointer" /></div>
+                <div className="flex flex-col"><label className="text-xs font-medium text-gray-400 mb-2 text-center">Цвет Фона</label><input type="color" value={editingTemplate.config?.bgColor} onChange={e => setEditingTemplate({...editingTemplate, config: {...editingTemplate.config!, bgColor: e.target.value}})} className="w-full h-12 bg-gray-800 border border-gray-700 rounded-xl cursor-pointer" /></div>
                 <div className="flex flex-col"><label className="text-xs font-medium text-gray-400 mb-2 text-center">Акцент</label><input type="color" value={editingTemplate.config?.accentColor} onChange={e => setEditingTemplate({...editingTemplate, config: {...editingTemplate.config!, accentColor: e.target.value}})} className="w-full h-12 bg-gray-800 border border-gray-700 rounded-xl cursor-pointer" /></div>
-                <div className="flex flex-col"><label className="text-xs font-medium text-gray-400 mb-2 text-center">Сетка</label><input type="color" value={editingTemplate.config?.gridColor} onChange={e => setEditingTemplate({...editingTemplate, config: {...editingTemplate.config!, gridColor: e.target.value}})} className="w-full h-12 bg-gray-800 border border-gray-700 rounded-xl cursor-pointer" /></div>
+                <div className="flex flex-col"><label className="text-xs font-medium text-gray-400 mb-2 text-center">Цвет Сетки</label><input type="color" value={editingTemplate.config?.gridColor} onChange={e => setEditingTemplate({...editingTemplate, config: {...editingTemplate.config!, gridColor: e.target.value}})} className="w-full h-12 bg-gray-800 border border-gray-700 rounded-xl cursor-pointer" /></div>
               </div>
               <div><label className="block text-sm font-medium text-gray-400 mb-2">Текст в подвале (футере)</label><input type="text" value={editingTemplate.config?.footerText} onChange={e => setEditingTemplate({...editingTemplate, config: {...editingTemplate.config!, footerText: e.target.value}})} className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none" /></div>
+              
+              {/* ЧЕКБОКСЫ И QR КОД (НОВОЕ) */}
               <div className="space-y-3 pt-4 border-t border-gray-800">
                 <label className="flex items-center justify-between p-4 bg-gray-800 hover:bg-gray-700 transition cursor-pointer rounded-xl border border-gray-700"><span className="font-medium">Показывать исполнителя</span><input type="checkbox" checked={editingTemplate.config?.showArtist} onChange={e => setEditingTemplate({...editingTemplate, config: {...editingTemplate.config!, showArtist: e.target.checked}})} className="w-5 h-5 accent-purple-600" /></label>
                 <label className="flex items-center justify-between p-4 bg-gray-800 hover:bg-gray-700 transition cursor-pointer rounded-xl border border-gray-700"><span className="font-medium">Добавить блок QR-кода</span><input type="checkbox" checked={editingTemplate.config?.showQR} onChange={e => setEditingTemplate({...editingTemplate, config: {...editingTemplate.config!, showQR: e.target.checked}})} className="w-5 h-5 accent-purple-600" /></label>
+                
+                {editingTemplate.config?.showQR && (
+                  <div className="mt-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <label className="block text-sm font-medium text-gray-400 mb-2">Ссылка для QR-кода (куда ведет)</label>
+                    <input 
+                      type="url" 
+                      value={editingTemplate.config?.qrUrl || ''} 
+                      onChange={e => setEditingTemplate({...editingTemplate, config: {...editingTemplate.config!, qrUrl: e.target.value}})} 
+                      className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none placeholder:text-gray-600" 
+                      placeholder="https://t.me/мой_канал или сайт" 
+                    />
+                  </div>
+                )}
               </div>
+
             </div>
             <div className="mt-8 flex gap-3 pt-6 border-t border-gray-800 bg-gray-900">
               <button onClick={() => setIsCreateTemplateModalOpen(false)} className="flex-1 bg-gray-800 hover:bg-gray-700 py-4 rounded-xl font-bold transition">Отмена</button>
@@ -1188,11 +1293,21 @@ export default function App() {
             <div className="absolute top-10 left-10 flex flex-col text-gray-400"><span className="flex items-center gap-2 font-bold text-white mb-1"><Eye size={20} /> Предпросмотр печати</span><span className="text-sm">Отображается пример генерации на листе бумаги</span></div>
             <div className={`bg-white shadow-[0_0_60px_rgba(0,0,0,0.8)] flex items-center justify-center gap-4 p-4 transition-all duration-500 ${editingTemplate.config?.layout === '1' ? 'w-[400px] aspect-[1/1.414]' : editingTemplate.config?.layout === '2' ? 'w-[600px] aspect-[1.414/1] flex-row' : 'w-[450px] aspect-[1/1.414] grid grid-cols-2 grid-rows-2'}`}>
               {[...Array(Number(editingTemplate.config?.layout || 1))].map((_, cardIndex) => (
-                <div key={cardIndex} style={{ backgroundColor: editingTemplate.config?.bgColor, color: editingTemplate.config?.textColor }} className={`relative flex flex-col rounded shadow-md overflow-hidden ${editingTemplate.config?.layout === '1' ? 'w-full h-full p-8 border-2 border-dashed border-gray-300' : editingTemplate.config?.layout === '2' ? 'w-1/2 h-full p-6 border border-dashed border-gray-300' : 'w-full h-full p-3 border border-dashed border-gray-300'}`}>
+                <div 
+                  key={cardIndex} 
+                  style={{ 
+                    backgroundColor: editingTemplate.config?.bgColor, 
+                    color: editingTemplate.config?.textColor,
+                    backgroundImage: editingTemplate.config?.backgroundImageUrl ? `url(${editingTemplate.config?.backgroundImageUrl})` : 'none',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                  }} 
+                  className={`relative flex flex-col rounded shadow-md overflow-hidden ${editingTemplate.config?.layout === '1' ? 'w-full h-full p-8 border-2 border-dashed border-gray-300' : editingTemplate.config?.layout === '2' ? 'w-1/2 h-full p-6 border border-dashed border-gray-300' : 'w-full h-full p-3 border border-dashed border-gray-300'}`}
+                >
                   <div style={{ color: editingTemplate.config?.accentColor, borderColor: `${editingTemplate.config?.accentColor}44` }} className={`text-center font-black border-b-4 uppercase italic tracking-tighter ${editingTemplate.config?.layout === '4' ? 'text-xl mb-2 pb-1 border-b-2' : 'text-3xl mb-4 pb-3'}`}>{editingTemplate.config?.cardTitle}</div>
                   <div className="grid grid-cols-5 gap-1 flex-1">
                     {[...Array(25)].map((_, i) => (
-                      <div key={i} style={{ backgroundColor: editingTemplate.config?.gridColor }} className="rounded border border-white/10 flex flex-col items-center justify-center text-center p-1">
+                      <div key={i} style={{ backgroundColor: editingTemplate.config?.gridColor }} className="rounded border border-white/10 flex flex-col items-center justify-center text-center p-1 backdrop-blur-sm">
                         {i === 12 ? <div style={{ color: editingTemplate.config?.accentColor }} className={`font-black uppercase leading-tight ${editingTemplate.config?.layout === '4' ? 'text-[8px]' : 'text-xs'}`}>{editingTemplate.config?.centerText}</div> : (
                           <><div className={`font-bold leading-tight opacity-90 uppercase ${editingTemplate.config?.layout === '4' ? 'text-[6px]' : 'text-[9px]'}`}>Трек {i+1}</div>{editingTemplate.config?.showArtist && <div style={{ color: editingTemplate.config?.accentColor }} className={`font-medium leading-tight opacity-90 italic mt-0.5 ${editingTemplate.config?.layout === '4' ? 'text-[5px]' : 'text-[7px]'}`}>Исполнитель</div>}</>
                         )}
@@ -1200,8 +1315,19 @@ export default function App() {
                     ))}
                   </div>
                   <div className={`mt-4 flex justify-between items-end ${editingTemplate.config?.layout === '4' ? 'mt-2' : ''}`}>
-                    <div className="flex flex-col"><div className={`opacity-60 uppercase font-bold ${editingTemplate.config?.layout === '4' ? 'text-[6px]' : 'text-[9px]'}`}>ID: #{1042 + cardIndex}</div><div className={`opacity-40 font-medium ${editingTemplate.config?.layout === '4' ? 'text-[5px]' : 'text-[7px]'}`}>{editingTemplate.config?.footerText}</div></div>
-                    {editingTemplate.config?.showQR && <div className={`bg-white/10 border border-white/20 flex flex-col items-center justify-center ${editingTemplate.config?.layout === '4' ? 'w-8 h-8 rounded-sm' : 'w-12 h-12 rounded'}`}><div className={`font-bold opacity-50 text-center leading-none ${editingTemplate.config?.layout === '4' ? 'text-[4px]' : 'text-[6px]'}`}>МЕСТО ДЛЯ<br/>QR КОДА</div></div>}
+                    <div className="flex flex-col bg-white/50 backdrop-blur-sm p-1 rounded-sm"><div className={`opacity-80 uppercase font-bold ${editingTemplate.config?.layout === '4' ? 'text-[6px]' : 'text-[9px]'}`}>ID: #{1042 + cardIndex}</div><div className={`opacity-70 font-medium ${editingTemplate.config?.layout === '4' ? 'text-[5px]' : 'text-[7px]'}`}>{editingTemplate.config?.footerText}</div></div>
+                    
+                    {/* НАСТОЯЩИЙ QR КОД ПРИ ПРЕДПРОСМОТРЕ */}
+                    {editingTemplate.config?.showQR && (
+                      <div className={`bg-white/90 border border-white/20 flex flex-col items-center justify-center p-1 shadow-sm ${editingTemplate.config?.layout === '4' ? 'w-8 h-8 rounded-sm' : 'w-12 h-12 rounded'}`}>
+                        {editingTemplate.config?.qrUrl ? (
+                          <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(editingTemplate.config.qrUrl)}`} className="w-full h-full object-contain mix-blend-multiply" alt="QR" />
+                        ) : (
+                          <div className={`font-bold opacity-50 text-center leading-none text-black ${editingTemplate.config?.layout === '4' ? 'text-[4px]' : 'text-[6px]'}`}>МЕСТО ДЛЯ<br/>QR КОДА</div>
+                        )}
+                      </div>
+                    )}
+
                   </div>
                 </div>
               ))}
