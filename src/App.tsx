@@ -665,7 +665,7 @@ export default function App() {
             <div key={pageIndex} className="w-[210mm] h-[297mm] bg-white shadow-2xl print:shadow-none print:w-full print:h-screen print:page-break-after-always overflow-hidden">
               <div className={`w-full h-full p-[10mm] gap-[10mm] ${layoutNum === 1 ? 'flex flex-col' : layoutNum === 2 ? 'grid grid-cols-1 grid-rows-2' : 'grid grid-cols-2 grid-rows-2'}`}>
                 {pageCards.map((card) => (
-                  <div key={card.id} style={{ backgroundColor: template.config.bgColor, color: template.config.textColor, backgroundImage: template.config.backgroundImageUrl ? `url(${template.config.backgroundImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }} className="relative flex flex-col rounded-xl overflow-hidden p-6 print:p-4 border-2 border-dashed border-gray-300">
+                  <div key={card.id} style={{ backgroundColor: template.config.bgColor, color: template.config.textColor, backgroundImage: template.config.backgroundImageUrl ? `url(${template.config.backgroundImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', fontFamily: editingTemplate.config?.fontFamily || '"Inter", sans-serif' }} className="relative flex flex-col rounded-xl overflow-hidden p-6 print:p-4 border-2 border-dashed border-gray-300">
                     <div style={{ color: template.config.accentColor, borderColor: `${template.config.accentColor}44` }} className={`text-center font-black border-b-4 uppercase italic tracking-tighter ${layoutNum === 4 ? 'text-2xl mb-2 pb-2 border-b-2' : 'text-5xl mb-6 pb-4'}`}>{template.config.cardTitle}</div>
                     <div className="grid grid-cols-5 gap-1.5 print:gap-1 flex-1">
                       {card.cells.map((cell, i) => {
