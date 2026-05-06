@@ -18,18 +18,18 @@ const ITEMS_PER_PAGE = 50;
 interface GlobalSearchTabProps {
   playingTrackId: string | number | null;
   togglePlay: (track: Track) => void;
-  setTrackToAdd: (track: Track) => void;
+  // ИЗМЕНЕНО: теперь добавляем в Базу Данных
+  setTrackToAddToDb: (track: Track) => void;
 }
 
-export default function GlobalSearchTab({ playingTrackId, togglePlay, setTrackToAdd }: GlobalSearchTabProps) {
+export default function GlobalSearchTab({ playingTrackId, togglePlay, setTrackToAddToDb }: GlobalSearchTabProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Track[]>([]);
   const[isSearching, setIsSearching] = useState(false);
   const [activeFilter, setActiveFilter] = useState('Топ Чарт');
   
-  // Пагинация
   const [currentPage, setCurrentPage] = useState(0);
-  const [hasNextPage, setHasNextPage] = useState(false);
+  const[hasNextPage, setHasNextPage] = useState(false);
   const activeQueryRef = useRef<{ type: 'chart'; id: string; name: string } | { type: 'search'; query: string; name: string } | null>(null);
 
   useEffect(() => {
@@ -44,40 +44,28 @@ export default function GlobalSearchTab({ playingTrackId, togglePlay, setTrackTo
     }));
 
   const loadChartByGenre = async (genreId: string, filterName: string, page = 0) => {
-    setIsSearching(true);
-    setActiveFilter(filterName);
-    setSearchQuery('');
-    setCurrentPage(page);
+    setIsSearching(true); setActiveFilter(filterName); setSearchQuery(''); setCurrentPage(page);
     activeQueryRef.current = { type: 'chart', id: genreId, name: filterName };
     try {
       const res = await fetch(`/api/deezer/chart/${genreId}/tracks?limit=${ITEMS_PER_PAGE}&index=${page * ITEMS_PER_PAGE}`);
       const data = await res.json();
-      if (data.data) {
-        setSearchResults(parseDeezerTracks(data.data));
-        setHasNextPage(data.data.length === ITEMS_PER_PAGE);
-      }
+      if (data.data) { setSearchResults(parseDeezerTracks(data.data)); setHasNextPage(data.data.length === ITEMS_PER_PAGE); }
     } catch (e) { console.error(e); } finally { setIsSearching(false); }
   };
 
   const searchDeezer = async (query: string, filterName?: string, page = 0) => {
     if (!query) return;
-    setIsSearching(true);
-    setActiveFilter(filterName || '');
-    setCurrentPage(page);
+    setIsSearching(true); setActiveFilter(filterName || ''); setCurrentPage(page);
     activeQueryRef.current = { type: 'search', query, name: filterName || '' };
     try {
       const res = await fetch(`/api/deezer/search?q=${encodeURIComponent(query)}&limit=${ITEMS_PER_PAGE}&index=${page * ITEMS_PER_PAGE}`);
       const data = await res.json();
-      if (data.data) {
-        setSearchResults(parseDeezerTracks(data.data));
-        setHasNextPage(data.data.length === ITEMS_PER_PAGE);
-      }
+      if (data.data) { setSearchResults(parseDeezerTracks(data.data)); setHasNextPage(data.data.length === ITEMS_PER_PAGE); }
     } catch (e) { console.error(e); } finally { setIsSearching(false); }
   };
 
   const goToPage = (page: number) => {
-    const q = activeQueryRef.current;
-    if (!q) return;
+    const q = activeQueryRef.current; if (!q) return;
     if (q.type === 'chart') loadChartByGenre(q.id, q.name, page);
     else searchDeezer(q.query, q.name, page);
     document.querySelector('.custom-scrollbar')?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -88,7 +76,7 @@ export default function GlobalSearchTab({ playingTrackId, togglePlay, setTrackTo
   return (
     <div className="animate-in fade-in duration-300 flex flex-col h-full">
       <h1 className="text-3xl font-bold mb-2">Глобальный поиск (API)</h1>
-      <p className="text-gray-400 mb-6">Ищите треки через API Deezer для добавления в свою базу</p>
+      <p className="text-gray-400 mb-6">Ищите треки через API Deezer для добавления в свою Базу</p>
       
       <form onSubmit={handleSearchSubmit} className="flex gap-4 mb-4">
         <div className="relative flex-1">
@@ -102,26 +90,8 @@ export default function GlobalSearchTab({ playingTrackId, togglePlay, setTrackTo
 
       <div className="flex flex-wrap gap-2 mb-8">
         {FILTERS.map(f => (
-          <button
-            key={f.name}
-            onClick={() => {
-              if (f.type === 'chart') {
-                loadChartByGenre(f.id!, f.name);
-              } else {
-                setSearchQuery(f.query!);
-                searchDeezer(f.query!, f.name);
-              }
-            }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition ${
-              activeFilter === f.name
-                ? f.name === 'Топ Чарт'
-                  ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
-                  : 'bg-purple-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-            }`}
-          >
-            {f.name === 'Топ Чарт' && <Flame size={16} />}
-            {f.name}
+          <button key={f.name} onClick={() => { if (f.type === 'chart') loadChartByGenre(f.id!, f.name); else { setSearchQuery(f.query!); searchDeezer(f.query!, f.name); } }} className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition ${activeFilter === f.name ? f.name === 'Топ Чарт' ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white' : 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+            {f.name === 'Топ Чарт' && <Flame size={16} />}{f.name}
           </button>
         ))}
       </div>
@@ -141,25 +111,18 @@ export default function GlobalSearchTab({ playingTrackId, togglePlay, setTrackTo
                       <div className={`absolute inset-0 bg-black/50 flex items-center justify-center transition ${isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>{isPlaying ? <PauseCircle size={28} className="text-purple-400" /> : <PlayCircle size={28} className="text-white" />}</div>
                     </div>
                     <div className="flex-1 overflow-hidden"><h4 className={`font-bold truncate text-sm ${isPlaying ? 'text-purple-400' : 'text-white'}`}>{track.title}</h4><p className="text-xs text-gray-400 truncate">{track.artist}</p></div>
-                    <button onClick={() => setTrackToAdd(track)} className="p-2 bg-gray-800 rounded-lg hover:bg-purple-600 transition flex-shrink-0 text-gray-400 hover:text-white"><Plus size={18} /></button>
+                    {/* КНОПКА ДОБАВИТЬ В БАЗУ */}
+                    <button onClick={() => setTrackToAddToDb(track)} className="p-2 bg-gray-800 rounded-lg hover:bg-purple-600 transition flex-shrink-0 text-gray-400 hover:text-white" title="Сохранить в Мою Базу"><Plus size={18} /></button>
                   </div>
                 );
               })}
             </div>
 
-            {/* ПАГИНАЦИЯ */}
             {searchResults.length > 0 && (
               <div className="flex items-center justify-between border-t border-gray-800 pt-6 pb-2 mt-2">
-                <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 0 || isSearching} className="flex items-center gap-2 px-5 py-2.5 bg-gray-800 hover:bg-gray-700 rounded-xl font-bold transition disabled:opacity-30 disabled:cursor-not-allowed">
-                  <ChevronLeft size={18} /> Назад
-                </button>
-                <div className="text-center">
-                  <span className="text-white font-bold">Страница {currentPage + 1}</span>
-                  <div className="text-gray-500 text-xs mt-0.5">треки {currentPage * ITEMS_PER_PAGE + 1}–{currentPage * ITEMS_PER_PAGE + searchResults.length}</div>
-                </div>
-                <button onClick={() => goToPage(currentPage + 1)} disabled={!hasNextPage || isSearching} className="flex items-center gap-2 px-5 py-2.5 bg-gray-800 hover:bg-gray-700 rounded-xl font-bold transition disabled:opacity-30 disabled:cursor-not-allowed">
-                  Вперёд <ChevronLeft size={18} className="rotate-180" />
-                </button>
+                <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 0 || isSearching} className="flex items-center gap-2 px-5 py-2.5 bg-gray-800 hover:bg-gray-700 rounded-xl font-bold transition disabled:opacity-30 disabled:cursor-not-allowed"><ChevronLeft size={18} /> Назад</button>
+                <div className="text-center"><span className="text-white font-bold">Страница {currentPage + 1}</span><div className="text-gray-500 text-xs mt-0.5">треки {currentPage * ITEMS_PER_PAGE + 1}–{currentPage * ITEMS_PER_PAGE + searchResults.length}</div></div>
+                <button onClick={() => goToPage(currentPage + 1)} disabled={!hasNextPage || isSearching} className="flex items-center gap-2 px-5 py-2.5 bg-gray-800 hover:bg-gray-700 rounded-xl font-bold transition disabled:opacity-30 disabled:cursor-not-allowed">Вперёд <ChevronLeft size={18} className="rotate-180" /></button>
               </div>
             )}
           </>
