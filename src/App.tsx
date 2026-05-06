@@ -1032,7 +1032,7 @@ export default function App() {
     
             {/* ПАГИНАЦИЯ */}
             {searchResults.length > 0 && (
-              <div className="flex items-center justify-between border-t border-gray-800 pt-6 pb-2">
+              <div className="flex items-center justify-between border-t border-gray-800 pt-6 pb-2 mt-2">
                 <button
                   onClick={() => goToPage(currentPage - 1)}
                   disabled={currentPage === 0 || isSearching}
@@ -1040,17 +1040,17 @@ export default function App() {
                 >
                   <ChevronLeft size={18} /> Назад
                 </button>
-    
+            
                 <div className="text-center">
-                  <div className="text-white font-bold">Страница {currentPage + 1}</div>
-                  <div className="text-gray-500 text-xs">
-                    {currentPage * ITEMS_PER_PAGE + 1}–{Math.min((currentPage + 1) * ITEMS_PER_PAGE, totalResults)} из {totalResults.toLocaleString()}
+                  <span className="text-white font-bold">Страница {currentPage + 1}</span>
+                  <div className="text-gray-500 text-xs mt-0.5">
+                    треки {currentPage * ITEMS_PER_PAGE + 1}–{currentPage * ITEMS_PER_PAGE + searchResults.length}
                   </div>
                 </div>
-    
+            
                 <button
                   onClick={() => goToPage(currentPage + 1)}
-                  disabled={(currentPage + 1) * ITEMS_PER_PAGE >= totalResults || isSearching}
+                  disabled={!hasNextPage || isSearching}
                   className="flex items-center gap-2 px-5 py-2.5 bg-gray-800 hover:bg-gray-700 rounded-xl font-bold transition disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   Вперёд <ChevronLeft size={18} className="rotate-180" />
