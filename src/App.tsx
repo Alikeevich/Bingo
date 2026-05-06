@@ -1266,7 +1266,10 @@ export default function App() {
               <div className="flex items-center gap-4 mb-6 p-4 bg-gray-950 rounded-xl border border-gray-800"><img src={trackToAdd.cover} className="w-12 h-12 rounded-md" alt="" /><div className="overflow-hidden"><p className="font-bold truncate">{trackToAdd.title}</p><p className="text-sm text-gray-400 truncate">{trackToAdd.artist}</p></div></div>
               {playlists.length === 0
                 ? <div className="text-center py-6"><button onClick={() => { setTrackToAdd(null); setIsCreatePlaylistModalOpen(true); }} className="px-6 py-2 bg-purple-600 rounded-lg font-bold">Создать плейлист</button></div>
-                : <div className="max-h-60 overflow-y-auto pr-2 flex flex-col gap-2 custom-scrollbar">{playlists.map(p => { const isAdded = p.tracks.some(t => t.id === trackToAdd.id); return <button key={p.id} onClick={() => !isAdded && addTrackToPlaylist(p.id)} disabled={isAdded} className={`flex justify-between p-4 rounded-xl border text-left ${isAdded ? 'bg-gray-800/50 border-gray-800 opacity-50' : 'bg-gray-800 border-gray-700 hover:border-purple-500'}`}><span className="font-bold truncate pr-4">{p.name}</span><span className="text-xs text-gray-400 whitespace-nowrap">{isAdded ? 'Добавлен' : `${p.tracks.length} треков`}</span></button>; })}</div>}
+                : <div className="max-h-60 overflow-y-auto pr-2 flex flex-col gap-2 custom-scrollbar">{playlists.map(p => { const isAdded = p.tracks.some(
+                t => t.id === trackToAdd.id || 
+                     t.artist.toLowerCase() === trackToAdd.artist.toLowerCase()
+              ); return <button key={p.id} onClick={() => !isAdded && addTrackToPlaylist(p.id)} disabled={isAdded} className={`flex justify-between p-4 rounded-xl border text-left ${isAdded ? 'bg-gray-800/50 border-gray-800 opacity-50' : 'bg-gray-800 border-gray-700 hover:border-purple-500'}`}><span className="font-bold truncate pr-4">{p.name}</span><span className="text-xs text-gray-400 whitespace-nowrap">{isAdded ? 'Добавлен' : `${p.tracks.length} треков`}</span></button>; })}</div>}
             </div>
           </div>
         </div>
