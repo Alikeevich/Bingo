@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabase';
-import { Music, ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, Tag as TagIcon, X } from 'lucide-react';
+import { Music, ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, X } from 'lucide-react';
 import { Track, Playlist, Game, Round, Template, BingoCard, Tag } from './types';
 
 // Вкладки
@@ -16,42 +16,37 @@ import HostScreen from './components/screens/HostScreen';
 import Projector from './components/screens/Projector';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'games' | 'playlists' | 'mydatabase' | 'global_search' | 'templates'>('games');
+  const[activeTab, setActiveTab] = useState<'games' | 'playlists' | 'mydatabase' | 'global_search' | 'templates'>('games');
 
-  // Глобальные данные БД
-  const[playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [games, setGames] = useState<Game[]>([]);
-  const [templates, setTemplates] = useState<Template[]>([]);
+  const[templates, setTemplates] = useState<Template[]>([]);
   
-  // НОВЫЕ СТЕЙТЫ ДЛЯ "МОЕЙ БАЗЫ"
-  const[dbTracks, setDbTracks] = useState<Track[]>([]);
+  const [dbTracks, setDbTracks] = useState<Track[]>([]);
   const [dbTags, setDbTags] = useState<Tag[]>([]);
 
-  // Плеер
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [playingTrackId, setPlayingTrackId] = useState<string | number | null>(null);
+  const[playingTrackId, setPlayingTrackId] = useState<string | number | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
-  const[duration, setDuration] = useState(0);
-  const [isAutoPlay, setIsAutoPlay] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const[isAutoPlay, setIsAutoPlay] = useState(false);
 
-  // Сессия ведущего
   const [hostSession, setHostSession] = useState<{ game: Game; round: Round; playlist: Playlist } | null>(null);
   const[shuffledTracks, setShuffledTracks] = useState<Track[]>([]);
   const[playedTrackIds, setPlayedTrackIds] = useState<Set<string | number>>(new Set());
   const[currentHostTrackIndex, setCurrentHostTrackIndex] = useState<number>(0);
-  const [hideTrackInfo, setHideTrackInfo] = useState(true);
+  const[hideTrackInfo, setHideTrackInfo] = useState(true);
   const [isProjectorMode, setIsProjectorMode] = useState(false);
   const [autoWinners, setAutoWinners] = useState<string[]>([]);
 
-  // Экраны и попапы
-  const [printViewCards, setPrintViewCards] = useState<{ cards: BingoCard[]; template: Template } | null>(null);
-  const [trackToAdd, setTrackToAdd] = useState<Track | null>(null); // Модалка добавления в Плейлист
+  const[printViewCards, setPrintViewCards] = useState<{ cards: BingoCard[]; template: Template } | null>(null);
+  const [trackToAdd, setTrackToAdd] = useState<Track | null>(null); 
   const [toast, setToast] = useState<string | null>(null);
 
-  // Стейты для модалки сохранения в БД
-  const[trackToAddToDb, setTrackToAddToDb] = useState<Track | null>(null);
-  const[selectedTagsForNewTrack, setSelectedTagsForNewTrack] = useState<string[]>([]);
-  const[newTagInput, setNewTagInput] = useState('');
+  // Стейты модалки Базы
+  const [trackToAddToDb, setTrackToAddToDb] = useState<Track | null>(null);
+  const [selectedTagsForNewTrack, setSelectedTagsForNewTrack] = useState<string[]>([]);
+  const [newTagInput, setNewTagInput] = useState('');
 
   useEffect(() => {
     fetchPlaylists();
@@ -114,13 +109,11 @@ export default function App() {
     if (data) setTemplates(data);
   };
 
-  // ЗАГРУЗКА БАЗЫ И ТЕГОВ
   const fetchDatabase = async () => {
     const { data: tracksData } = await supabase.from('tracks').select('*').order('created_at', { ascending: false });
     const { data: tagsData } = await supabase.from('tags').select('*').order('name', { ascending: true });
     
     if (tracksData) {
-      // Маппинг из змеиного регистра БД в наш интерфейс Track
       const mappedTracks: Track[] = tracksData.map(t => ({
         id: t.id, title: t.title, artist: t.artist, cover: t.cover, 
         preview: t.preview, isCustom: t.is_custom, tags: t.tags
@@ -136,8 +129,8 @@ export default function App() {
     const audioEl = audioRef.current;
     if (!audioEl) return;
     if (playingTrackId === track.id) {
-      audioEl.paused ? audioEl.play().catch(console.error) : audioEl.pause();
-      setPlayingTrackId(!audioEl.paused ? track.id : null);
+      if (audioEl.paused) audioEl.play().catch(console.error);
+      else { audioEl.pause(); setPlayingTrackId(null); }
       return;
     }
     audioEl.pause();
@@ -204,22 +197,34 @@ export default function App() {
     },
   };
 
-  // ЛОГИКА СОХРАНЕНИЯ В "МОЮ БАЗУ"
-  const handleCreateTag = async () => {
-    if (!newTagInput.trim()) return;
-    const name = newTagInput.trim();
-    if (dbTags.some(t => t.name.toLowerCase() === name.toLowerCase())) {
-      return showToast('Такой тег уже есть');
-    }
-    const colors =['#ef4444', '#f97316', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#f43f5e'];
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+  // --- УМНАЯ ЛОГИКА ТЕГОВ ---
+  const handleAddTag = async (tagName: string) => {
+    const name = tagName.trim();
+    if (!name) return;
     
-    const { data, error } = await supabase.from('tags').insert([{ name, color: randomColor }]).select();
-    if (data) {
-       setDbTags([...dbTags, data[0]]);
-       setSelectedTagsForNewTrack([...selectedTagsForNewTrack, data[0].name]);
-       setNewTagInput('');
-    } else if (error) { showToast('Ошибка создания тега'); }
+    // Если тег уже выбран, просто очищаем инпут
+    if (selectedTagsForNewTrack.some(t => t.toLowerCase() === name.toLowerCase())) {
+      setNewTagInput('');
+      return;
+    }
+
+    // Ищем, есть ли он уже в БД
+    const existingDbTag = dbTags.find(t => t.name.toLowerCase() === name.toLowerCase());
+    
+    if (existingDbTag) {
+      setSelectedTagsForNewTrack([...selectedTagsForNewTrack, existingDbTag.name]);
+    } else {
+      // Создаем новый тег в БД на лету
+      const colors =['#ef4444', '#f97316', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#f43f5e'];
+      const randomColor = colors[Math.floor(Math.random() * colors.length)];
+      
+      const { data, error } = await supabase.from('tags').insert([{ name, color: randomColor }]).select();
+      if (data) {
+         setDbTags([...dbTags, data[0]]);
+         setSelectedTagsForNewTrack([...selectedTagsForNewTrack, data[0].name]);
+      } else if (error) { showToast('Ошибка создания тега'); }
+    }
+    setNewTagInput(''); // очищаем поле ввода
   };
 
   const saveTrackToDb = async () => {
@@ -237,7 +242,6 @@ export default function App() {
     if (error) { showToast('Ошибка сохранения в базу'); return; }
     
     if (data) {
-       // Добавляем в локальный стейт, заменяя если уже был
        setDbTracks(prev => {
          const filtered = prev.filter(t => String(t.id) !== String(data[0].id));
          const addedTrack: Track = {
@@ -250,17 +254,15 @@ export default function App() {
     }
     setTrackToAddToDb(null);
     setSelectedTagsForNewTrack([]);
+    setNewTagInput('');
   };
 
   const deleteTrackFromDb = async (trackId: string | number) => {
     if (!confirm('Удалить трек из вашей Базы?')) return;
     await supabase.from('tracks').delete().eq('id', String(trackId));
     setDbTracks(prev => prev.filter(t => String(t.id) !== String(trackId)));
-    // При удалении из базы мы НЕ удаляем его из плейлистов (чтобы не сломать игры),
-    // но он перестанет отображаться во вкладке "Моя База".
     showToast('Трек удален из базы');
   };
-
 
   if (printViewCards) return <PrintView printViewCards={printViewCards} setPrintViewCards={setPrintViewCards} />;
 
@@ -317,59 +319,72 @@ export default function App() {
         {activeTab === 'templates' && <TemplatesTab templates={templates} setTemplates={setTemplates} showToast={showToast} />}
       </main>
 
-
-      {/* --- НОВАЯ МОДАЛКА: СОХРАНЕНИЕ ТРЕКА В БАЗУ --- */}
+      {/* --- МОДАЛКА: СОХРАНЕНИЕ ТРЕКА В БАЗУ --- */}
       {trackToAddToDb && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold flex items-center gap-2"><Database size={20} className="text-purple-400"/> Сохранить в Базу</h3><button onClick={() => setTrackToAddToDb(null)} className="text-gray-400"><X size={24}/></button></div>
             <div className="flex items-center gap-4 mb-6 p-4 bg-gray-950 rounded-xl"><img src={trackToAddToDb.cover} className="w-12 h-12 rounded-md" alt="" /><div className="overflow-hidden"><p className="font-bold truncate">{trackToAddToDb.title}</p><p className="text-sm text-gray-400">{trackToAddToDb.artist}</p></div></div>
             
-            <div className="mb-6">
-              <label className="block text-sm font-bold text-gray-400 mb-3">Выберите теги категории:</label>
-              <div className="flex flex-wrap gap-2 mb-4 max-h-32 overflow-y-auto custom-scrollbar pr-1">
-                {dbTags.map(tag => {
-                  const isSelected = selectedTagsForNewTrack.includes(tag.name);
-                  return (
-                    <button key={tag.id} onClick={() => {
-                      if (isSelected) setSelectedTagsForNewTrack(prev => prev.filter(t => t !== tag.name));
-                      else setSelectedTagsForNewTrack([...selectedTagsForNewTrack, tag.name]);
-                    }} className={`px-3 py-1.5 border rounded-lg text-sm font-medium transition ${isSelected ? 'bg-purple-600 border-purple-500 text-white shadow-lg' : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'}`}>
-                      {tag.name}
-                    </button>
-                  );
-                })}
+            <div className="mb-8">
+              <label className="block text-sm font-bold text-gray-400 mb-2">Жанр или категория:</label>
+              
+              {/* Поле ввода тегов (чипы + инпут) */}
+              <div className="flex flex-wrap gap-2 mb-3 bg-gray-950 p-3 rounded-xl border border-gray-800 items-center min-h-[50px]">
+                {selectedTagsForNewTrack.map(tag => (
+                  <span key={tag} className="flex items-center gap-1 px-2.5 py-1 bg-purple-600 text-white rounded-lg text-sm font-medium shadow-md">
+                    {tag}
+                    <button onClick={() => setSelectedTagsForNewTrack(prev => prev.filter(t => t !== tag))} className="hover:text-red-300 transition ml-1"><X size={14} /></button>
+                  </span>
+                ))}
+                <input 
+                  type="text" 
+                  value={newTagInput} 
+                  onChange={e => setNewTagInput(e.target.value)} 
+                  placeholder={selectedTagsForNewTrack.length === 0 ? "Напишите тег и нажмите Enter..." : "Добавить еще..."}
+                  className="flex-1 bg-transparent border-none outline-none text-sm min-w-[150px] text-white" 
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(newTagInput); } }} 
+                />
               </div>
-              <div className="flex gap-2">
-                <input type="text" value={newTagInput} onChange={e => setNewTagInput(e.target.value)} placeholder="Новый тег (напр. Русский Рок)" className="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm focus:border-purple-500 outline-none" onKeyDown={e => e.key === 'Enter' && handleCreateTag()} />
-                <button onClick={handleCreateTag} className="bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg transition" title="Создать тег"><TagIcon size={18} className="text-gray-400" /></button>
-              </div>
+
+              {/* Быстрый выбор из существующих тегов */}
+              {dbTags.length > 0 && (
+                <>
+                  <div className="text-xs text-gray-500 mb-2 font-medium">Или выберите из существующих:</div>
+                  <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto custom-scrollbar pr-1">
+                    {dbTags.filter(t => !selectedTagsForNewTrack.includes(t.name)).map(tag => (
+                      <button key={tag.id} onClick={() => handleAddTag(tag.name)} className="px-3 py-1 bg-gray-800 border border-gray-700 rounded-lg text-xs font-medium text-gray-400 hover:border-gray-500 hover:text-gray-200 transition">
+                        + {tag.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex gap-4">
-              <button onClick={() => setTrackToAddToDb(null)} className="flex-1 py-3 bg-gray-800 rounded-xl font-bold">Отмена</button>
-              <button onClick={saveTrackToDb} className="flex-1 py-3 bg-purple-600 hover:bg-purple-500 rounded-xl font-bold shadow-lg shadow-purple-900/30">В Мою Базу</button>
+              <button onClick={() => setTrackToAddToDb(null)} className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 transition rounded-xl font-bold">Отмена</button>
+              <button onClick={saveTrackToDb} className="flex-1 py-3 bg-purple-600 hover:bg-purple-500 transition rounded-xl font-bold shadow-lg shadow-purple-900/30">В Мою Базу</button>
             </div>
           </div>
         </div>
       )}
 
-
-      {/* --- СТАРАЯ МОДАЛКА ДОБАВЛЕНИЯ В ПЛЕЙЛИСТ (Вызывается из Моей Базы) --- */}
+      {/* --- МОДАЛКА ДОБАВЛЕНИЯ В ПЛЕЙЛИСТ (Вызывается из Моей Базы) --- */}
       {trackToAdd && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[50] p-4">
           <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6">
-            <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold">Добавить в плейлист</h3><button onClick={() => setTrackToAdd(null)} className="text-gray-400"><X size={24}/></button></div>
+            <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold">Добавить в плейлист</h3><button onClick={() => setTrackToAdd(null)} className="text-gray-400 hover:text-white"><X size={24}/></button></div>
             <div className="flex items-center gap-4 mb-6 p-4 bg-gray-950 rounded-xl"><img src={trackToAdd.cover} className="w-12 h-12 rounded-md" alt="" /><div className="overflow-hidden"><p className="font-bold truncate">{trackToAdd.title}</p><p className="text-sm text-gray-400">{trackToAdd.artist}</p></div></div>
             {playlists.length === 0 ? (
-               <div className="text-center py-6">Нет плейлистов. Создайте их во вкладке "Плейлисты".</div>
+               <div className="text-center py-6 text-gray-500">Нет плейлистов. Создайте их во вкладке "Плейлисты".</div>
             ) : (
-              <div className="max-h-60 overflow-y-auto pr-2 flex flex-col gap-2">{playlists.map(p => { 
+              <div className="max-h-60 overflow-y-auto pr-2 flex flex-col gap-2 custom-scrollbar">{playlists.map(p => { 
                 const isAdded = p.tracks.some(t => t.id === trackToAdd.id || t.artist.toLowerCase() === trackToAdd.artist.toLowerCase()); 
                 return (
                   <button key={p.id} onClick={async () => {
                     if (isAdded) return;
-                    const newTracks = [...p.tracks, trackToAdd];
+                    const newTracks =[...p.tracks, trackToAdd];
                     setPlaylists(playlists.map(pl => pl.id === p.id ? { ...pl, tracks: newTracks } : pl));
                     await supabase.from('playlists').update({ tracks: newTracks }).eq('id', p.id);
                     showToast('Трек добавлен!');
