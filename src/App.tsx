@@ -162,7 +162,7 @@ export default function App() {
     fetchPlaylists();
     fetchGames();
     fetchTemplates();
-    loadChartByGenre();
+    loadChartByGenre('0', 'Топ Чарт', 0);
 
     const savedSessionStr = localStorage.getItem('muzbingo_host_session');
     if (savedSessionStr) {
