@@ -461,8 +461,8 @@ export default function App() {
         <text x="1240" y="1680" font-family="sans-serif" font-size="100" font-weight="bold" text-anchor="middle" fill="#166534">СЕТКА ДЛЯ ТРЕКОВ</text>
         <text x="1240" y="1820" font-family="sans-serif" font-size="70" font-weight="bold" text-anchor="middle" fill="#166534">(ОСТАВЬТЕ ЗОНУ СВЕТЛОЙ)</text>
         <!-- Footer / ID Area -->
-        <rect x="200" y="3000" width="1000" height="200" fill="#fcd34d" opacity="0.5" />
-        <text x="700" y="3120" font-family="sans-serif" font-size="80" font-weight="bold" text-anchor="middle" fill="#854d0e">ID И ПОДВАЛ</text>
+        <rect x="200" y="2950" width="600" height="120" fill="#fcd34d" opacity="0.5" rx="15" />
+        <text x="500" y="3025" font-family="sans-serif" font-size="50" font-weight="bold" text-anchor="middle" fill="#854d0e">ID И ПОДВАЛ</text>
         <!-- QR Area -->
         <rect x="1980" y="2900" width="300" height="300" fill="#93c5fd" opacity="0.5" />
         <text x="2130" y="3070" font-family="sans-serif" font-size="60" font-weight="bold" text-anchor="middle" fill="#1e3a8a">QR КОД</text>
