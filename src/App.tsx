@@ -100,7 +100,7 @@ export default function App() {
   const [searchResults, setSearchResults] = useState<Track[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
-  const [totalResults, setTotalResults] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
   const ITEMS_PER_PAGE = 50;
   const activeQueryRef = useRef<{ type: 'chart'; id: string; name: string } | { type: 'search'; query: string; name: string } | null>(null);
   const [activeFilter, setActiveFilter] = useState('Топ Чарт');
