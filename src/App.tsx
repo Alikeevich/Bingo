@@ -1345,6 +1345,20 @@ export default function App() {
                   ))}
                 </div>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Шрифт (с поддержкой Қазақша)</label>
+                <select 
+                  value={editingTemplate.config?.fontFamily || '"Inter", sans-serif'} 
+                  onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, fontFamily: e.target.value } })}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none"
+                >
+                  <option value='"Inter", sans-serif'>Inter (Стандартный)</option>
+                  <option value='"Montserrat", sans-serif'>Montserrat (Широкий, стильный)</option>
+                  <option value='"Golos Text", sans-serif'>Golos Text (Современный)</option>
+                  <option value='"Roboto", sans-serif'>Roboto (Классика)</option>
+                  <option value='"Rubik", sans-serif'>Rubik (Скругленный)</option>
+                </select>
+              </div>
               <div className="grid grid-cols-3 gap-4">
                 <div className="flex flex-col"><label className="text-xs font-medium text-gray-400 mb-2 text-center">Цвет Фона</label><input type="color" value={editingTemplate.config?.bgColor} onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, bgColor: e.target.value } })} className="w-full h-12 bg-gray-800 border border-gray-700 rounded-xl cursor-pointer" /></div>
                 <div className="flex flex-col"><label className="text-xs font-medium text-gray-400 mb-2 text-center">Акцент</label><input type="color" value={editingTemplate.config?.accentColor} onChange={e => setEditingTemplate({ ...editingTemplate, config: { ...editingTemplate.config!, accentColor: e.target.value } })} className="w-full h-12 bg-gray-800 border border-gray-700 rounded-xl cursor-pointer" /></div>
@@ -1371,7 +1385,7 @@ export default function App() {
             <div className="absolute top-10 left-10 flex flex-col text-gray-400"><span className="flex items-center gap-2 font-bold text-white mb-1"><Eye size={20} /> Предпросмотр печати</span><span className="text-sm">Пример генерации на листе бумаги</span></div>
             <div className={`bg-white shadow-[0_0_60px_rgba(0,0,0,0.8)] flex items-center justify-center gap-4 p-4 transition-all duration-500 ${editingTemplate.config?.layout === '1' ? 'w-[400px] aspect-[1/1.414]' : editingTemplate.config?.layout === '2' ? 'w-[600px] aspect-[1.414/1] flex-row' : 'w-[450px] aspect-[1/1.414] grid grid-cols-2 grid-rows-2'}`}>
               {[...Array(Number(editingTemplate.config?.layout || 1))].map((_, cardIndex) => (
-                <div key={cardIndex} style={{ backgroundColor: editingTemplate.config?.bgColor, color: editingTemplate.config?.textColor, backgroundImage: editingTemplate.config?.backgroundImageUrl ? `url(${editingTemplate.config?.backgroundImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }} className={`relative flex flex-col rounded shadow-md overflow-hidden ${editingTemplate.config?.layout === '1' ? 'w-full h-full p-8 border-2 border-dashed border-gray-300' : editingTemplate.config?.layout === '2' ? 'w-1/2 h-full p-6 border border-dashed border-gray-300' : 'w-full h-full p-3 border border-dashed border-gray-300'}`}>
+                <div key={cardIndex} style={{ backgroundColor: editingTemplate.config?.bgColor, color: editingTemplate.config?.textColor, backgroundImage: editingTemplate.config?.backgroundImageUrl ? `url(${editingTemplate.config?.backgroundImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', fontFamily: template.config.fontFamily || '"Inter", sans-serif' }} className={`relative flex flex-col rounded shadow-md overflow-hidden ${editingTemplate.config?.layout === '1' ? 'w-full h-full p-8 border-2 border-dashed border-gray-300' : editingTemplate.config?.layout === '2' ? 'w-1/2 h-full p-6 border border-dashed border-gray-300' : 'w-full h-full p-3 border border-dashed border-gray-300'}`}>
                   <div style={{ color: editingTemplate.config?.accentColor, borderColor: `${editingTemplate.config?.accentColor}44` }} className={`text-center font-black border-b-4 uppercase italic tracking-tighter ${editingTemplate.config?.layout === '4' ? 'text-xl mb-2 pb-1 border-b-2' : 'text-3xl mb-4 pb-3'}`}>{editingTemplate.config?.cardTitle}</div>
                   <div className="grid grid-cols-5 gap-1 flex-1">
                     {[...Array(25)].map((_, i) => (
