@@ -960,11 +960,30 @@ export default function App() {
         <button type="submit" disabled={isSearching} className="bg-purple-600 hover:bg-purple-500 px-8 rounded-xl font-bold transition disabled:opacity-50 min-w-[120px] flex items-center justify-center">{isSearching ? <Loader2 className="animate-spin" size={20} /> : 'Найти'}</button>
       </form>
       <div className="flex flex-wrap gap-2 mb-8">
-        <button onClick={loadTopChart} className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition ${activeFilter === 'Топ Чарт' ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}><Flame size={16} /> Топ Чарт</button>
-        {['Русские хиты', 'Поп', 'Рок', 'Хип-Хоп', 'Дискотека 80х'].map(f => (
-          <button key={f} onClick={() => { setSearchQuery(f); searchDeezer(f, f); }} className={`px-4 py-2 rounded-full font-medium transition ${activeFilter === f ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>{f}</button>
-        ))}
-      </div>
+      {FILTERS.map(f => (
+        <button
+          key={f.name}
+          onClick={() => {
+            if (f.type === 'chart') {
+              loadChartByGenre(f.id!, f.name);
+            } else {
+              setSearchQuery(f.query!);
+              searchDeezer(f.query!, f.name);
+            }
+          }}
+          className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition ${
+            activeFilter === f.name
+              ? f.name === 'Топ Чарт'
+                ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
+                : 'bg-purple-600 text-white'
+              : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+          }`}
+        >
+          {f.name === 'Топ Чарт' && <Flame size={16} />}
+          {f.name}
+        </button>
+      ))}
+    </div>
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-10">
         {isSearching && searchResults.length === 0
           ? <div className="flex flex-col items-center justify-center h-40 text-gray-500"><Loader2 className="animate-spin mb-4" size={32} /><p>Ищем музыку...</p></div>
