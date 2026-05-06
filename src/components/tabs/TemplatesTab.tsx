@@ -19,17 +19,26 @@ const FONTS =[
 
 const ZONES = {
   PAD: 2.7,
+  
+  // ── Layout 1 (1 на А4) — A4 Portrait (210×297) ───────────────
   1: {
     headerH:  21.2, headerGap: 4.2, gridH: 211.7, footerH: 34.5, qrSize: 29.6, idH: 20.3, idW: 25.4, cellGap: 1.5,
     titleFz:  13.0, trackFz: 3.5, artistFz: 2.7, centerFz: 5.0, idFz: 2.8, idSubFz: 2.0, qrPhFz: 2.5,
   },
+  
+  // ── Layout 2 (2 на А4) — A4 Landscape (297×210) ───────────────
+  // Лист перевернут. Карточки стоят рядом (2 колонки, 1 строка)
+  // Идеально сохраняет пропорции вертикальной карточки.
   2: {
-    headerH:  10.0, headerGap: 2.0, gridH:  99.8, footerH: 16.3, qrSize: 14.0, idH:  9.6, idW: 25.4, cellGap: 0.8,
-    titleFz:   6.1, trackFz: 1.65, artistFz: 1.27, centerFz: 2.36, idFz: 1.4, idSubFz: 1.0, qrPhFz: 1.2,
+    headerH:  14.4, headerGap: 2.8, gridH: 143.9, footerH: 23.5, qrSize: 20.1, idH: 13.8, idW: 17.6, cellGap: 1.0,
+    titleFz:   8.8, trackFz: 2.4, artistFz: 1.8, centerFz: 3.4, idFz: 1.9, idSubFz: 1.4, qrPhFz: 1.7,
   },
+  
+  // ── Layout 4 (4 на А4) — A4 Portrait (210×297) ────────────────
+  // Сетка 2x2. Карточки тоже остаются вертикальными.
   4: {
-    headerH:  10.0, headerGap: 2.0, gridH:  99.8, footerH: 16.3, qrSize: 12.0, idH:  9.6, idW: 11.6, cellGap: 0.5,
-    titleFz:   5.0, trackFz: 1.3, artistFz: 1.0, centerFz: 1.8, idFz: 1.1, idSubFz: 0.8, qrPhFz: 1.0,
+    headerH:  10.0, headerGap: 2.0, gridH:  99.8, footerH: 16.3, qrSize: 14.0, idH:  9.6, idW: 12.0, cellGap: 0.7,
+    titleFz:   6.1, trackFz: 1.6, artistFz: 1.2, centerFz: 2.3, idFz: 1.3, idSubFz: 0.9, qrPhFz: 1.2,
   },
 } as const;
 
