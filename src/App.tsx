@@ -109,16 +109,23 @@ export default function App() {
   const togglePlay = async (track: Track) => {
     const audioEl = audioRef.current;
     if (!audioEl) return;
+
     if (playingTrackId === track.id) {
-      audioEl.paused ? audioEl.play() : audioEl.pause();
-      if (!audioEl.paused) setPlayingTrackId(track.id);
-      else setPlayingTrackId(null);
+      if (audioEl.paused) {
+        audioEl.play().catch(console.error);
+      } else {
+        audioEl.pause();
+        setPlayingTrackId(null);
+      }
       return;
     }
+
     audioEl.pause();
     setPlayingTrackId(track.id);
+
     try {
       let currentUrl = track.preview;
+
       if (track.isCustom) {
         const { data } = supabase.storage.from('audio-tracks').getPublicUrl(String(track.id));
         currentUrl = data.publicUrl;
@@ -130,6 +137,7 @@ export default function App() {
           if (data.preview) currentUrl = data.preview;
         }
       }
+
       audioEl.src = currentUrl.includes('?') ? `${currentUrl}&t=${Date.now()}` : `${currentUrl}?t=${Date.now()}`;
       audioEl.load();
       audioEl.play().catch(err => { console.error(err); setPlayingTrackId(null); });
