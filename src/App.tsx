@@ -281,10 +281,15 @@ export default function App() {
       const match = await cache.match(url);
       if (match) {
         const blob = await match.blob();
-        return URL.createObjectURL(blob);
+        // Защита от битых файлов: если файл скачался криво (пустой), игнорируем кэш
+        if (blob.size > 500) {
+          return URL.createObjectURL(blob);
+        }
       }
-    } catch (e) { console.error("Ошибка чтения кэша", e); }
-    return url;
+    } catch (e) { 
+      console.error("Ошибка чтения кэша", e); 
+    }
+    return url; // Возвращаем онлайн ссылку, если кэша нет или он битый
   };
 
   const cachePlaylistForOffline = async (playlist: Playlist) => {
@@ -315,44 +320,71 @@ export default function App() {
   };
 
   const togglePlay = async (track: Track) => {
-    if (!track.preview) return showToast('Ошибка: у этого трека нет аудио-превью!');
+  if (!track.preview) return showToast('Ошибка: у этого трека нет аудио-превью!');
 
-    if (playingTrackId === track.id) {
-      audioRef.current?.pause();
+  const audioEl = audioRef.current;
+  if (!audioEl) return;
+
+  // Если это тот же трек — просто pause/resume
+  if (playingTrackId === track.id) {
+    if (audioEl.paused) {
+      audioEl.play().catch(e => console.error('Resume error:', e));
+    } else {
+      audioEl.pause();
       setPlayingTrackId(null);
-      return;
     }
+    return;
+  }
 
-    if (audioRef.current) audioRef.current.pause();
-    
-    setPlayingTrackId(track.id);
-    let audioUrl = track.preview.replace('http://', 'https://');
+  // Останавливаем предыдущий
+  audioEl.pause();
+  setPlayingTrackId(track.id);
 
+  let audioUrl = track.preview.replace('http://', 'https://');
+
+  try {
+    // Для не-кастомных треков пробуем обновить протухшую ссылку Deezer
     if (!track.isCustom) {
       const expMatch = audioUrl.match(/exp=(\d+)/);
-      if (expMatch) {
-        const expTime = parseInt(expMatch[1], 10) * 1000;
-        if (Date.now() + 300000 > expTime) {
-            try {
-              const res = await fetch(`/api/deezer/track/${track.id}`);
-              const data = await res.json();
-              if (data.preview) audioUrl = data.preview.replace('http://', 'https://');
-          } catch (e) { console.error("Не удалось обновить ссылку", e); }
-        }
+      if (expMatch && Date.now() + 300000 > parseInt(expMatch[1], 10) * 1000) {
+        try {
+          const res = await fetch(`/api/deezer/track/${track.id}`);
+          const data = await res.json();
+          if (data.preview) audioUrl = data.preview.replace('http://', 'https://');
+        } catch (e) { console.warn('Не удалось обновить ссылку Deezer', e); }
       }
     }
 
-    const finalUrl = await getCachedTrackUrl(audioUrl);
+    // Проверяем офлайн-кэш
+    let finalUrl = audioUrl;
+    try {
+      const cache = await caches.open('muzbingo-audio-v1');
+      const match = await cache.match(audioUrl);
+      if (match) {
+        const blob = await match.blob();
+        if (blob.size > 500) {
+          finalUrl = URL.createObjectURL(blob);
+          console.log('Играем из кэша:', track.title);
+        }
+      }
+    } catch (e) { console.warn('Кэш недоступен:', e); }
 
-    if (audioRef.current) {
-      audioRef.current.src = finalUrl;
-      audioRef.current.play().catch((err) => {
-        console.error(err);
-        showToast('Аудио заблокировано. Возможно трек удален.');
-        setPlayingTrackId(null);
-      });
-    }
-  };
+    audioEl.src = finalUrl;
+    audioEl.currentTime = 0;
+    audioEl.load();
+
+    audioEl.play().catch(error => {
+      console.error('Браузер заблокировал аудио:', error);
+      setPlayingTrackId(null);
+      showToast('Не удалось воспроизвести. Попробуйте снова.');
+    });
+
+  } catch (err) {
+    console.error('Ошибка плеера:', err);
+    setPlayingTrackId(null);
+    showToast('Ошибка при загрузке трека.');
+  }
+};
 
   // --- ЗАГРУЗКА СВОИХ MP3 ---
   const uploadCustomTracks = async (e: React.ChangeEvent<HTMLInputElement>, playlistId: string) => {
@@ -666,7 +698,7 @@ export default function App() {
             <div key={pageIndex} className="w-[210mm] h-[297mm] bg-white shadow-2xl print:shadow-none print:w-full print:h-screen print:page-break-after-always overflow-hidden">
               <div className={`w-full h-full p-[10mm] gap-[10mm] ${layoutNum === 1 ? 'flex flex-col' : layoutNum === 2 ? 'grid grid-cols-1 grid-rows-2' : 'grid grid-cols-2 grid-rows-2'}`}>
                 {pageCards.map((card) => (
-                  <div key={card.id} style={{ backgroundColor: template.config.bgColor, color: template.config.textColor, backgroundImageUrl: template.config.backgroundImageUrl ? `url(${template.config.backgroundImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center'}} className="relative flex flex-col rounded-xl overflow-hidden p-6 print:p-4 border-2 border-dashed border-gray-300">
+                  <div key={card.id} style={{ backgroundColor: template.config.bgColor, color: template.config.textColor, backgroundImage: template.config.backgroundImageUrl ? `url(${template.config.backgroundImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center'}} className="relative flex flex-col rounded-xl overflow-hidden p-6 print:p-4 border-2 border-dashed border-gray-300">
                     <div style={{ color: template.config.accentColor, borderColor: `${template.config.accentColor}44` }} className={`text-center font-black border-b-4 uppercase italic tracking-tighter ${layoutNum === 4 ? 'text-2xl mb-2 pb-2 border-b-2' : 'text-5xl mb-6 pb-4'}`}>{template.config.cardTitle}</div>
                     <div className="grid grid-cols-5 gap-1.5 print:gap-1 flex-1">
                       {card.cells.map((cell, i) => {
@@ -786,7 +818,23 @@ export default function App() {
                   <p className={`text-xl transition-all duration-300 ${hideTrackInfo ? 'text-gray-700 blur-sm select-none' : 'text-purple-400 font-medium'}`}>{hideTrackInfo ? '?????????' : currentTrack.artist}</p>
                 </div>
 
-                <div className="w-full bg-gray-900/80 p-6 rounded-3xl backdrop-blur-md border border-gray-800 shadow-2xl flex flex-col gap-6">
+                <div className="w-full bg-gray-900/80 p-6 rounded-3xl backdrop-blur-md border border-gray-800 shadow-2xl flex flex-col gap-5">
+
+                  {/* ВЕРХНЯЯ ПАНЕЛЬ: КРАСИВЫЙ ПЕРЕКЛЮЧАТЕЛЬ АВТО-ПЕРЕХОДА */}
+                  <div className="flex justify-end w-full">
+                    <label className="flex items-center gap-3 cursor-pointer group" title="Автоматически включать следующий трек">
+                      <span className={`text-sm font-bold transition-colors ${isAutoPlay ? 'text-purple-400' : 'text-gray-500 group-hover:text-gray-300'}`}>
+                        Авто-переход
+                      </span>
+                      {/* Сам тумблер (iOS style) */}
+                      <div className={`relative w-12 h-6 transition-all duration-300 rounded-full shadow-inner ${isAutoPlay ? 'bg-purple-600' : 'bg-gray-800 border border-gray-700'}`}>
+                        <div className={`absolute top-[3px] w-4 h-4 bg-white rounded-full transition-transform duration-300 shadow-md ${isAutoPlay ? 'translate-x-7' : 'translate-x-1'}`}></div>
+                      </div>
+                      <input type="checkbox" checked={isAutoPlay} onChange={e => setIsAutoPlay(e.target.checked)} className="hidden" />
+                    </label>
+                  </div>
+
+                  {/* ПРОГРЕСС БАР */}
                   <div className="flex items-center gap-4 text-sm font-medium text-gray-400">
                     <span className="w-10 text-right">{formatTime(currentTime)}</span>
                     <div className="flex-1 h-3 bg-gray-800 rounded-full overflow-hidden relative">
@@ -795,20 +843,26 @@ export default function App() {
                     <span className="w-10">{formatTime(duration)}</span>
                   </div>
 
-                  <div className="flex items-center justify-center gap-8 relative">
-                    <label className="absolute left-0 flex items-center gap-2 cursor-pointer text-gray-400 hover:text-white transition bg-gray-800 px-4 py-2 rounded-xl text-sm font-bold">
-                      <input type="checkbox" checked={isAutoPlay} onChange={e => setIsAutoPlay(e.target.checked)} className="accent-purple-500 w-4 h-4" />
-                      Авто-переход
-                    </label>
-
-                    <button onClick={() => setHideTrackInfo(!hideTrackInfo)} className={`w-14 h-14 rounded-full flex items-center justify-center transition ${hideTrackInfo ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'}`}>
+                  {/* КНОПКИ ПЛЕЕРА */}
+                  <div className="flex items-center justify-center gap-4 sm:gap-8">
+                    <button onClick={() => setHideTrackInfo(!hideTrackInfo)} className={`w-14 h-14 rounded-full flex items-center justify-center transition ${hideTrackInfo ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/50' : 'bg-gray-800 text-gray-400 hover:text-white'}`} title={hideTrackInfo ? "Показать ответ" : "Скрыть ответ"}>
                       {hideTrackInfo ? <EyeOff size={24} /> : <Eye size={24} />}
                     </button>
-                    <button onClick={() => playHostTrack(currentHostTrackIndex - 1)} disabled={currentHostTrackIndex === 0} className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center text-white hover:bg-gray-700 disabled:opacity-50 transition"><SkipBack size={28} /></button>
-                    <button onClick={() => playHostTrack(currentHostTrackIndex)} className={`w-24 h-24 rounded-full flex items-center justify-center text-white transition transform hover:scale-105 shadow-2xl ${isPlaying ? 'bg-orange-600' : 'bg-purple-600'}`}>
+
+                    <button onClick={() => playHostTrack(currentHostTrackIndex - 1)} disabled={currentHostTrackIndex === 0} className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center text-white hover:bg-gray-700 disabled:opacity-50 transition">
+                      <SkipBack size={28} />
+                    </button>
+
+                    <button onClick={() => playHostTrack(currentHostTrackIndex)} className={`w-24 h-24 rounded-full flex items-center justify-center text-white transition transform hover:scale-105 shadow-2xl flex-shrink-0 ${isPlaying ? 'bg-orange-600 shadow-orange-900/50' : 'bg-purple-600 shadow-purple-900/50'}`}>
                       {isPlaying ? <PauseCircle size={48} /> : <Play size={48} className="ml-2" />}
                     </button>
-                    <button onClick={() => { playHostTrack(currentHostTrackIndex + 1); setHideTrackInfo(true); }} disabled={currentHostTrackIndex === shuffledTracks.length - 1} className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center text-white hover:bg-gray-700 disabled:opacity-50 transition"><SkipForward size={28} /></button>
+
+                    <button onClick={() => { playHostTrack(currentHostTrackIndex + 1); setHideTrackInfo(true); }} disabled={currentHostTrackIndex === shuffledTracks.length - 1} className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center text-white hover:bg-gray-700 disabled:opacity-50 transition">
+                      <SkipForward size={28} />
+                    </button>
+
+                    {/* Невидимый блок-пустышка для идеальной симметрии (чтобы Play был ровно по центру) */}
+                    <div className="w-14 h-14 hidden sm:block"></div>
                   </div>
                 </div>
               </div>
@@ -1117,7 +1171,7 @@ export default function App() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 overflow-y-auto pr-2 custom-scrollbar pb-10">
         {templates.map(template => (
           <div key={template.id} className="group relative bg-gray-900 border border-gray-800 p-4 rounded-2xl">
-             <div style={{ backgroundColor: template.config.bgColor, backgroundImageUrl: template.config.backgroundImageUrl ? `url(${template.config.backgroundImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }} className="aspect-[3/4] rounded-xl p-3 shadow-inner border border-white/10 overflow-hidden mb-4 relative">
+             <div style={{ backgroundColor: template.config.bgColor, backgroundImage: template.config.backgroundImageUrl ? `url(${template.config.backgroundImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }} className="aspect-[3/4] rounded-xl p-3 shadow-inner border border-white/10 overflow-hidden mb-4 relative">
                 <div style={{ color: template.config.accentColor }} className="text-center font-black text-sm mb-2 border-b pb-1 border-white/10 uppercase">{template.config.cardTitle}</div>
                 <div className="grid grid-cols-5 gap-0.5 opacity-40">
                   {[...Array(25)].map((_, i) => <div key={i} style={{ backgroundColor: template.config.gridColor }} className="aspect-square rounded-sm border border-white/5" />)}
@@ -1139,21 +1193,22 @@ export default function App() {
     <div className="flex h-screen bg-gray-950 text-white font-sans selection:bg-purple-500 overflow-hidden relative">
       
       {/* ГЛОБАЛЬНЫЙ СКРЫТЫЙ АУДИО ПЛЕЕР */}
-      <audio 
-        ref={audioRef}
-        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-        onEnded={() => {
-          setPlayingTrackId(null);
-          // Если мы в режиме ведущего и включен Автоплей -> переключаем на следующий
-          if (hostSession && isAutoPlay) {
-            if (currentHostTrackIndex < shuffledTracks.length - 1) {
-              playHostTrack(currentHostTrackIndex + 1);
-              setHideTrackInfo(true);
+        <audio
+          ref={audioRef}
+          crossOrigin="anonymous"   // ← ДОБАВИТЬ ЭТО
+          preload="auto"
+          onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+          onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+          onEnded={() => {
+            setPlayingTrackId(null);
+            if (hostSession && isAutoPlay) {
+              if (currentHostTrackIndex < shuffledTracks.length - 1) {
+                playHostTrack(currentHostTrackIndex + 1);
+                setHideTrackInfo(true);
+              }
             }
-          }
-        }}
-      />
+          }}
+        />
 
       {toast && <div className="absolute top-6 right-6 bg-green-600 text-white px-6 py-4 rounded-xl shadow-2xl font-bold flex items-center gap-3 z-[300] animate-in slide-in-from-top-4"><CheckCircle2 size={20} />{toast}</div>}
 
@@ -1363,7 +1418,7 @@ export default function App() {
             <div className="absolute top-10 left-10 flex flex-col text-gray-400"><span className="flex items-center gap-2 font-bold text-white mb-1"><Eye size={20} /> Предпросмотр печати</span><span className="text-sm">Отображается пример генерации на листе бумаги</span></div>
             <div className={`bg-white shadow-[0_0_60px_rgba(0,0,0,0.8)] flex items-center justify-center gap-4 p-4 transition-all duration-500 ${editingTemplate.config?.layout === '1' ? 'w-[400px] aspect-[1/1.414]' : editingTemplate.config?.layout === '2' ? 'w-[600px] aspect-[1.414/1] flex-row' : 'w-[450px] aspect-[1/1.414] grid grid-cols-2 grid-rows-2'}`}>
               {[...Array(Number(editingTemplate.config?.layout || 1))].map((_, cardIndex) => (
-                <div key={cardIndex} style={{ backgroundColor: editingTemplate.config?.bgColor, color: editingTemplate.config?.textColor, backgroundImageUrl: editingTemplate.config?.backgroundImageUrl ? `url(${editingTemplate.config?.backgroundImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }} className={`relative flex flex-col rounded shadow-md overflow-hidden ${editingTemplate.config?.layout === '1' ? 'w-full h-full p-8 border-2 border-dashed border-gray-300' : editingTemplate.config?.layout === '2' ? 'w-1/2 h-full p-6 border border-dashed border-gray-300' : 'w-full h-full p-3 border border-dashed border-gray-300'}`}>
+                <div key={cardIndex} style={{ backgroundColor: editingTemplate.config?.bgColor, color: editingTemplate.config?.textColor, backgroundImage: editingTemplate.config?.backgroundImageUrl ? `url(${editingTemplate.config?.backgroundImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }} className={`relative flex flex-col rounded shadow-md overflow-hidden ${editingTemplate.config?.layout === '1' ? 'w-full h-full p-8 border-2 border-dashed border-gray-300' : editingTemplate.config?.layout === '2' ? 'w-1/2 h-full p-6 border border-dashed border-gray-300' : 'w-full h-full p-3 border border-dashed border-gray-300'}`}>
                   <div style={{ color: editingTemplate.config?.accentColor, borderColor: `${editingTemplate.config?.accentColor}44` }} className={`text-center font-black border-b-4 uppercase italic tracking-tighter ${editingTemplate.config?.layout === '4' ? 'text-xl mb-2 pb-1 border-b-2' : 'text-3xl mb-4 pb-3'}`}>{editingTemplate.config?.cardTitle}</div>
                   <div className="grid grid-cols-5 gap-1 flex-1">
                     {[...Array(25)].map((_, i) => (
