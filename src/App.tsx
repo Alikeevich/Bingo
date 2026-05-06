@@ -642,34 +642,17 @@ export default function App() {
     if (isProjectorMode) {
       return (
         <div className="fixed inset-0 bg-black text-white z-[100] flex flex-col items-center justify-center animate-in fade-in duration-500 group overflow-hidden">
-          {/* АУДИО ЭЛЕМЕНТ — обязателен в каждой ветке раннего return */}
-          <audio ref={audioRef} preload="auto" crossOrigin="anonymous" {...audioHandlers} />
-
+          {/* БАННЕР БИНГО НА ПРОЕКТОРЕ */}
           {autoWinners.length > 0 && (
-            <div className="absolute top-10 flex items-center gap-4 bg-green-500 text-white px-10 py-4 rounded-full font-black text-4xl shadow-[0_0_80px_rgba(34,197,94,0.8)] z-[200] animate-bounce border-4 border-white">
-              <PartyPopper size={40} /> БИНГО У КАРТОЧЕК: {autoWinners.join(', ')}!
+            <div className="absolute top-10 flex items-center gap-4 bg-green-600 text-white px-10 py-4 rounded-full font-black text-4xl shadow-[0_0_80px_rgba(22,163,74,0.6)] z-[200] animate-bounce">
+              <PartyPopper size={40} /> БИНГО: {autoWinners.join(', ')}
             </div>
           )}
-          <button onClick={() => setIsProjectorMode(false)} className="absolute top-8 right-8 p-4 bg-white/10 hover:bg-white/30 rounded-full transition opacity-0 group-hover:opacity-100 text-white z-50"><Minimize size={32} /></button>
-          {currentTrack && (
-            <div className="flex flex-col items-center justify-center max-w-5xl w-full px-10 pb-28 h-full">
-              <div className={`relative w-[45vh] h-[45vh] min-w-[250px] min-h-[250px] max-w-[600px] max-h-[600px] rounded-[3rem] overflow-hidden mb-8 transition-all duration-1000 flex-shrink-0 ${isPlaying ? 'scale-105' : 'scale-100'}`}>
-                <img src={currentTrack.cover} className={`w-full h-full object-cover transition-all duration-1000 ${hideTrackInfo ? 'blur-[50px] scale-125 brightness-50' : ''}`} alt="" />
-                {hideTrackInfo && <div className="absolute inset-0 flex items-center justify-center"><Music size={100} className="text-white/10" /></div>}
-              </div>
-              <div className="text-center flex-shrink-0">
-                <h1 className={`text-5xl md:text-7xl font-black mb-4 transition-all duration-500 tracking-tight line-clamp-2 ${hideTrackInfo ? 'text-gray-800 blur-sm' : 'text-white'}`}>{hideTrackInfo ? 'Угадай трек!' : currentTrack.title}</h1>
-                <p className={`text-3xl md:text-4xl transition-all duration-500 line-clamp-1 ${hideTrackInfo ? 'text-gray-900 blur-sm' : 'text-purple-400 font-bold'}`}>{hideTrackInfo ? 'Исполнитель' : currentTrack.artist}</p>
-              </div>
-            </div>
-          )}
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity z-50 bg-black/60 p-3 rounded-[2.5rem] backdrop-blur-md border border-white/10">
-            <button onClick={() => setHideTrackInfo(!hideTrackInfo)} className={`flex items-center gap-3 px-8 py-4 rounded-full font-bold text-xl transition-all ${hideTrackInfo ? 'bg-purple-600 hover:bg-purple-500 text-white' : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`}>
-              {hideTrackInfo ? <Eye size={28} /> : <EyeOff size={28} />}{hideTrackInfo ? 'Показать ответ' : 'Скрыть ответ'}
-            </button>
-            <button onClick={() => { playHostTrack(currentHostTrackIndex + 1); setHideTrackInfo(true); }} disabled={currentHostTrackIndex === shuffledTracks.length - 1} className="flex items-center gap-3 px-8 py-4 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 rounded-full font-bold text-xl transition-all text-white">
-              Дальше <SkipForward size={28} />
-            </button>
+          <button onClick={() => setIsProjectorMode(false)} className="absolute top-8 right-8 p-4 bg-white/10 rounded-full opacity-0 group-hover:opacity-100 transition-all"><Minimize size={32} /></button>
+          <div className="text-center">
+             <img src={currentTrack?.cover} className={`w-[40vh] h-[40vh] mx-auto rounded-[3rem] mb-10 transition-all ${hideTrackInfo ? 'blur-3xl' : ''}`} />
+             <h1 className="text-7xl font-black mb-4">{hideTrackInfo ? '???' : currentTrack?.title}</h1>
+             <p className="text-4xl text-purple-400">{hideTrackInfo ? '???' : currentTrack?.artist}</p>
           </div>
         </div>
       );
