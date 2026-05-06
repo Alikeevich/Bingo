@@ -10,13 +10,35 @@ interface TemplatesTabProps {
 }
 
 // Список шрифтов с поддержкой кириллицы и казахских символов
-const FONTS = [
+const FONTS =[
   { name: 'Inter (Стандартный)', value: '"Inter", sans-serif' },
   { name: 'Montserrat (Стильный)', value: '"Montserrat", sans-serif' },
   { name: 'Golos Text (Современный)', value: '"Golos Text", sans-serif' },
   { name: 'Roboto (Классика)', value: '"Roboto", sans-serif' },
   { name: 'Rubik (Скругленный)', value: '"Rubik", sans-serif' },
 ];
+
+// ================================================================
+//  ЗОНЫ КАРТОЧКИ — захардкожены по дизайн-гайду (Синхронизировано с PrintView)
+// ================================================================
+const ZONES = {
+  PAD: 2.7,
+  1: {
+    headerH:  21.2, headerGap: 4.2, gridH: 211.7, footerH: 34.5, qrSize: 29.6, idH: 20.3, idW: 25.4, cellGap: 1.5,
+    titleFz:  13.0, trackFz: 3.5, artistFz: 2.7, centerFz: 5.0, idFz: 2.8, idSubFz: 2.0, qrPhFz: 2.5,
+  },
+  2: {
+    headerH:  10.0, headerGap: 2.0, gridH:  99.8, footerH: 16.3, qrSize: 14.0, idH:  9.6, idW: 25.4, cellGap: 0.8,
+    titleFz:   6.1, trackFz: 1.65, artistFz: 1.27, centerFz: 2.36, idFz: 1.4, idSubFz: 1.0, qrPhFz: 1.2,
+  },
+  4: {
+    headerH:  10.0, headerGap: 2.0, gridH:  99.8, footerH: 16.3, qrSize: 12.0, idH:  9.6, idW: 11.6, cellGap: 0.5,
+    titleFz:   5.0, trackFz: 1.3, artistFz: 1.0, centerFz: 1.8, idFz: 1.1, idSubFz: 0.8, qrPhFz: 1.0,
+  },
+} as const;
+
+// Хелпер: число → CSS-строка в мм
+const mm = (v: number) => `${v}mm`;
 
 export default function TemplatesTab({ templates, setTemplates, showToast }: TemplatesTabProps) {
   const [isCreateTemplateModalOpen, setIsCreateTemplateModalOpen] = useState(false);
@@ -65,6 +87,26 @@ export default function TemplatesTab({ templates, setTemplates, showToast }: Tem
       await supabase.from('templates').delete().eq('id', id);
       showToast('Шаблон удалён');
     }
+  };
+
+  // Переменные для точного предпросмотра
+  const layoutNum = parseInt(editingTemplate.config?.layout || '1') as 1 | 2 | 4;
+  const g = ZONES[layoutNum];
+  const p = ZONES.PAD;
+  
+  const pageStyle: React.CSSProperties = {
+    width: '210mm',
+    height: '297mm',
+    backgroundColor: 'white',
+    overflow: 'hidden',
+    padding: '10mm',
+    gap: '10mm',
+    boxSizing: 'border-box',
+    ...(layoutNum === 1
+      ? { display: 'flex', flexDirection: 'column' }
+      : layoutNum === 2
+      ? { display: 'grid', gridTemplateColumns: '1fr', gridTemplateRows: '1fr 1fr' }
+      : { display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' }),
   };
 
   return (
@@ -211,43 +253,250 @@ export default function TemplatesTab({ templates, setTemplates, showToast }: Tem
           </div>
 
           <div className="flex-1 flex flex-col items-center justify-center p-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-800 to-black relative overflow-hidden">
-             <div className="absolute top-10 left-10 flex flex-col text-gray-400"><span className="flex items-center gap-2 font-bold text-white mb-1"><Eye size={20} /> Предпросмотр печати</span><span className="text-sm">Пример генерации на листе бумаги</span></div>
+             <div className="absolute top-10 left-10 flex flex-col text-gray-400">
+               <span className="flex items-center gap-2 font-bold text-white mb-1"><Eye size={20} /> Предпросмотр печати</span>
+               <span className="text-sm">Точные пропорции гайда (масштабировано для экрана)</span>
+             </div>
              
-             <div className={`bg-white shadow-[0_0_60px_rgba(0,0,0,0.8)] flex items-center justify-center gap-4 p-4 transition-all duration-500 ${editingTemplate.config?.layout === '1' ? 'w-[400px] aspect-[1/1.414]' : editingTemplate.config?.layout === '2' ? 'w-[600px] aspect-[1.414/1] flex-row' : 'w-[450px] aspect-[1/1.414] grid grid-cols-2 grid-rows-2'}`}>
-                {[...Array(Number(editingTemplate.config?.layout || 1))].map((_, cardIndex) => (
-                  <div key={cardIndex} style={{ 
-                    backgroundColor: editingTemplate.config?.bgColor, 
-                    color: editingTemplate.config?.textColor, 
-                    fontFamily: editingTemplate.config?.fontFamily,
-                    backgroundImage: editingTemplate.config?.backgroundImageUrl ? `url(${editingTemplate.config.backgroundImageUrl})` : 'none',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center'
-                  }} className={`relative flex flex-col rounded shadow-md overflow-hidden ${editingTemplate.config?.layout === '1' ? 'w-full h-full p-8 border-2 border-dashed border-gray-300' : editingTemplate.config?.layout === '2' ? 'w-1/2 h-full p-6 border border-dashed border-gray-300' : 'w-full h-full p-3 border border-dashed border-gray-300'}`}>
-                    <div style={{ color: editingTemplate.config?.accentColor, borderColor: `${editingTemplate.config?.accentColor}44` }} className={`text-center font-black border-b-4 uppercase italic tracking-tighter ${editingTemplate.config?.layout === '4' ? 'text-xl mb-2 pb-1 border-b-2' : 'text-3xl mb-4 pb-3'}`}>{editingTemplate.config?.cardTitle}</div>
-                    
-                    <div className="grid grid-cols-5 gap-1 flex-1">
-                      {[...Array(25)].map((_, i) => (
-                        <div key={i} style={{ backgroundColor: editingTemplate.config?.gridColor }} className="rounded border border-white/10 flex flex-col items-center justify-center text-center p-1 overflow-hidden">
-                          {i === 12 
-                            ? <div style={{ color: editingTemplate.config?.accentColor }} className={`font-black uppercase leading-tight ${editingTemplate.config?.layout === '4' ? 'text-[8px]' : 'text-xs'}`}>{editingTemplate.config?.centerText}</div>
-                            : <>
-                                <div className={`font-bold leading-tight opacity-90 uppercase ${editingTemplate.config?.layout === '4' ? 'text-[6px]' : 'text-[9px]'}`}>ТРЕК {i + 1}</div>
-                                {editingTemplate.config?.showArtist && <div style={{ color: editingTemplate.config?.accentColor }} className={`font-medium leading-tight opacity-90 italic mt-0.5 ${editingTemplate.config?.layout === '4' ? 'text-[5px]' : 'text-[7px]'}`}>Исполнитель</div>}
-                              </>
-                          }
-                        </div>
-                      ))}
-                    </div>
+             {/* РЕАЛЬНЫЙ А4 ДЛЯ ПРЕДПРОСМОТРА, УМЕНЬШЕННЫЙ ЧЕРЕЗ SCALE */}
+             <div className="relative w-full h-full flex items-center justify-center">
+               <div style={{ position: 'absolute', transform: 'scale(0.5)', transition: 'all 0.3s ease' }}>
+                 <div style={pageStyle} className="shadow-[0_0_80px_rgba(0,0,0,0.8)]">
+                   {[...Array(layoutNum)].map((_, cardIndex) => (
+                     <div
+                       key={cardIndex}
+                       style={{
+                         flex: layoutNum === 1 ? '1 1 auto' : undefined,
+                         display: 'flex',
+                         flexDirection: 'column',
+                         padding: mm(p),
+                         boxSizing: 'border-box',
+                         overflow: 'hidden',
+                         backgroundColor: editingTemplate.config?.bgColor,
+                         color: editingTemplate.config?.textColor,
+                         backgroundImage: editingTemplate.config?.backgroundImageUrl
+                           ? `url(${editingTemplate.config.backgroundImageUrl})`
+                           : 'none',
+                         backgroundSize: 'cover',
+                         backgroundPosition: 'center',
+                         fontFamily: editingTemplate.config?.fontFamily || '"Inter", sans-serif',
+                         borderRadius: '3mm',
+                         border: '0.4mm dashed #9ca3af',
+                       }}
+                     >
+                       {/* ЗОНА 1 — ЗАГОЛОВОК */}
+                       <div
+                         style={{
+                           height:    mm(g.headerH),
+                           minHeight: mm(g.headerH),
+                           maxHeight: mm(g.headerH),
+                           flexShrink: 0,
+                           display: 'flex',
+                           alignItems: 'center',
+                           justifyContent: 'center',
+                           borderBottom: `0.7mm solid ${editingTemplate.config?.accentColor}55`,
+                           color: editingTemplate.config?.accentColor,
+                           fontSize: mm(g.titleFz),
+                           fontWeight: 900,
+                           fontStyle: 'italic',
+                           textTransform: 'uppercase',
+                           letterSpacing: '-0.03em',
+                           overflow: 'hidden',
+                         }}
+                       >
+                         {editingTemplate.config?.cardTitle}
+                       </div>
 
-                    <div className={`mt-4 flex justify-between items-end ${editingTemplate.config?.layout === '4' ? 'mt-2' : ''}`}>
-                      <div className="flex flex-col bg-white/50 p-1 rounded-sm">
-                        <div className={`opacity-80 uppercase font-bold ${editingTemplate.config?.layout === '4' ? 'text-[6px]' : 'text-[9px]'}`}>ID: #1042</div>
-                        <div className={`opacity-70 font-medium ${editingTemplate.config?.layout === '4' ? 'text-[5px]' : 'text-[7px]'}`}>{editingTemplate.config?.footerText}</div>
-                      </div>
-                      {editingTemplate.config?.showQR && <div className={`bg-white/90 border border-white/20 flex items-center justify-center p-1 ${editingTemplate.config?.layout === '4' ? 'w-8 h-8 rounded-sm' : 'w-12 h-12 rounded'}`}><div className="text-black text-[4px] font-bold">QR CODE</div></div>}
-                    </div>
-                  </div>
-                ))}
+                       {/* ЗОНА 2 — GAP */}
+                       <div style={{ height: mm(g.headerGap), flexShrink: 0 }} />
+
+                       {/* ЗОНА 3 — СЕТКА */}
+                       <div
+                         style={{
+                           display: 'grid',
+                           gridTemplateColumns: 'repeat(5, 1fr)',
+                           gridTemplateRows: 'repeat(5, 1fr)',
+                           gap: mm(g.cellGap),
+                           height:    mm(g.gridH),
+                           minHeight: mm(g.gridH),
+                           maxHeight: mm(g.gridH),
+                           flexShrink: 0,
+                         }}
+                       >
+                         {[...Array(25)].map((_, i) => {
+                           const isFree = i === 12;
+                           return (
+                             <div
+                               key={i}
+                               style={{
+                                 backgroundColor: editingTemplate.config?.gridColor,
+                                 borderRadius: '0.8mm',
+                                 border: '0.2mm solid rgba(255,255,255,0.1)',
+                                 display: 'flex',
+                                 flexDirection: 'column',
+                                 alignItems: 'center',
+                                 justifyContent: 'center',
+                                 textAlign: 'center',
+                                 padding: '0.5mm',
+                                 overflow: 'hidden',
+                               }}
+                             >
+                               {isFree ? (
+                                 <div
+                                   style={{
+                                     color: editingTemplate.config?.accentColor,
+                                     fontSize: mm(g.centerFz),
+                                     fontWeight: 900,
+                                     textTransform: 'uppercase',
+                                     lineHeight: 1.1,
+                                   }}
+                                 >
+                                   {editingTemplate.config?.centerText}
+                                 </div>
+                               ) : (
+                                 <>
+                                   <div
+                                     style={{
+                                       fontSize: mm(g.trackFz),
+                                       fontWeight: 700,
+                                       lineHeight: 1.2,
+                                       opacity: 0.9,
+                                       overflow: 'hidden',
+                                       display: '-webkit-box',
+                                       WebkitLineClamp: 3,
+                                       WebkitBoxOrient: 'vertical',
+                                       wordBreak: 'break-word',
+                                       width: '100%',
+                                       padding: '0 0.3mm',
+                                     } as React.CSSProperties}
+                                   >
+                                     ТРЕК {i + 1}
+                                   </div>
+                                   {editingTemplate.config?.showArtist && (
+                                     <div
+                                       style={{
+                                         color: editingTemplate.config?.accentColor,
+                                         fontSize: mm(g.artistFz),
+                                         fontWeight: 500,
+                                         fontStyle: 'italic',
+                                         lineHeight: 1.2,
+                                         opacity: 0.9,
+                                         marginTop: '0.3mm',
+                                         overflow: 'hidden',
+                                         display: '-webkit-box',
+                                         WebkitLineClamp: 2,
+                                         WebkitBoxOrient: 'vertical',
+                                         wordBreak: 'break-word',
+                                         width: '100%',
+                                         padding: '0 0.3mm',
+                                       } as React.CSSProperties}
+                                     >
+                                       Исполнитель
+                                     </div>
+                                   )}
+                                 </>
+                               )}
+                             </div>
+                           );
+                         })}
+                       </div>
+
+                       {/* ЗОНА 4 — ПОДВАЛ */}
+                       <div
+                         style={{
+                           height:    mm(g.footerH),
+                           minHeight: mm(g.footerH),
+                           flexShrink: 0,
+                           display: 'flex',
+                           justifyContent: 'space-between',
+                           alignItems: 'flex-end',
+                         }}
+                       >
+                         {/* ID-блок */}
+                         <div
+                           style={{
+                             width:     mm(g.idW),
+                             height:    mm(g.idH),
+                             minWidth:  mm(g.idW),
+                             flexShrink: 0,
+                             backgroundColor: 'rgba(255,255,255,0.5)',
+                             borderRadius: '1mm',
+                             padding: '0.5mm 1mm',
+                             display: 'flex',
+                             flexDirection: 'column',
+                             justifyContent: 'center',
+                             boxSizing: 'border-box',
+                             overflow: 'hidden',
+                           }}
+                         >
+                           <div
+                             style={{
+                               fontSize: mm(g.idFz),
+                               fontWeight: 700,
+                               textTransform: 'uppercase',
+                               letterSpacing: '0.08em',
+                               opacity: 0.8,
+                               lineHeight: 1.2,
+                               color: editingTemplate.config?.textColor,
+                               whiteSpace: 'nowrap',
+                               overflow: 'hidden',
+                             }}
+                           >
+                             ID: #1042
+                           </div>
+                           <div
+                             style={{
+                               fontSize: mm(g.idSubFz),
+                               fontWeight: 500,
+                               opacity: 0.7,
+                               lineHeight: 1.2,
+                               color: editingTemplate.config?.textColor,
+                               whiteSpace: 'nowrap',
+                               overflow: 'hidden',
+                             }}
+                           >
+                             {editingTemplate.config?.footerText}
+                           </div>
+                         </div>
+
+                         {/* QR-блок */}
+                         {editingTemplate.config?.showQR && (
+                           <div
+                             style={{
+                               width:     mm(g.qrSize),
+                               height:    mm(g.qrSize),
+                               minWidth:  mm(g.qrSize),
+                               flexShrink: 0,
+                               backgroundColor: 'rgba(255,255,255,0.9)',
+                               border: '0.2mm solid rgba(255,255,255,0.2)',
+                               borderRadius: '2mm',
+                               display: 'flex',
+                               alignItems: 'center',
+                               justifyContent: 'center',
+                               padding: '1mm',
+                               boxSizing: 'border-box',
+                             }}
+                           >
+                             <div
+                               style={{
+                                 fontSize: mm(g.qrPhFz),
+                                 fontWeight: 700,
+                                 opacity: 0.5,
+                                 textAlign: 'center',
+                                 lineHeight: 1.2,
+                                 color: '#000',
+                               }}
+                             >
+                               МЕСТО ДЛЯ<br />QR КОДА
+                             </div>
+                           </div>
+                         )}
+                       </div>
+
+                     </div>
+                   ))}
+                 </div>
+               </div>
              </div>
           </div>
         </div>
