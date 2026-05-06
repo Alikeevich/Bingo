@@ -458,7 +458,8 @@ export default function App() {
         <text x="1240" y="380" font-family="sans-serif" font-size="100" font-weight="bold" text-anchor="middle" fill="#991b1b">ЗОНА ЗАГОЛОВКА</text>
         <!-- Grid Area -->
         <rect x="200" y="700" width="2080" height="2080" fill="#86efac" opacity="0.5" />
-        <text x="1240" y="1740" font-family="sans-serif" font-size="120" font-weight="bold" text-anchor="middle" fill="#166534">СЕТКА (ОСТАВИТЬ НЕЙТРАЛЬНЫМ/СВЕТЛЫМ)</text>
+        <text x="1240" y="1680" font-family="sans-serif" font-size="100" font-weight="bold" text-anchor="middle" fill="#166534">СЕТКА ДЛЯ ТРЕКОВ</text>
+        <text x="1240" y="1820" font-family="sans-serif" font-size="70" font-weight="bold" text-anchor="middle" fill="#166534">(ОСТАВЬТЕ ЗОНУ СВЕТЛОЙ)</text>
         <!-- Footer / ID Area -->
         <rect x="200" y="3000" width="1000" height="200" fill="#fcd34d" opacity="0.5" />
         <text x="700" y="3120" font-family="sans-serif" font-size="80" font-weight="bold" text-anchor="middle" fill="#854d0e">ID И ПОДВАЛ</text>
