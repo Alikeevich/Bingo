@@ -467,11 +467,12 @@ export default function App() {
         <text x="1240" y="1660" font-family="sans-serif" font-size="140" font-weight="black" text-anchor="middle" fill="#166534">СЕТКА ТРЕКОВ (5x5)</text>
         <text x="1240" y="1800" font-family="sans-serif" font-size="70" font-weight="bold" text-anchor="middle" fill="#166534">(Оставьте эту зону нейтральной/читаемой)</text>
 
-        <!-- ID И ПОДВАЛ (Слева внизу, компактный прямоугольник) -->
-        <rect x="150" y="3200" width="350" height="150" fill="#fcd34d" opacity="0.6" rx="15" />
-        <text x="325" y="3290" font-family="sans-serif" font-size="50" font-weight="bold" text-anchor="middle" fill="#854d0e">ID И ПОДВАЛ</text>
+        <!-- БЛОК ID И ПОДВАЛ (Слева внизу, две строки текста) -->
+        <rect x="150" y="3150" width="450" height="200" fill="#fcd34d" opacity="0.6" rx="15" />
+        <text x="375" y="3240" font-family="sans-serif" font-size="60" font-weight="bold" text-anchor="middle" fill="#854d0e">ID: #1042</text>
+        <text x="375" y="3310" font-family="sans-serif" font-size="45" font-weight="bold" opacity="0.8" text-anchor="middle" fill="#854d0e">MuzBingo (Подвал)</text>
 
-        <!-- QR КОД (Справа внизу, крупный квадрат) -->
+        <!-- QR КОД (Справа внизу, прижат к той же нижней линии) -->
         <rect x="1980" y="3000" width="350" height="350" fill="#93c5fd" opacity="0.6" rx="20" />
         <text x="2155" y="3190" font-family="sans-serif" font-size="60" font-weight="bold" text-anchor="middle" fill="#1e3a8a">QR-КОД</text>
 
