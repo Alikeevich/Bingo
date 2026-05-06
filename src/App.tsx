@@ -54,6 +54,7 @@ interface TemplateConfig {
   layout: '1' | '2' | '4';
   backgroundImageUrl?: string;
   qrUrl?: string;
+  fontFamily?: string;
 }
 interface Template {
   id: string;
@@ -153,6 +154,7 @@ export default function App() {
       bgColor: '#1e1b4b', textColor: '#ffffff', accentColor: '#8b5cf6',
       gridColor: '#2e1065', cardTitle: 'MUZ BINGO', showArtist: true,
       centerText: 'FREE SPACE', footerText: 'MuzBingo', showQR: true, layout: '2',
+      fontFamily: '"Inter", sans-serif',
     },
   });
 
@@ -1145,7 +1147,7 @@ export default function App() {
     <div className="animate-in fade-in duration-300 h-full flex flex-col">
       <div className="flex justify-between items-end mb-8">
         <div><h1 className="text-3xl font-bold mb-2">Шаблоны карточек</h1><p className="text-gray-400">Настройте внешний вид бинго-карточек.</p></div>
-        <button onClick={() => { setEditingTemplate({ name: '', config: { bgColor: '#1e1b4b', textColor: '#ffffff', accentColor: '#8b5cf6', gridColor: '#2e1065', cardTitle: 'MUZ BINGO', showArtist: true, centerText: 'FREE SPACE', footerText: 'MuzBingo', showQR: true, layout: '2' } }); setIsCreateTemplateModalOpen(true); }} className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition flex items-center gap-2"><Palette size={20} /> Создать шаблон</button>
+        <button onClick={() => { setEditingTemplate({ name: '', config: { bgColor: '#1e1b4b', textColor: '#ffffff', accentColor: '#8b5cf6', gridColor: '#2e1065', cardTitle: 'MUZ BINGO', showArtist: true, centerText: 'FREE SPACE', footerText: 'MuzBingo', showQR: true, layout: '2', fontFamily: '"Inter", sans-serif' } }); setIsCreateTemplateModalOpen(true); }} className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition flex items-center gap-2"><Palette size={20} /> Создать шаблон</button>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 overflow-y-auto pr-2 custom-scrollbar pb-10">
         {templates.map(template => (
