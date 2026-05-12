@@ -64,7 +64,9 @@ function textStyleToReact(s: TextStyle): Style {
 
 const styles = StyleSheet.create({
   page: { position: 'relative', backgroundColor: 'white' },
-  bgImage: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
+  // Фон — оборачиваем в absolute View, иначе react-pdf измеряет Image как flow и ругается на "can't wrap between pages"
+  bgWrap:  { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  bgImage: { width: '100%', height: '100%' },
   slot:    { position: 'absolute', overflow: 'hidden' },
   gridCell: {
     flex: 1,
@@ -175,8 +177,9 @@ function CardPage({ card, template, qrPngDataUrl }: CardPageProps) {
     <Page size="A4" orientation={orientation} style={styles.page}>
       {/* ФОН — дизайнерская картинка во всю страницу */}
       {backgroundImageUrl && (
-        // src — строка-URL; react-pdf сам скачает
-        <Image src={backgroundImageUrl} style={styles.bgImage} />
+        <View style={styles.bgWrap}>
+          <Image src={backgroundImageUrl} style={styles.bgImage} />
+        </View>
       )}
 
       {/* СЕТКА */}
