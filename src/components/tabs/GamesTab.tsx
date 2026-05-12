@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../../supabase';
 import { Game, Round, Playlist, Template, BingoCard } from '../../types';
-import { ChevronLeft, Calendar, Trash2, PlusCircle, ListMusic, LayoutTemplate, Play, Printer, PartyPopper, X } from 'lucide-react';
+import { ChevronLeft, Calendar, Trash2, PlusCircle, ListMusic, LayoutTemplate, Play, Printer, PartyPopper } from 'lucide-react';
 
 interface GamesTabProps {
   games: Game[];

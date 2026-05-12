@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Track, Tag } from '../../types';
-import { PlayCircle, PauseCircle, Plus, Trash2, Tags, Search, Edit3, UploadCloud } from 'lucide-react';
+import { PlayCircle, PauseCircle, Plus, Trash2, Tags, Search, Edit3, UploadCloud, X } from 'lucide-react';
 
 interface MyDatabaseTabProps {
   dbTracks: Track[];
@@ -9,12 +9,13 @@ interface MyDatabaseTabProps {
   togglePlay: (track: Track) => void;
   setTrackToAdd: (track: Track) => void; // Добавляет в плейлист
   deleteTrackFromDb: (id: string | number) => void;
+  deleteTagFromDb: (tag: Tag) => void;
   onUploadCustomFile: (file: File) => void; // Клик по загрузке файла
   onEditTrack: (track: Track) => void;       // Клик по редактированию
 }
 
-export default function MyDatabaseTab({ 
-  dbTracks, dbTags, playingTrackId, togglePlay, setTrackToAdd, deleteTrackFromDb, onUploadCustomFile, onEditTrack 
+export default function MyDatabaseTab({
+  dbTracks, dbTags, playingTrackId, togglePlay, setTrackToAdd, deleteTrackFromDb, deleteTagFromDb, onUploadCustomFile, onEditTrack
 }: MyDatabaseTabProps) {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -70,10 +71,22 @@ export default function MyDatabaseTab({
           Все треки
         </button>
         {dbTags.map(tag => (
-          <button key={tag.id} onClick={() => setActiveTag(tag.name)} className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition ${activeTag === tag.name ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/50' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color || '#8b5cf6' }} />
-            {tag.name}
-          </button>
+          <div key={tag.id} className={`group/tag flex items-center gap-2 pl-4 pr-1 py-2 rounded-full font-medium transition ${activeTag === tag.name ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/50' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+            <button onClick={() => setActiveTag(tag.name)} className="flex items-center gap-2 outline-none">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color || '#8b5cf6' }} />
+              {tag.name}
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (activeTag === tag.name) setActiveTag(null);
+                deleteTagFromDb(tag);
+              }}
+              title="Удалить тег"
+              className="ml-1 p-1 rounded-full opacity-0 group-hover/tag:opacity-100 hover:bg-red-500/30 hover:text-red-200 transition">
+              <X size={12} />
+            </button>
+          </div>
         ))}
       </div>
 

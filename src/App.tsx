@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabase';
 import { Music, ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, Loader2, X } from 'lucide-react';
 import { Track, Playlist, Game, Round, Template, BingoCard, Tag } from './types';
+import { migrateTemplate } from './lib/migrateTemplate';
 
 // Вкладки
 import GamesTab from './components/tabs/GamesTab';
@@ -120,7 +121,7 @@ export default function App() {
   };
   const fetchTemplates = async () => {
     const { data } = await supabase.from('templates').select('*').order('created_at', { ascending: false });
-    if (data) setTemplates(data);
+    if (data) setTemplates(data.map(migrateTemplate));
   };
 
   const fetchDatabase = async () => {
@@ -351,6 +352,32 @@ export default function App() {
     showToast('Трек удален');
   };
 
+  const deleteTagFromDb = async (tag: Tag) => {
+    const affected = dbTracks.filter(t => (t.tags || []).includes(tag.name));
+    const msg = affected.length > 0
+      ? `Удалить тег «${tag.name}»? Он отвязан от ${affected.length} ${affected.length === 1 ? 'трека' : 'треков'}.`
+      : `Удалить тег «${tag.name}»?`;
+    if (!confirm(msg)) return;
+
+    // 1) чистим тег у всех треков (батчем — параллельно, ок для небольших объёмов)
+    if (affected.length > 0) {
+      await Promise.all(affected.map(t => {
+        const cleaned = (t.tags || []).filter(n => n !== tag.name);
+        return supabase.from('tracks').update({ tags: cleaned }).eq('id', String(t.id));
+      }));
+      setDbTracks(prev => prev.map(t => (t.tags || []).includes(tag.name)
+        ? { ...t, tags: (t.tags || []).filter(n => n !== tag.name) }
+        : t));
+    }
+
+    // 2) удаляем сам тег
+    const { error } = await supabase.from('tags').delete().eq('id', tag.id);
+    if (error) return showToast('Ошибка удаления тега: ' + error.message);
+
+    setDbTags(prev => prev.filter(t => t.id !== tag.id));
+    showToast('Тег удалён');
+  };
+
   if (printViewCards) return <PrintView printViewCards={printViewCards} setPrintViewCards={setPrintViewCards} />;
 
   if (hostSession) {
@@ -401,9 +428,10 @@ export default function App() {
       <main className="flex-1 overflow-hidden p-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-gray-900 via-gray-950 to-gray-950">
         {activeTab === 'games' && <GamesTab games={games} setGames={setGames} playlists={playlists} templates={templates} showToast={showToast} startHostSession={startHostSession} setPrintViewCards={setPrintViewCards} />}
         {activeTab === 'mydatabase' && (
-          <MyDatabaseTab 
-            dbTracks={dbTracks} dbTags={dbTags} playingTrackId={playingTrackId} togglePlay={togglePlay} 
-            setTrackToAdd={setTrackToAdd} deleteTrackFromDb={deleteTrackFromDb} 
+          <MyDatabaseTab
+            dbTracks={dbTracks} dbTags={dbTags} playingTrackId={playingTrackId} togglePlay={togglePlay}
+            setTrackToAdd={setTrackToAdd} deleteTrackFromDb={deleteTrackFromDb}
+            deleteTagFromDb={deleteTagFromDb}
             onUploadCustomFile={handleUploadCustomFile}
             onEditTrack={(track) => {
               setTrackToAddToDb(track);

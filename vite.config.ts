@@ -61,6 +61,10 @@ const audioProxyPlugin: Plugin = {
 
 export default defineConfig({
   plugins: [react(), audioProxyPlugin],
+  // Полифиллы для @react-pdf/renderer (использует Node globals)
+  define: {
+    global: 'globalThis',
+  },
   server: {
     proxy: {
       '/api/deezer': {
