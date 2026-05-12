@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabase';
 import { Music, ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, Loader2, X } from 'lucide-react';
 import { Track, Playlist, Game, Round, Template, BingoCard, Tag } from './types';
+import { migrateTemplate } from './lib/migrateTemplate';
 
 // Вкладки
 import GamesTab from './components/tabs/GamesTab';
@@ -120,7 +121,7 @@ export default function App() {
   };
   const fetchTemplates = async () => {
     const { data } = await supabase.from('templates').select('*').order('created_at', { ascending: false });
-    if (data) setTemplates(data);
+    if (data) setTemplates(data.map(migrateTemplate));
   };
 
   const fetchDatabase = async () => {
