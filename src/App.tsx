@@ -52,6 +52,8 @@ export default function App() {
   const [trackToAddToDb, setTrackToAddToDb] = useState<Track | null>(null);
   const [editedTitle, setEditedTitle] = useState('');
   const [editedArtist, setEditedArtist] = useState('');
+  // Подтверждение дубликата (in-app, вместо нативного confirm)
+  const [dupWarning, setDupWarning] = useState<Track | null>(null);
   const [editedPreviewStart, setEditedPreviewStart] = useState(0);
   const [editedPreviewEnd,   setEditedPreviewEnd]   = useState(0);
   const [customFileUrl, setCustomFileUrl] = useState<string | null>(null);
@@ -319,25 +321,23 @@ export default function App() {
   };
 
   // --- СОХРАНЕНИЕ / ОБНОВЛЕНИЕ ТРЕКА В БАЗУ ---
-  const saveTrackToDb = async () => {
+  const saveTrackToDb = async (overrideDuplicate = false) => {
     if (!trackToAddToDb) return;
 
     // Дедупликация — ищем существующий трек с тем же названием+исполнителем (без учёта регистра/лишних пробелов)
-    const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
-    const incomingTitle  = norm(editedTitle  || trackToAddToDb.title);
-    const incomingArtist = norm(editedArtist || trackToAddToDb.artist);
-    const duplicate = dbTracks.find(t =>
-      String(t.id) !== String(trackToAddToDb.id) &&
-      norm(t.title)  === incomingTitle &&
-      norm(t.artist) === incomingArtist
-    );
-    if (duplicate) {
-      const dupTags = (duplicate.tags && duplicate.tags.length > 0) ? `Жанры: ${duplicate.tags.join(', ')}` : 'Без жанров';
-      const ok = confirm(
-        `«${duplicate.title}» от ${duplicate.artist} уже есть в базе.\n${dupTags}\n\n` +
-        `Точно добавить дубликат?\n(Лучше нажми Отмена и отредактируй существующий — кнопка с карандашом.)`
+    if (!overrideDuplicate) {
+      const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+      const incomingTitle  = norm(editedTitle  || trackToAddToDb.title);
+      const incomingArtist = norm(editedArtist || trackToAddToDb.artist);
+      const duplicate = dbTracks.find(t =>
+        String(t.id) !== String(trackToAddToDb.id) &&
+        norm(t.title)  === incomingTitle &&
+        norm(t.artist) === incomingArtist
       );
-      if (!ok) return;
+      if (duplicate) {
+        setDupWarning(duplicate);
+        return;
+      }
     }
 
     let finalTags = [...selectedTagsForNewTrack];
@@ -632,7 +632,7 @@ export default function App() {
 
             <div className="flex gap-4">
               <button onClick={() => { setTrackToAddToDb(null); setCustomFile(null); }} disabled={isUploadingMp3} className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 transition rounded-xl font-bold disabled:opacity-50">Отмена</button>
-              <button onClick={saveTrackToDb} disabled={isUploadingMp3 || !editedTitle.trim() || !editedArtist.trim()} className="flex-1 py-3 bg-purple-600 hover:bg-purple-500 transition rounded-xl font-bold shadow-lg shadow-purple-900/30 flex items-center justify-center gap-2 disabled:opacity-50">
+              <button onClick={() => saveTrackToDb()} disabled={isUploadingMp3 || !editedTitle.trim() || !editedArtist.trim()} className="flex-1 py-3 bg-purple-600 hover:bg-purple-500 transition rounded-xl font-bold shadow-lg shadow-purple-900/30 flex items-center justify-center gap-2 disabled:opacity-50">
                 {isUploadingMp3 ? <Loader2 size={18} className="animate-spin" /> : 'В Мою Базу'}
               </button>
             </div>
@@ -640,6 +640,52 @@ export default function App() {
         </div>
         );
       })()}
+
+      {/* --- МОДАЛКА: ПРЕДУПРЕЖДЕНИЕ О ДУБЛИКАТЕ --- */}
+      {dupWarning && (
+        <div className="fixed inset-0 bg-black/85 z-[70] flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-gray-900 border border-yellow-500/40 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center shrink-0">
+                <span className="text-yellow-400 text-xl">⚠</span>
+              </div>
+              <h3 className="text-lg font-bold">Такой трек уже есть в базе</h3>
+            </div>
+
+            <div className="bg-gray-950 rounded-xl p-4 mb-4 border border-gray-800">
+              <div className="flex items-center gap-3">
+                <img src={dupWarning.cover} className="w-12 h-12 rounded object-cover shrink-0" alt="" />
+                <div className="overflow-hidden">
+                  <div className="font-bold truncate">{dupWarning.title}</div>
+                  <div className="text-sm text-gray-400 truncate">{dupWarning.artist}</div>
+                </div>
+              </div>
+              {dupWarning.tags && dupWarning.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-3">
+                  {dupWarning.tags.map((tag, i) => (
+                    <span key={i} className="text-[10px] px-2 py-0.5 bg-purple-600/20 text-purple-300 rounded">{tag}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <p className="text-sm text-gray-400 mb-6 leading-relaxed">
+              Лучше нажми «Отмена» и отредактируй уже сохранённый трек (карандашик в Моей Базе) — добавь там нужный жанр. Если это правда другая версия (live, ремикс) — жми «Сохранить дубль».
+            </p>
+
+            <div className="flex gap-3">
+              <button onClick={() => setDupWarning(null)}
+                className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 rounded-xl font-bold transition">
+                Отмена
+              </button>
+              <button onClick={() => { setDupWarning(null); saveTrackToDb(true); }}
+                className="flex-1 py-3 bg-yellow-600 hover:bg-yellow-500 rounded-xl font-bold transition">
+                Сохранить дубль
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* --- МОДАЛКА ДОБАВЛЕНИЯ В ПЛЕЙЛИСТ --- */}
       {trackToAdd && (
