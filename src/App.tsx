@@ -31,6 +31,9 @@ export default function App() {
   // Скрытый второй <audio>, который пре-буферит следующий трек пока играет текущий.
   // Только preload — звук с него не идёт.
   const preloadAudioRef = useRef<HTMLAudioElement | null>(null);
+  // Кеш промисов refresh Deezer-URL по track.id — чтобы параллельные вызовы (togglePlay + prefetchTrack)
+  // не делали 2 одинаковых запроса к Deezer API.
+  const refreshPromisesRef = useRef<Map<string, Promise<string | null>>>(new Map());
   // Активный фрагмент (preview_start / preview_end в секундах) текущего проигрываемого трека.
   // Хранится в ref чтобы onTimeUpdate (статичный хендлер) знал актуальные границы без re-attach.
   const currentSegmentRef = useRef<{ start?: number; end?: number; finished?: boolean }>({});
@@ -206,20 +209,67 @@ export default function App() {
     }, stepMs);
   };
 
-  // URL для воспроизведения трека (кастомный из supabase или Deezer)
-  const getTrackPlayUrl = (track: Track): string => {
+  // Проверяет URL Deezer по exp= токену и при необходимости обновляет через API.
+  // Возвращает свежий URL или null если трек больше не доступен.
+  // Кеширует параллельные вызовы для одного track.id.
+  const refreshDeezerUrl = async (track: Track): Promise<string | null> => {
+    const url = track.preview;
+    if (!url) return null;
+    // если нет токена expiry — считаем URL валидным
+    if (!url.includes('exp=')) return url;
+    const expMatch = url.match(/exp=(\d+)/);
+    const exp = expMatch ? parseInt(expMatch[1]) : 0;
+    // 10 секунд запаса, чтобы не успеть протухнуть пока браузер качает
+    if (exp - 10 > Date.now() / 1000) return url;
+
+    const key = String(track.id);
+    const cached = refreshPromisesRef.current.get(key);
+    if (cached) return cached;
+
+    const promise = (async (): Promise<string | null> => {
+      try {
+        const res = await fetch(`/api/deezer/track/${track.id}`);
+        const data = await res.json();
+        if (data?.preview && typeof data.preview === 'string' && data.preview.length > 0) {
+          const fresh: string = data.preview;
+          // 1) в supabase tracks (fire-and-forget)
+          supabase.from('tracks').update({ preview: fresh }).eq('id', String(track.id)).then(() => {});
+          // 2) в стейте Моей Базы
+          setDbTracks(prev => prev.map(t => String(t.id) === String(track.id) ? { ...t, preview: fresh } : t));
+          // 3) в текущей host-сессии (важно — иначе следующий togglePlay снова с протухшим)
+          setShuffledTracks(prev => prev.map(t => String(t.id) === String(track.id) ? { ...t, preview: fresh } : t));
+          return fresh;
+        }
+        return null; // Deezer убрал превью — трек больше не играбелен
+      } catch (e) {
+        console.warn('refreshDeezerUrl failed for', track.id, e);
+        return null;
+      } finally {
+        // через секунду удаляем из кеша (на случай если опять протухнет через время)
+        setTimeout(() => refreshPromisesRef.current.delete(key), 1000);
+      }
+    })();
+
+    refreshPromisesRef.current.set(key, promise);
+    return promise;
+  };
+
+  // Резолвит готовый-к-воспроизведению URL для трека. Для Deezer — через refresh, для кастомных — из supabase storage.
+  const resolveTrackUrl = async (track: Track): Promise<string | null> => {
     if (track.isCustom) {
       return supabase.storage.from('audio-tracks').getPublicUrl(String(track.id)).data.publicUrl;
     }
-    return track.preview;
+    return refreshDeezerUrl(track);
   };
 
-  // Пре-кеширует трек на скрытом audio-элементе — браузер скачает данные в фоне
-  const prefetchTrack = (track: Track | undefined) => {
+  // Пре-кеширует следующий трек на скрытом audio-элементе — браузер скачает данные в фоне.
+  // Для Deezer-треков с протухшим URL — заранее делает refresh, чтобы preload-элемент не упёрся в 403.
+  const prefetchTrack = async (track: Track | undefined) => {
     const el = preloadAudioRef.current;
     if (!el || !track || !track.preview) return;
-    const url = getTrackPlayUrl(track);
-    if (el.src && el.src.endsWith(url)) return; // уже пре-кешен этот трек
+    const url = await resolveTrackUrl(track);
+    if (!url) return; // трек недоступен, нет смысла грузить
+    if (el.src && el.src.endsWith(url)) return;
     try { el.src = url; el.load(); } catch {}
   };
 
@@ -252,36 +302,15 @@ export default function App() {
     };
 
     try {
-      let currentUrl = track.preview;
-      if (track.isCustom) {
-        const { data } = supabase.storage.from('audio-tracks').getPublicUrl(String(track.id));
-        currentUrl = data.publicUrl;
-      } else {
-        const isExpired = currentUrl.includes('exp=') && Date.now() / 1000 > parseInt(currentUrl.match(/exp=(\d+)/)?.[1] || '0');
-        if (isExpired) {
-          try {
-            const res = await fetch(`/api/deezer/track/${track.id}`);
-            const data = await res.json();
-            if (data.preview && typeof data.preview === 'string' && data.preview.length > 0) {
-              currentUrl = data.preview;
-              // Сохраняем свежий URL обратно в БД, чтобы при следующем заходе не упираться в expired
-              supabase.from('tracks').update({ preview: currentUrl }).eq('id', String(track.id))
-                .then(() => {});
-              setDbTracks(prev => prev.map(t => String(t.id) === String(track.id) ? { ...t, preview: currentUrl } : t));
-            } else {
-              // Deezer больше не отдаёт превью для этого трека (issue прав / regions)
-              showToast(`«${track.title}» больше не доступен в Deezer`);
-              setPlayingTrackId(null);
-              if (isAutoPlay && hostSession && currentHostTrackIndex < shuffledTracks.length - 1) {
-                setTimeout(() => playHostTrack(currentHostTrackIndex + 1), 400);
-              }
-              return;
-            }
-          } catch (e) {
-            console.warn('Deezer refresh failed:', e);
-            // Сеть отвалилась — пробуем со старым URL (вероятно 403, но onError ниже подхватит)
-          }
+      const currentUrl = await resolveTrackUrl(track);
+      if (!currentUrl) {
+        // Трек неиграбелен (Deezer убрал превью) — пропускаем и переходим к следующему в автоплее
+        showToast(`«${track.title}» больше не доступен в Deezer`);
+        setPlayingTrackId(null);
+        if (isAutoPlay && hostSession && currentHostTrackIndex < shuffledTracks.length - 1) {
+          setTimeout(() => playHostTrack(currentHostTrackIndex + 1), 400);
         }
+        return;
       }
       // БЕЗ cache-buster — чтобы HTTP-кеш браузера хитил при повторном проигрывании
       // и чтобы preload-элемент мог подгреть тот же самый URL заранее.
