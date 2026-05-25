@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabase';
-import { Music, ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, Loader2, X } from 'lucide-react';
+import { Music, ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, Loader2, X, Scissors } from 'lucide-react';
 import { Track, Playlist, Game, Round, Template, BingoCard, Tag } from './types';
 import { migrateTemplate } from './lib/migrateTemplate';
+import AudioTrimmer from './components/AudioTrimmer';
 
 // Вкладки
 import GamesTab from './components/tabs/GamesTab';
@@ -27,6 +28,9 @@ export default function App() {
   const [dbTags, setDbTags] = useState<Tag[]>([]);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Активный фрагмент (preview_start / preview_end в секундах) текущего проигрываемого трека.
+  // Хранится в ref чтобы onTimeUpdate (статичный хендлер) знал актуальные границы без re-attach.
+  const currentSegmentRef = useRef<{ start?: number; end?: number; finished?: boolean }>({});
   const [playingTrackId, setPlayingTrackId] = useState<string | number | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -48,6 +52,9 @@ export default function App() {
   const [trackToAddToDb, setTrackToAddToDb] = useState<Track | null>(null);
   const [editedTitle, setEditedTitle] = useState('');
   const [editedArtist, setEditedArtist] = useState('');
+  const [editedPreviewStart, setEditedPreviewStart] = useState(0);
+  const [editedPreviewEnd,   setEditedPreviewEnd]   = useState(0);
+  const [customFileUrl, setCustomFileUrl] = useState<string | null>(null);
   const [customFile, setCustomFile] = useState<File | null>(null);
   const [selectedTagsForNewTrack, setSelectedTagsForNewTrack] = useState<string[]>([]);
   const [newTagInput, setNewTagInput] = useState('');
@@ -79,11 +86,26 @@ export default function App() {
     if (trackToAddToDb) {
       setEditedTitle(trackToAddToDb.title);
       setEditedArtist(trackToAddToDb.artist);
+      setEditedPreviewStart(trackToAddToDb.previewStart ?? 0);
+      setEditedPreviewEnd(trackToAddToDb.previewEnd ?? 0);
+      // глушим глобальный плеер чтобы не пересекался со встроенным в триммер
+      audioRef.current?.pause();
+      setPlayingTrackId(null);
     } else {
       setEditedTitle('');
       setEditedArtist('');
+      setEditedPreviewStart(0);
+      setEditedPreviewEnd(0);
     }
   }, [trackToAddToDb]);
+
+  // blob-URL для нового MP3 (источник для AudioTrimmer)
+  useEffect(() => {
+    if (!customFile) { setCustomFileUrl(null); return; }
+    const url = URL.createObjectURL(customFile);
+    setCustomFileUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [customFile]);
 
   useEffect(() => {
     if (hostSession) {
@@ -130,8 +152,10 @@ export default function App() {
     
     if (tracksData) {
       const mappedTracks: Track[] = tracksData.map(t => ({
-        id: t.id, title: t.title, artist: t.artist, cover: t.cover, 
-        preview: t.preview, isCustom: t.is_custom, tags: t.tags
+        id: t.id, title: t.title, artist: t.artist, cover: t.cover,
+        preview: t.preview, isCustom: t.is_custom, tags: t.tags,
+        previewStart: t.preview_start != null ? Number(t.preview_start) : undefined,
+        previewEnd:   t.preview_end   != null ? Number(t.preview_end)   : undefined,
       }));
       setDbTracks(mappedTracks);
     }
@@ -150,6 +174,14 @@ export default function App() {
     }
     audioEl.pause();
     setPlayingTrackId(track.id);
+
+    // Запоминаем границы фрагмента для этого трека (использует onTimeUpdate глобального handler)
+    currentSegmentRef.current = {
+      start: typeof track.previewStart === 'number' && track.previewStart > 0 ? track.previewStart : undefined,
+      end:   typeof track.previewEnd   === 'number' && track.previewEnd   > 0 ? track.previewEnd   : undefined,
+      finished: false,
+    };
+
     try {
       let currentUrl = track.preview;
       if (track.isCustom) {
@@ -165,8 +197,26 @@ export default function App() {
       }
       audioEl.src = currentUrl.includes('?') ? `${currentUrl}&t=${Date.now()}` : `${currentUrl}?t=${Date.now()}`;
       audioEl.load();
+      // Когда метаданные подгрузились — сикаем на старт фрагмента (если задан)
+      const onMeta = () => {
+        const s = currentSegmentRef.current.start;
+        if (typeof s === 'number') {
+          try { audioEl.currentTime = s; } catch {}
+        }
+        audioEl.removeEventListener('loadedmetadata', onMeta);
+      };
+      audioEl.addEventListener('loadedmetadata', onMeta);
       audioEl.play().catch(err => { console.error(err); setPlayingTrackId(null); });
     } catch (err) { console.error(err); setPlayingTrackId(null); }
+  };
+
+  // Что делать когда трек дошёл до конца (или до preview_end)
+  const handleTrackFinished = () => {
+    setPlayingTrackId(null);
+    if (isAutoPlay && hostSession && currentHostTrackIndex < shuffledTracks.length - 1) {
+      playHostTrack(currentHostTrackIndex + 1);
+      setHideTrackInfo(true);
+    }
   };
 
   const startHostSession = (game: Game, round: Round) => {
@@ -201,14 +251,21 @@ export default function App() {
   const endHostSession = () => { if (confirm('Точно завершить тур?')) setHostSession(null); };
 
   const audioHandlers = {
-    onTimeUpdate: (e: React.SyntheticEvent<HTMLAudioElement>) => setCurrentTime(e.currentTarget.currentTime),
+    onTimeUpdate: (e: React.SyntheticEvent<HTMLAudioElement>) => {
+      const el = e.currentTarget;
+      const t  = el.currentTime;
+      setCurrentTime(t);
+      const seg = currentSegmentRef.current;
+      if (!seg.finished && typeof seg.end === 'number' && t >= seg.end) {
+        seg.finished = true;
+        el.pause();
+        handleTrackFinished();
+      }
+    },
     onLoadedMetadata: (e: React.SyntheticEvent<HTMLAudioElement>) => setDuration(e.currentTarget.duration),
     onEnded: () => {
-      setPlayingTrackId(null);
-      if (isAutoPlay && hostSession && currentHostTrackIndex < shuffledTracks.length - 1) {
-        playHostTrack(currentHostTrackIndex + 1);
-        setHideTrackInfo(true);
-      }
+      currentSegmentRef.current.finished = true;
+      handleTrackFinished();
     },
   };
 
@@ -320,7 +377,9 @@ export default function App() {
       cover: trackToAddToDb.cover,
       preview: previewUrl,
       is_custom: isCustomTrack,
-      tags: finalTags
+      tags: finalTags,
+      preview_start: editedPreviewStart > 0 ? editedPreviewStart : null,
+      preview_end:   editedPreviewEnd   > 0 ? editedPreviewEnd   : null,
     };
 
     const { data, error } = await supabase.from('tracks').upsert(newTrackRow).select();
@@ -333,7 +392,9 @@ export default function App() {
          const filtered = prev.filter(t => String(t.id) !== String(data[0].id));
          const addedTrack: Track = {
            id: data[0].id, title: data[0].title, artist: data[0].artist,
-           cover: data[0].cover, preview: data[0].preview, isCustom: data[0].is_custom, tags: data[0].tags
+           cover: data[0].cover, preview: data[0].preview, isCustom: data[0].is_custom, tags: data[0].tags,
+           previewStart: data[0].preview_start != null ? Number(data[0].preview_start) : undefined,
+           previewEnd:   data[0].preview_end   != null ? Number(data[0].preview_end)   : undefined,
          };
          return [addedTrack, ...filtered];
        });
@@ -451,44 +512,72 @@ export default function App() {
       </main>
 
       {/* --- МОДАЛКА: СОХРАНЕНИЕ / РЕДАКТИРОВАНИЕ ТРЕКА В БАЗУ --- */}
-      {trackToAddToDb && (
+      {trackToAddToDb && (() => {
+        // Источник аудио для триммера: blob от нового MP3 или публичный URL из supabase при правке кастомного
+        const trimmerSrc =
+          customFileUrl ??
+          (trackToAddToDb.isCustom
+            ? supabase.storage.from('audio-tracks').getPublicUrl(String(trackToAddToDb.id)).data.publicUrl
+            : null);
+
+        return (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4 animate-in fade-in">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold flex items-center gap-2">
-                <Database size={20} className="text-purple-400"/> 
+                <Database size={20} className="text-purple-400"/>
                 {customFile ? 'Загрузка MP3' : 'Сохранить в Базу'}
               </h3>
               <button onClick={() => { setTrackToAddToDb(null); setCustomFile(null); }} className="text-gray-400"><X size={24}/></button>
             </div>
-            
+
             <div className="flex items-center gap-4 mb-6 p-4 bg-gray-950 rounded-xl">
               <img src={trackToAddToDb.cover} className="w-14 h-14 rounded-md object-cover" alt="" />
               <div className="overflow-hidden flex-1 space-y-2">
                 {/* РЕДАКТИРУЕМЫЕ ПОЛЯ */}
                 <div>
                   <label className="block text-[10px] uppercase tracking-widest font-bold text-gray-500 mb-0.5">Название трека</label>
-                  <input 
-                    type="text" 
-                    value={editedTitle} 
-                    onChange={e => setEditedTitle(e.target.value)} 
+                  <input
+                    type="text"
+                    value={editedTitle}
+                    onChange={e => setEditedTitle(e.target.value)}
                     className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-sm text-white focus:border-purple-500 outline-none"
                     placeholder="Название трека"
                   />
                 </div>
                 <div>
                   <label className="block text-[10px] uppercase tracking-widest font-bold text-gray-500 mb-0.5">Исполнитель</label>
-                  <input 
-                    type="text" 
-                    value={editedArtist} 
-                    onChange={e => setEditedArtist(e.target.value)} 
+                  <input
+                    type="text"
+                    value={editedArtist}
+                    onChange={e => setEditedArtist(e.target.value)}
                     className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-sm text-white focus:border-purple-500 outline-none"
                     placeholder="Исполнитель"
                   />
                 </div>
               </div>
             </div>
-            
+
+            {/* ─── ТРИММЕР АУДИО (только для кастомных MP3) ─── */}
+            {trimmerSrc && (
+              <div className="mb-6">
+                <label className="text-sm font-bold text-gray-400 mb-2 flex items-center gap-2">
+                  <Scissors size={14} className="text-purple-400"/>
+                  Фрагмент трека для игры
+                </label>
+                <AudioTrimmer
+                  src={trimmerSrc}
+                  start={editedPreviewStart}
+                  end={editedPreviewEnd}
+                  onChange={(s, e) => { setEditedPreviewStart(s); setEditedPreviewEnd(e); }}
+                />
+                <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+                  В игре трек начнётся с зелёной метки и автоматически остановится на красной.
+                  Сбрось чтобы играть с начала до конца.
+                </p>
+              </div>
+            )}
+
             <div className="mb-8">
               <label className="block text-sm font-bold text-gray-400 mb-2">Жанр или категория:</label>
               
@@ -531,7 +620,8 @@ export default function App() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* --- МОДАЛКА ДОБАВЛЕНИЯ В ПЛЕЙЛИСТ --- */}
       {trackToAdd && (
