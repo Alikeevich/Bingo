@@ -361,16 +361,6 @@ export default function App() {
     if (isAutoPlay) prefetchTrack(shuffledTracks[index + 1]);
   };
 
-  const reshuffleTracks = () => {
-    if (playedTrackIds.size > 0 && confirm('Перемешать оставшиеся треки?')) {
-      const unplayed = shuffledTracks.filter(t => !playedTrackIds.has(t.id));
-      const played = shuffledTracks.filter(t => playedTrackIds.has(t.id));
-      setShuffledTracks([...played, ...unplayed.sort(() => Math.random() - 0.5)]);
-    } else if (playedTrackIds.size === 0) {
-      setShuffledTracks([...shuffledTracks].sort(() => Math.random() - 0.5));
-    }
-  };
-
   const endHostSession = () => { if (confirm('Точно завершить тур?')) setHostSession(null); };
 
   const audioHandlers = {
@@ -637,7 +627,7 @@ export default function App() {
         <audio ref={audioRef} preload="auto" crossOrigin="anonymous" {...audioHandlers} />
         <audio ref={preloadAudioRef} preload="auto" crossOrigin="anonymous" muted aria-hidden="true" style={{ display: 'none' }} />
         <HostScreen
-          hostSession={hostSession} shuffledTracks={shuffledTracks} playedTrackIds={playedTrackIds} currentHostTrackIndex={currentHostTrackIndex} hideTrackInfo={hideTrackInfo} autoWinners={autoWinners} playingTrackId={playingTrackId} currentTime={currentTime} duration={duration} isAutoPlay={isAutoPlay} setIsAutoPlay={setIsAutoPlay} setHideTrackInfo={setHideTrackInfo} setIsProjectorMode={setIsProjectorMode} playHostTrack={playHostTrack} endHostSession={endHostSession} reshuffleTracks={reshuffleTracks} setAutoWinners={setAutoWinners} togglePlay={togglePlay} audioRef={audioRef}
+          hostSession={hostSession} shuffledTracks={shuffledTracks} playedTrackIds={playedTrackIds} currentHostTrackIndex={currentHostTrackIndex} hideTrackInfo={hideTrackInfo} autoWinners={autoWinners} playingTrackId={playingTrackId} currentTime={currentTime} duration={duration} isAutoPlay={isAutoPlay} setIsAutoPlay={setIsAutoPlay} setHideTrackInfo={setHideTrackInfo} setIsProjectorMode={setIsProjectorMode} playHostTrack={playHostTrack} endHostSession={endHostSession} setAutoWinners={setAutoWinners} togglePlay={togglePlay} audioRef={audioRef}
         />
       </>
     );

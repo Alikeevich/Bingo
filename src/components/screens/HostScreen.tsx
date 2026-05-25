@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { 
   PartyPopper, MonitorPlay, CheckCircle2, Power, Music, EyeOff, Eye, 
-  SkipBack, SkipForward, PauseCircle, Play, ListChecks, Shuffle, Loader2, Trophy, SearchCheck
+  SkipBack, SkipForward, PauseCircle, Play, ListChecks, Loader2, Trophy, SearchCheck
 } from 'lucide-react';
 import { Track, Game, Round, Playlist, BingoCard } from '../../types';
 import { formatTime } from '../../utils';
@@ -22,7 +22,6 @@ interface HostScreenProps {
   setIsProjectorMode: (val: boolean) => void;
   playHostTrack: (index: number) => void;
   endHostSession: () => void;
-  reshuffleTracks: () => void;
   setAutoWinners: (val: string[]) => void;
   togglePlay: (track: Track) => void;
   audioRef: React.RefObject<HTMLAudioElement>;
@@ -159,7 +158,7 @@ export default function HostScreen(props: HostScreenProps) {
         <div className="w-[400px] bg-gray-900 border-l border-gray-800 flex flex-col z-10 shrink-0">
           <div className="p-6 border-b border-gray-800 flex items-center justify-between">
             <div className="flex items-center gap-3"><ListChecks className="text-purple-400" /><h3 className="text-lg font-bold">Очередь</h3></div>
-            <button onClick={props.reshuffleTracks} className="p-2 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white rounded-lg transition"><Shuffle size={18} /></button>
+            <span className="text-xs text-gray-500">{props.playedTrackIds.size}/{props.shuffledTracks.length}</span>
           </div>
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-2">
             {props.shuffledTracks.map((track, index) => {

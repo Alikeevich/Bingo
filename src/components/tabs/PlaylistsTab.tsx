@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../../supabase';
 import { Playlist, Track } from '../../types';
-import { ChevronLeft, CheckCircle2, UploadCloud, HardDriveDownload, Loader2, Music, Timer, PauseCircle, PlayCircle, Trash2, FolderPlus } from 'lucide-react';
+import { ChevronLeft, CheckCircle2, UploadCloud, HardDriveDownload, Loader2, Music, Timer, PauseCircle, PlayCircle, Trash2, FolderPlus, Shuffle } from 'lucide-react';
 import { getProxiedUrl } from '../../utils';
 
 interface PlaylistsTabProps {
@@ -35,6 +35,21 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
       await supabase.from('playlists').delete().eq('id', id);
       showToast('Плейлист удалён');
     }
+  };
+
+  const shufflePlaylist = async (playlistId: string) => {
+    const playlist = playlists.find(p => p.id === playlistId);
+    if (!playlist || playlist.tracks.length < 2) return;
+    // Fisher–Yates shuffle (надёжнее чем sort + Math.random())
+    const shuffled = [...playlist.tracks];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    setPlaylists(playlists.map(p => p.id === playlistId ? { ...p, tracks: shuffled } : p));
+    if (viewingPlaylist?.id === playlistId) setViewingPlaylist({ ...viewingPlaylist, tracks: shuffled });
+    await supabase.from('playlists').update({ tracks: shuffled }).eq('id', playlistId);
+    showToast('Плейлист перемешан');
   };
 
   const removeTrackFromPlaylist = async (playlistId: string, trackId: string | number) => {
@@ -119,6 +134,13 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
               <span>Загрузить свои MP3</span>
               <input type="file" multiple accept="audio/mpeg,audio/mp3,audio/wav" className="hidden" onChange={e => uploadCustomTracks(e, currentPlaylist.id)} disabled={isUploadingMp3} />
             </label>
+            <button
+              onClick={() => shufflePlaylist(currentPlaylist.id)}
+              disabled={currentPlaylist.tracks.length < 2}
+              title="Перемешать порядок треков в плейлисте"
+              className="bg-gray-800 hover:bg-gray-700 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition disabled:opacity-50">
+              <Shuffle size={20} /> Перемешать
+            </button>
             <button onClick={() => cachePlaylistForOffline(currentPlaylist)} disabled={currentPlaylist.tracks.length === 0} className="bg-gray-800 hover:bg-gray-700 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition disabled:opacity-50"><HardDriveDownload size={20} /> Офлайн Кэш</button>
           </div>
         </div>
