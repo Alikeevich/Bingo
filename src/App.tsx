@@ -411,18 +411,22 @@ export default function App() {
   const saveTrackToDb = async (overrideDuplicate = false) => {
     if (!trackToAddToDb) return;
 
-    // Дедупликация — ищем существующий трек с тем же названием+исполнителем (без учёта регистра/лишних пробелов)
+    // Дедупликация:
+    //   1) Полный матч — название + исполнитель совпадают (lowercase, лишние пробелы выкинуты).
+    //   2) Слабый матч — только название (исполнитель может отличаться, например Deezer
+    //      отдаёт «Dobro», а в БД лежит «Добро»). Тоже показываем модалку — пользователь решит.
     if (!overrideDuplicate) {
       const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
       const incomingTitle  = norm(editedTitle  || trackToAddToDb.title);
       const incomingArtist = norm(editedArtist || trackToAddToDb.artist);
-      const duplicate = dbTracks.find(t =>
-        String(t.id) !== String(trackToAddToDb.id) &&
+      const otherTracks = dbTracks.filter(t => String(t.id) !== String(trackToAddToDb.id));
+      const strongDup = otherTracks.find(t =>
         norm(t.title)  === incomingTitle &&
         norm(t.artist) === incomingArtist
       );
-      if (duplicate) {
-        setDupWarning(duplicate);
+      const weakDup = strongDup ?? otherTracks.find(t => norm(t.title) === incomingTitle);
+      if (weakDup) {
+        setDupWarning(weakDup);
         return;
       }
     }
@@ -733,17 +737,24 @@ export default function App() {
       })()}
 
       {/* --- МОДАЛКА: ПРЕДУПРЕЖДЕНИЕ О ДУБЛИКАТЕ --- */}
-      {dupWarning && (
+      {dupWarning && (() => {
+        const normForCheck = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+        const incomingArtist = normForCheck(editedArtist || trackToAddToDb?.artist || '');
+        const sameArtist = normForCheck(dupWarning.artist) === incomingArtist;
+        return (
         <div className="fixed inset-0 bg-black/85 z-[70] flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-gray-900 border border-yellow-500/40 rounded-2xl w-full max-w-md p-6 shadow-2xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center shrink-0">
                 <span className="text-yellow-400 text-xl">⚠</span>
               </div>
-              <h3 className="text-lg font-bold">Такой трек уже есть в базе</h3>
+              <h3 className="text-lg font-bold">
+                {sameArtist ? 'Такой трек уже есть в базе' : 'Возможно дубликат — название совпадает'}
+              </h3>
             </div>
 
             <div className="bg-gray-950 rounded-xl p-4 mb-4 border border-gray-800">
+              <div className="text-[10px] uppercase tracking-widest font-bold text-gray-500 mb-2">Уже в базе:</div>
               <div className="flex items-center gap-3">
                 <img src={dupWarning.cover} className="w-12 h-12 rounded object-cover shrink-0" alt="" />
                 <div className="overflow-hidden">
@@ -758,10 +769,24 @@ export default function App() {
                   ))}
                 </div>
               )}
+              {!sameArtist && trackToAddToDb && (
+                <div className="mt-3 pt-3 border-t border-gray-800">
+                  <div className="text-[10px] uppercase tracking-widest font-bold text-yellow-500 mb-2">Хочешь добавить:</div>
+                  <div className="flex items-center gap-3">
+                    <img src={trackToAddToDb.cover} className="w-12 h-12 rounded object-cover shrink-0" alt="" />
+                    <div className="overflow-hidden">
+                      <div className="font-bold truncate">{editedTitle || trackToAddToDb.title}</div>
+                      <div className="text-sm text-gray-400 truncate">{editedArtist || trackToAddToDb.artist}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <p className="text-sm text-gray-400 mb-6 leading-relaxed">
-              Лучше нажми «Отмена» и отредактируй уже сохранённый трек (карандашик в Моей Базе) — добавь там нужный жанр. Если это правда другая версия (live, ремикс) — жми «Сохранить дубль».
+              {sameArtist
+                ? 'Лучше нажми «Отмена» и отредактируй уже сохранённый трек (карандашик в Моей Базе) — добавь там нужный жанр. Если это правда другая версия (live, ремикс) — жми «Сохранить дубль».'
+                : 'Название одинаковое, а исполнитель пишется иначе (часто бывает: латиница vs кириллица). Если это один и тот же трек — жми «Отмена» и подправь исполнителя у существующего трека в Моей Базе. Если разные песни с одинаковым названием — жми «Сохранить дубль».'}
             </p>
 
             <div className="flex gap-3">
@@ -776,7 +801,8 @@ export default function App() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* --- МОДАЛКА ДОБАВЛЕНИЯ В ПЛЕЙЛИСТ --- */}
       {trackToAdd && (
