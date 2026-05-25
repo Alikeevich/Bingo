@@ -322,6 +322,24 @@ export default function App() {
   const saveTrackToDb = async () => {
     if (!trackToAddToDb) return;
 
+    // Дедупликация — ищем существующий трек с тем же названием+исполнителем (без учёта регистра/лишних пробелов)
+    const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+    const incomingTitle  = norm(editedTitle  || trackToAddToDb.title);
+    const incomingArtist = norm(editedArtist || trackToAddToDb.artist);
+    const duplicate = dbTracks.find(t =>
+      String(t.id) !== String(trackToAddToDb.id) &&
+      norm(t.title)  === incomingTitle &&
+      norm(t.artist) === incomingArtist
+    );
+    if (duplicate) {
+      const dupTags = (duplicate.tags && duplicate.tags.length > 0) ? `Жанры: ${duplicate.tags.join(', ')}` : 'Без жанров';
+      const ok = confirm(
+        `«${duplicate.title}» от ${duplicate.artist} уже есть в базе.\n${dupTags}\n\n` +
+        `Точно добавить дубликат?\n(Лучше нажми Отмена и отредактируй существующий — кнопка с карандашом.)`
+      );
+      if (!ok) return;
+    }
+
     let finalTags = [...selectedTagsForNewTrack];
 
     // Подхватываем недописанный тег
