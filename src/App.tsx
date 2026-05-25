@@ -28,9 +28,16 @@ export default function App() {
   const [dbTags, setDbTags] = useState<Tag[]>([]);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Скрытый второй <audio>, который пре-буферит следующий трек пока играет текущий.
+  // Только preload — звук с него не идёт.
+  const preloadAudioRef = useRef<HTMLAudioElement | null>(null);
   // Активный фрагмент (preview_start / preview_end в секундах) текущего проигрываемого трека.
   // Хранится в ref чтобы onTimeUpdate (статичный хендлер) знал актуальные границы без re-attach.
   const currentSegmentRef = useRef<{ start?: number; end?: number; finished?: boolean }>({});
+  // Интервал плавного изменения громкости (fade-in / fade-out)
+  const fadeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Флаг что fade-out уже запущен для текущего трека (чтобы не запускать повторно каждый onTimeUpdate)
+  const fadeOutStartedRef = useRef(false);
   const [playingTrackId, setPlayingTrackId] = useState<string | number | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -119,6 +126,13 @@ export default function App() {
     }
   }, [hostSession, shuffledTracks, playedTrackIds, currentHostTrackIndex, hideTrackInfo]);
 
+  // Пре-кеш следующего трека при изменении автоплея или индекса — для бесшовного перехода
+  useEffect(() => {
+    if (isAutoPlay && hostSession && currentHostTrackIndex < shuffledTracks.length - 1) {
+      prefetchTrack(shuffledTracks[currentHostTrackIndex + 1]);
+    }
+  }, [isAutoPlay, hostSession, currentHostTrackIndex, shuffledTracks]);
+
   useEffect(() => {
     if (!hostSession?.round.cards || playedTrackIds.size === 0) return setAutoWinners([]);
     const condition = hostSession.round.winCondition;
@@ -166,14 +180,63 @@ export default function App() {
 
   const showToast = (message: string) => { setToast(message); setTimeout(() => setToast(null), 3000); };
 
+  // ─── ПЛЕЕР: помощники для плавных переходов ───────────────────────────
+
+  // Плавно меняет громкость аудио-элемента от `from` к `to` за `durationMs`
+  const fadeVolume = (audio: HTMLAudioElement, from: number, to: number, durationMs: number) => {
+    if (fadeIntervalRef.current) { clearInterval(fadeIntervalRef.current); fadeIntervalRef.current = null; }
+    const steps = 12;
+    const stepMs = Math.max(8, durationMs / steps);
+    const totalSteps = Math.max(1, Math.round(durationMs / stepMs));
+    let i = 0;
+    audio.volume = Math.max(0, Math.min(1, from));
+    fadeIntervalRef.current = setInterval(() => {
+      i++;
+      const p = i / totalSteps;
+      const v = from + (to - from) * p;
+      audio.volume = Math.max(0, Math.min(1, v));
+      if (i >= totalSteps) {
+        audio.volume = Math.max(0, Math.min(1, to));
+        if (fadeIntervalRef.current) { clearInterval(fadeIntervalRef.current); fadeIntervalRef.current = null; }
+      }
+    }, stepMs);
+  };
+
+  // URL для воспроизведения трека (кастомный из supabase или Deezer)
+  const getTrackPlayUrl = (track: Track): string => {
+    if (track.isCustom) {
+      return supabase.storage.from('audio-tracks').getPublicUrl(String(track.id)).data.publicUrl;
+    }
+    return track.preview;
+  };
+
+  // Пре-кеширует трек на скрытом audio-элементе — браузер скачает данные в фоне
+  const prefetchTrack = (track: Track | undefined) => {
+    const el = preloadAudioRef.current;
+    if (!el || !track || !track.preview) return;
+    const url = getTrackPlayUrl(track);
+    if (el.src && el.src.endsWith(url)) return; // уже пре-кешен этот трек
+    try { el.src = url; el.load(); } catch {}
+  };
+
   const togglePlay = async (track: Track) => {
     const audioEl = audioRef.current;
     if (!audioEl) return;
     if (playingTrackId === track.id) {
-      if (audioEl.paused) audioEl.play().catch(console.error);
-      else { audioEl.pause(); setPlayingTrackId(null); }
+      if (audioEl.paused) {
+        // На случай если пауза пришлась в момент fade-out — обнуляем активный fade и поднимаем громкость
+        if (fadeIntervalRef.current) { clearInterval(fadeIntervalRef.current); fadeIntervalRef.current = null; }
+        audioEl.volume = 1;
+        audioEl.play().catch(console.error);
+      } else {
+        audioEl.pause();
+        setPlayingTrackId(null);
+      }
       return;
     }
+    // Сбрасываем активный fade и флаги
+    if (fadeIntervalRef.current) { clearInterval(fadeIntervalRef.current); fadeIntervalRef.current = null; }
+    fadeOutStartedRef.current = false;
     audioEl.pause();
     setPlayingTrackId(track.id);
 
@@ -197,7 +260,9 @@ export default function App() {
           if (data.preview) currentUrl = data.preview;
         }
       }
-      audioEl.src = currentUrl.includes('?') ? `${currentUrl}&t=${Date.now()}` : `${currentUrl}?t=${Date.now()}`;
+      // БЕЗ cache-buster — чтобы HTTP-кеш браузера хитил при повторном проигрывании
+      // и чтобы preload-элемент мог подгреть тот же самый URL заранее.
+      audioEl.src = currentUrl;
       audioEl.load();
       // Когда метаданные подгрузились — сикаем на старт фрагмента (если задан)
       const onMeta = () => {
@@ -208,7 +273,9 @@ export default function App() {
         audioEl.removeEventListener('loadedmetadata', onMeta);
       };
       audioEl.addEventListener('loadedmetadata', onMeta);
-      audioEl.play().catch(err => { console.error(err); setPlayingTrackId(null); });
+      // Короткий fade-in (60мс) — звук не прыгает с тишины во весь объём
+      audioEl.volume = 0;
+      audioEl.play().then(() => fadeVolume(audioEl, 0, 1, 60)).catch(err => { console.error(err); setPlayingTrackId(null); });
     } catch (err) { console.error(err); setPlayingTrackId(null); }
   };
 
@@ -238,6 +305,8 @@ export default function App() {
     const track = shuffledTracks[index];
     setPlayedTrackIds(prev => new Set(prev).add(track.id));
     togglePlay(track);
+    // Параллельно — пре-кешим СЛЕДУЮЩИЙ трек, чтобы переход был мгновенным
+    if (isAutoPlay) prefetchTrack(shuffledTracks[index + 1]);
   };
 
   const reshuffleTracks = () => {
@@ -258,10 +327,28 @@ export default function App() {
       const t  = el.currentTime;
       setCurrentTime(t);
       const seg = currentSegmentRef.current;
-      if (!seg.finished && typeof seg.end === 'number' && t >= seg.end) {
+      const effectiveEnd = typeof seg.end === 'number' && seg.end > 0
+        ? seg.end
+        : (Number.isFinite(el.duration) && el.duration > 0 ? el.duration : 0);
+
+      // Достигли конца — пауза + переход на следующий
+      if (!seg.finished && effectiveEnd > 0 && t >= effectiveEnd) {
         seg.finished = true;
         el.pause();
         handleTrackFinished();
+        return;
+      }
+
+      // За 180мс до конца (если впереди ещё есть треки в hostSession+autoPlay) запускаем fade-out
+      if (
+        !fadeOutStartedRef.current &&
+        effectiveEnd > 0 &&
+        effectiveEnd - t < 0.18 &&
+        isAutoPlay && hostSession &&
+        currentHostTrackIndex < shuffledTracks.length - 1
+      ) {
+        fadeOutStartedRef.current = true;
+        fadeVolume(el, el.volume, 0, 150);
       }
     },
     onLoadedMetadata: (e: React.SyntheticEvent<HTMLAudioElement>) => setDuration(e.currentTarget.duration),
@@ -464,6 +551,7 @@ export default function App() {
       return (
         <>
           <audio ref={audioRef} preload="auto" crossOrigin="anonymous" {...audioHandlers} />
+          <audio ref={preloadAudioRef} preload="auto" crossOrigin="anonymous" muted aria-hidden="true" style={{ display: 'none' }} />
           <Projector currentTrack={shuffledTracks[currentHostTrackIndex]} hideTrackInfo={hideTrackInfo} autoWinners={autoWinners} setIsProjectorMode={setIsProjectorMode} setHideTrackInfo={setHideTrackInfo} />
         </>
       );
@@ -471,7 +559,8 @@ export default function App() {
     return (
       <>
         <audio ref={audioRef} preload="auto" crossOrigin="anonymous" {...audioHandlers} />
-        <HostScreen 
+        <audio ref={preloadAudioRef} preload="auto" crossOrigin="anonymous" muted aria-hidden="true" style={{ display: 'none' }} />
+        <HostScreen
           hostSession={hostSession} shuffledTracks={shuffledTracks} playedTrackIds={playedTrackIds} currentHostTrackIndex={currentHostTrackIndex} hideTrackInfo={hideTrackInfo} autoWinners={autoWinners} playingTrackId={playingTrackId} currentTime={currentTime} duration={duration} isAutoPlay={isAutoPlay} setIsAutoPlay={setIsAutoPlay} setHideTrackInfo={setHideTrackInfo} setIsProjectorMode={setIsProjectorMode} playHostTrack={playHostTrack} endHostSession={endHostSession} reshuffleTracks={reshuffleTracks} setAutoWinners={setAutoWinners} togglePlay={togglePlay} audioRef={audioRef}
         />
       </>
@@ -481,6 +570,8 @@ export default function App() {
   return (
     <div className="flex h-screen bg-gray-950 text-white font-sans selection:bg-purple-500 overflow-hidden relative">
       <audio ref={audioRef} preload="auto" crossOrigin="anonymous" {...audioHandlers} />
+      {/* Скрытый второй элемент — только для пре-кеша следующего трека (звук не воспроизводится) */}
+      <audio ref={preloadAudioRef} preload="auto" crossOrigin="anonymous" muted aria-hidden="true" style={{ display: 'none' }} />
 
       {toast && (
         <div className="absolute top-6 right-6 bg-green-600 text-white px-6 py-4 rounded-xl shadow-2xl font-bold flex items-center gap-3 z-[300] animate-in slide-in-from-top-4">
