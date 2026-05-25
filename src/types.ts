@@ -13,6 +13,10 @@ export interface Track {
   preview: string;
   isCustom?: boolean;
   tags?: string[];
+  // Опциональный фрагмент: с какой секунды начать и на какой остановиться.
+  // Применяется в основном к кастомным MP3. NULL/undefined = с начала до конца.
+  previewStart?: number;
+  previewEnd?: number;
 }
 
 export interface Playlist {
@@ -76,6 +80,14 @@ export interface TextStyle {
   lineClamp?: number;   // макс. строк (0 = без ограничения)
 }
 
+// Что показывать в строке клетки: имя исполнителя или название песни
+export type CellTextSource = 'artist' | 'title';
+
+// Стиль текста для клетки + источник данных (artist/title)
+export interface CellTextStyle extends TextStyle {
+  source: CellTextSource;
+}
+
 export interface TemplateConfig {
   // Дизайнерский фон страницы (A4 PNG/JPG); если не задан — печатается белый лист
   backgroundImageUrl: string;
@@ -86,9 +98,11 @@ export interface TemplateConfig {
   idSlot:  SlotRect;
   qrSlot:  QrSlot;
 
-  // Стили текста
-  trackTitle:  TextStyle;
-  trackArtist: TextStyle & { enabled: boolean };
+  // Стили текста в клетке.
+  // Имена полей legacy (trackTitle/trackArtist), но теперь они означают
+  // "главная строка" / "доп. строка". Источник данных задаёт поле .source.
+  trackTitle:  CellTextStyle;
+  trackArtist: CellTextStyle & { enabled: boolean };
   freeSpace:   TextStyle & { content: string };
   idText:      TextStyle & { prefix: string };   // напр. "ID: #"
   idSubText:   TextStyle & { enabled: boolean; content: string };
@@ -116,8 +130,10 @@ export const DEFAULT_TEMPLATE_CONFIG: TemplateConfig = {
   idSlot: { x: 15,  y: 260, width: 25,  height: 25 },
   qrSlot: { x: 170, y: 260, width: 25,  height: 25, enabled: true, margin: 1 },
 
-  trackTitle:  { fontFamily: 'Roboto',     fontSize: 9,  color: '#111111', bold: true,  align: 'center', lineClamp: 2 },
-  trackArtist: { fontFamily: 'Roboto',     fontSize: 7,  color: '#444444', italic: true, align: 'center', lineClamp: 1, enabled: true },
+  // Главная строка: по умолчанию — имя исполнителя
+  trackTitle:  { fontFamily: 'Roboto',     fontSize: 9,  color: '#111111', bold: true,  align: 'center', lineClamp: 2, source: 'artist' },
+  // Доп. строка: по умолчанию — название песни, но выключена
+  trackArtist: { fontFamily: 'Roboto',     fontSize: 7,  color: '#444444', italic: true, align: 'center', lineClamp: 1, enabled: false, source: 'title' },
   freeSpace:   { fontFamily: 'Roboto',     fontSize: 12, color: '#8b5cf6', bold: true,  align: 'center', content: 'FREE' },
   idText:      { fontFamily: 'RobotoMono', fontSize: 8,  color: '#111111', bold: true,  align: 'center', prefix: 'ID: ' },
   idSubText:   { fontFamily: 'Roboto',     fontSize: 6,  color: '#666666', align: 'center', enabled: true, content: 'MuzBingo' },

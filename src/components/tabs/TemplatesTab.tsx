@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '../../supabase';
-import { Template, TemplateConfig, GridSlot, QrSlot, SlotRect, TextStyle, DEFAULT_TEMPLATE_CONFIG } from '../../types';
+import { Template, TemplateConfig, GridSlot, QrSlot, SlotRect, TextStyle, CellTextSource, DEFAULT_TEMPLATE_CONFIG } from '../../types';
 import { migrateTemplateConfig } from '../../lib/migrateTemplate';
 import { Palette, Upload, Save, Trash2, X, LayoutGrid, Hash, QrCode, Type, Eye, EyeOff, Bold, Italic, Plus, Pencil } from 'lucide-react';
 
@@ -546,13 +546,23 @@ function GridSettings({ config, patchSlot, patchText }: {
         <NumberField label="Отступ (мм)"  value={config.grid.cellPad} step={0.1} onChange={v => patchSlot('grid', { cellPad: v })} />
       </div>
 
-      <Divider label="Текст трека" />
+      <Divider label="Главная строка в клетке" />
+      <CellSourceSelect
+        value={config.trackTitle.source}
+        onChange={v => patchText('trackTitle', { source: v })}
+      />
       <TextStyleEditor style={config.trackTitle} onChange={p => patchText('trackTitle', p)} />
 
-      <Divider label={`Исполнитель ${config.trackArtist.enabled ? '' : '(скрыт)'}`} />
-      <ToggleRow label="Показывать исполнителя" checked={config.trackArtist.enabled} onChange={v => patchText('trackArtist', { enabled: v })} />
+      <Divider label={`Доп. строка в клетке ${config.trackArtist.enabled ? '' : '(скрыта)'}`} />
+      <ToggleRow label="Показывать вторую строку" checked={config.trackArtist.enabled} onChange={v => patchText('trackArtist', { enabled: v })} />
       {config.trackArtist.enabled && (
-        <TextStyleEditor style={config.trackArtist} onChange={p => patchText('trackArtist', p)} />
+        <>
+          <CellSourceSelect
+            value={config.trackArtist.source}
+            onChange={v => patchText('trackArtist', { source: v })}
+          />
+          <TextStyleEditor style={config.trackArtist} onChange={p => patchText('trackArtist', p)} />
+        </>
       )}
 
       <Divider label="Свободная клетка (центр)" />
@@ -621,6 +631,25 @@ function QrSettings({ config, patchSlot, setConfig }: {
 // ─────────────────────────────────────────────────────────────────────────
 // ОБЩИЕ КОНТРОЛЫ
 // ─────────────────────────────────────────────────────────────────────────
+
+function CellSourceSelect({ value, onChange }: { value: CellTextSource; onChange: (v: CellTextSource) => void }) {
+  return (
+    <div className="flex items-stretch gap-1 p-1 bg-gray-800 rounded-xl border border-gray-700 mb-2">
+      {([
+        { v: 'artist' as const, label: 'Исполнитель' },
+        { v: 'title'  as const, label: 'Название песни' },
+      ]).map(opt => {
+        const isActive = value === opt.v;
+        return (
+          <button key={opt.v} onClick={() => onChange(opt.v)}
+            className={`flex-1 text-xs py-2 px-2 rounded-lg font-bold transition ${isActive ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}>
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function TextStyleEditor({ style, onChange }: { style: TextStyle; onChange: (p: Partial<TextStyle>) => void }) {
   return (

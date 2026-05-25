@@ -1,6 +1,10 @@
 import { Document, Page, View, Text, Image, Font, StyleSheet } from '@react-pdf/renderer';
 import type { Style } from '@react-pdf/types';
-import { BingoCard, Template, Track, TextStyle, SlotRect, GridSlot } from '../types';
+import { BingoCard, Template, Track, TextStyle, SlotRect, GridSlot, CellTextSource } from '../types';
+
+function pickSource(track: Track, source: CellTextSource): string {
+  return source === 'artist' ? (track.artist ?? '') : (track.title ?? '');
+}
 
 // ────────────────────────────────────────────────────────────────────────
 // РЕГИСТРАЦИЯ ШРИФТОВ (один раз, при импорте модуля)
@@ -133,11 +137,11 @@ function GridSlotView({ grid, cells, template }: {
                   ) : (
                     <>
                       <Text style={cellTitleStyle}>
-                        {clamp((cell as Track).title, trackTitle.lineClamp)}
+                        {clamp(pickSource(cell as Track, trackTitle.source), trackTitle.lineClamp)}
                       </Text>
                       {trackArtist.enabled && (
                         <Text style={[cellArtistStyle, { marginTop: mm(0.4) }]}>
-                          {clamp((cell as Track).artist, trackArtist.lineClamp)}
+                          {clamp(pickSource(cell as Track, trackArtist.source), trackArtist.lineClamp)}
                         </Text>
                       )}
                     </>
