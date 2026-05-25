@@ -343,7 +343,10 @@ export default function App() {
   const startHostSession = (game: Game, round: Round) => {
     const playlist = playlists.find(p => p.id === round.playlistId);
     if (!playlist) return showToast('Плейлист не найден!');
-    setShuffledTracks([...playlist.tracks].sort(() => Math.random() - 0.5));
+    // Берём треки в том порядке, который задан в плейлисте — пользователь может
+    // отдельно «перемешать» в Плейлистах, если хочет. Авто-шафл на старте убрали
+    // чтобы случайные комбинации не давали бинго на рандомных карточках.
+    setShuffledTracks([...playlist.tracks]);
     setPlayedTrackIds(new Set());
     setCurrentHostTrackIndex(0);
     setHideTrackInfo(true);
