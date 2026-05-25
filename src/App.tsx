@@ -57,6 +57,10 @@ export default function App() {
 
   // Стейты модалки сохранения/редактирования
   const [trackToAddToDb, setTrackToAddToDb] = useState<Track | null>(null);
+  // true когда модалка открыта через onEditTrack (правка существующей записи),
+  // false когда через handleUploadCustomFile или setTrackToAddToDb из Global Search.
+  // Нужно для дедупа: при правке исключаем себя из сравнения, при добавлении — нет.
+  const [isEditingTrack, setIsEditingTrack] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
   const [editedArtist, setEditedArtist] = useState('');
   // Подтверждение дубликата (in-app, вместо нативного confirm)
@@ -255,9 +259,28 @@ export default function App() {
       } else {
         const isExpired = currentUrl.includes('exp=') && Date.now() / 1000 > parseInt(currentUrl.match(/exp=(\d+)/)?.[1] || '0');
         if (isExpired) {
-          const res = await fetch(`/api/deezer/track/${track.id}`);
-          const data = await res.json();
-          if (data.preview) currentUrl = data.preview;
+          try {
+            const res = await fetch(`/api/deezer/track/${track.id}`);
+            const data = await res.json();
+            if (data.preview && typeof data.preview === 'string' && data.preview.length > 0) {
+              currentUrl = data.preview;
+              // Сохраняем свежий URL обратно в БД, чтобы при следующем заходе не упираться в expired
+              supabase.from('tracks').update({ preview: currentUrl }).eq('id', String(track.id))
+                .then(() => {});
+              setDbTracks(prev => prev.map(t => String(t.id) === String(track.id) ? { ...t, preview: currentUrl } : t));
+            } else {
+              // Deezer больше не отдаёт превью для этого трека (issue прав / regions)
+              showToast(`«${track.title}» больше не доступен в Deezer`);
+              setPlayingTrackId(null);
+              if (isAutoPlay && hostSession && currentHostTrackIndex < shuffledTracks.length - 1) {
+                setTimeout(() => playHostTrack(currentHostTrackIndex + 1), 400);
+              }
+              return;
+            }
+          } catch (e) {
+            console.warn('Deezer refresh failed:', e);
+            // Сеть отвалилась — пробуем со старым URL (вероятно 403, но onError ниже подхватит)
+          }
         }
       }
       // БЕЗ cache-buster — чтобы HTTP-кеш браузера хитил при повторном проигрывании
@@ -356,6 +379,21 @@ export default function App() {
       currentSegmentRef.current.finished = true;
       handleTrackFinished();
     },
+    onError: () => {
+      // Самая частая причина — 403 от Deezer (URL протух) или сетевая ошибка.
+      // Помечаем как «закончившийся» чтобы автоплей перешёл к следующему.
+      if (currentSegmentRef.current.finished) return;
+      currentSegmentRef.current.finished = true;
+      const t = hostSession
+        ? shuffledTracks[currentHostTrackIndex]
+        : dbTracks.find(x => String(x.id) === String(playingTrackId));
+      const name = t?.title ?? 'трек';
+      showToast(`Не удалось проиграть «${name}» — пропускаю`);
+      setPlayingTrackId(null);
+      if (isAutoPlay && hostSession && currentHostTrackIndex < shuffledTracks.length - 1) {
+        setTimeout(() => playHostTrack(currentHostTrackIndex + 1), 400);
+      }
+    },
   };
 
   // --- ЛОГИКА ТЕГОВ ---
@@ -394,6 +432,7 @@ export default function App() {
     }
 
     setCustomFile(file);
+    setIsEditingTrack(false);
     setTrackToAddToDb({
       id: `custom_pending_${Date.now()}`,
       title: title,
@@ -419,7 +458,11 @@ export default function App() {
       const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
       const incomingTitle  = norm(editedTitle  || trackToAddToDb.title);
       const incomingArtist = norm(editedArtist || trackToAddToDb.artist);
-      const otherTracks = dbTracks.filter(t => String(t.id) !== String(trackToAddToDb.id));
+      // При редактировании существующей записи — исключаем её саму из сравнения.
+      // При добавлении нового (включая повторный «add to base» того же Deezer-трека) — сравниваем со всеми.
+      const otherTracks = isEditingTrack
+        ? dbTracks.filter(t => String(t.id) !== String(trackToAddToDb.id))
+        : dbTracks;
       const strongDup = otherTracks.find(t =>
         norm(t.title)  === incomingTitle &&
         norm(t.artist) === incomingArtist
@@ -608,6 +651,7 @@ export default function App() {
             deleteTagFromDb={deleteTagFromDb}
             onUploadCustomFile={handleUploadCustomFile}
             onEditTrack={(track) => {
+              setIsEditingTrack(true);
               setTrackToAddToDb(track);
               setSelectedTagsForNewTrack(track.tags || []);
               setNewTagInput('');
@@ -617,7 +661,7 @@ export default function App() {
         {activeTab === 'global_search' && (
           <GlobalSearchTab 
             playingTrackId={playingTrackId} togglePlay={togglePlay} setTrackToAdd={setTrackToAdd} 
-            setTrackToAddToDb={(t) => { setTrackToAddToDb(t); setSelectedTagsForNewTrack([]); setNewTagInput(''); }} 
+            setTrackToAddToDb={(t) => { setIsEditingTrack(false); setTrackToAddToDb(t); setSelectedTagsForNewTrack([]); setNewTagInput(''); }}
           />
         )}
         {activeTab === 'playlists' && <PlaylistsTab playlists={playlists} setPlaylists={setPlaylists} playingTrackId={playingTrackId} togglePlay={togglePlay} showToast={showToast} />}
