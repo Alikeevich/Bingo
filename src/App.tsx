@@ -107,6 +107,28 @@ export default function App() {
       // глушим глобальный плеер чтобы не пересекался со встроенным в триммер
       audioRef.current?.pause();
       setPlayingTrackId(null);
+
+      // Поиск/чарт Deezer часто отдаёт только главного артиста. При добавлении НОВОГО
+      // Deezer-трека добираем полный список соавторов (contributors[]) из /track/{id}
+      // и подставляем в поле — feat-артисты больше не теряются. Правку существующих
+      // записей не трогаем (там артист уже мог быть исправлен вручную).
+      const enrichId = trackToAddToDb.id;
+      if (!isEditingTrack && !trackToAddToDb.isCustom && /^\d+$/.test(String(enrichId))) {
+        const original = trackToAddToDb.artist;
+        (async () => {
+          try {
+            const res = await fetch(`/api/deezer/track/${enrichId}`);
+            const data = await res.json();
+            const all = Array.isArray(data?.contributors)
+              ? data.contributors.map((c: any) => c?.name).filter(Boolean).join(', ')
+              : '';
+            // Обновляем только если так и не редактировали поле вручную и список реально полнее.
+            if (all && all !== original) {
+              setEditedArtist(prev => (prev === original ? all : prev));
+            }
+          } catch { /* офлайн / нет соавторов — оставляем как есть */ }
+        })();
+      }
     } else {
       setEditedTitle('');
       setEditedArtist('');
@@ -340,13 +362,44 @@ export default function App() {
     }
   };
 
+  // Продлевает текущий трек на `seconds` секунд — для случаев когда песня
+  // обрывается на припеве. Сдвигает границу фрагмента, но не дальше реальной
+  // длины аудио-файла: у 30-секундных превью Deezer продлевать нечего, у своих
+  // MP3 (полная песня + обрезка) — есть.
+  const extendCurrentTrack = (seconds = 10) => {
+    const el = audioRef.current;
+    if (!el) return;
+    const seg = currentSegmentRef.current;
+    const dur = Number.isFinite(el.duration) && el.duration > 0 ? el.duration : 0;
+    const currentEnd = typeof seg.end === 'number' && seg.end > 0 ? seg.end : dur;
+    if (currentEnd <= 0) return;
+    const hardCap = dur > 0 ? dur : currentEnd + seconds;
+    const newEnd = Math.min(currentEnd + seconds, hardCap);
+    if (newEnd <= currentEnd + 0.05) {
+      showToast('Дальше нет аудио — это вся дорожка');
+      return;
+    }
+    seg.end = newEnd;
+    seg.finished = false;
+    // Отменяем запущенный fade-out и возвращаем громкость на место.
+    fadeOutStartedRef.current = false;
+    if (fadeIntervalRef.current) { clearInterval(fadeIntervalRef.current); fadeIntervalRef.current = null; }
+    el.volume = 1;
+    if (el.paused) el.play().catch(() => {});
+    showToast(`+${seconds} секунд`);
+  };
+
   const startHostSession = (game: Game, round: Round) => {
     const playlist = playlists.find(p => p.id === round.playlistId);
     if (!playlist) return showToast('Плейлист не найден!');
     // Берём треки в том порядке, который задан в плейлисте — пользователь может
     // отдельно «перемешать» в Плейлистах, если хочет. Авто-шафл на старте убрали
     // чтобы случайные комбинации не давали бинго на рандомных карточках.
-    setShuffledTracks([...playlist.tracks]);
+    // Уникализируем по id — повтор одного трека в очереди звучал бы дважды за тур.
+    const uniqueQueue = Array.from(
+      new Map(playlist.tracks.map(t => [String(t.id), t])).values()
+    );
+    setShuffledTracks(uniqueQueue);
     setPlayedTrackIds(new Set());
     setCurrentHostTrackIndex(0);
     setHideTrackInfo(true);
@@ -630,7 +683,7 @@ export default function App() {
         <audio ref={audioRef} preload="auto" crossOrigin="anonymous" {...audioHandlers} />
         <audio ref={preloadAudioRef} preload="auto" crossOrigin="anonymous" muted aria-hidden="true" style={{ display: 'none' }} />
         <HostScreen
-          hostSession={hostSession} shuffledTracks={shuffledTracks} playedTrackIds={playedTrackIds} currentHostTrackIndex={currentHostTrackIndex} hideTrackInfo={hideTrackInfo} autoWinners={autoWinners} playingTrackId={playingTrackId} currentTime={currentTime} duration={duration} isAutoPlay={isAutoPlay} setIsAutoPlay={setIsAutoPlay} setHideTrackInfo={setHideTrackInfo} setIsProjectorMode={setIsProjectorMode} playHostTrack={playHostTrack} endHostSession={endHostSession} setAutoWinners={setAutoWinners} togglePlay={togglePlay} audioRef={audioRef}
+          hostSession={hostSession} shuffledTracks={shuffledTracks} playedTrackIds={playedTrackIds} currentHostTrackIndex={currentHostTrackIndex} hideTrackInfo={hideTrackInfo} autoWinners={autoWinners} playingTrackId={playingTrackId} currentTime={currentTime} duration={duration} isAutoPlay={isAutoPlay} setIsAutoPlay={setIsAutoPlay} setHideTrackInfo={setHideTrackInfo} setIsProjectorMode={setIsProjectorMode} playHostTrack={playHostTrack} endHostSession={endHostSession} setAutoWinners={setAutoWinners} togglePlay={togglePlay} audioRef={audioRef} extendCurrentTrack={extendCurrentTrack}
         />
       </>
     );

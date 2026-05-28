@@ -73,15 +73,31 @@ export default function GamesTab({ games, setGames, playlists, templates, showTo
     if (!cardGeneratorSetup || !selectedTemplateId) return;
     const { game, round } = cardGeneratorSetup;
     const playlist = playlists.find(p => p.id === round.playlistId);
-    if (!playlist || playlist.tracks.length < 24) return showToast('Ошибка: в плейлисте меньше 24 треков!');
+    if (!playlist) return;
     const template = templates.find(t => t.id === selectedTemplateId);
     if (!template) return;
-    
+
+    // Уникализируем по id — иначе один и тот же трек, попавший в плейлист дважды,
+    // мог оказаться в одной карточке дважды (визуальный дубль) и ломал бинго.
+    const uniqueTracks = Array.from(
+      new Map(playlist.tracks.map(t => [String(t.id), t])).values()
+    );
+    if (uniqueTracks.length < 24) return showToast(`Ошибка: нужно минимум 24 уникальных трека (сейчас ${uniqueTracks.length})!`);
+
+    // Fisher–Yates — честный шафл (sort(()=>Math.random()-0.5) смещён и нестабилен).
+    const shuffle = <T,>(arr: T[]): T[] => {
+      const a = [...arr];
+      for (let k = a.length - 1; k > 0; k--) {
+        const j = Math.floor(Math.random() * (k + 1));
+        [a[k], a[j]] = [a[j], a[k]];
+      }
+      return a;
+    };
+
     const newCards: BingoCard[] =[];
     const startId = 1000 + (round.cards?.length || 0) + 1;
     for (let i = 0; i < cardsCount; i++) {
-      const shuffled = [...playlist.tracks].sort(() => Math.random() - 0.5);
-      const cardTracks = shuffled.slice(0, 24);
+      const cardTracks = shuffle(uniqueTracks).slice(0, 24);
       const cells: any[] =[...cardTracks.slice(0, 12), { isFreeSpace: true }, ...cardTracks.slice(12, 24)];
       newCards.push({ id: String(startId + i), cells });
     }

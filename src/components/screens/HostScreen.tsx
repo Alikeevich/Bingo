@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { 
-  PartyPopper, MonitorPlay, CheckCircle2, Power, Music, EyeOff, Eye, 
-  SkipBack, SkipForward, PauseCircle, Play, ListChecks, Loader2, Trophy, SearchCheck
+  PartyPopper, MonitorPlay, CheckCircle2, Power, Music, EyeOff, Eye,
+  SkipBack, SkipForward, PauseCircle, Play, ListChecks, Loader2, Trophy, SearchCheck, Plus
 } from 'lucide-react';
 import { Track, Game, Round, Playlist, BingoCard } from '../../types';
 import { formatTime } from '../../utils';
@@ -25,6 +25,7 @@ interface HostScreenProps {
   setAutoWinners: (val: string[]) => void;
   togglePlay: (track: Track) => void;
   audioRef: React.RefObject<HTMLAudioElement>;
+  extendCurrentTrack: (seconds?: number) => void;
 }
 
 export default function HostScreen(props: HostScreenProps) {
@@ -144,7 +145,15 @@ export default function HostScreen(props: HostScreenProps) {
                     {isPlaying ? <PauseCircle size={44} /> : <Play size={44} className="ml-1" />}
                   </button>
                   <button onClick={() => { props.playHostTrack(props.currentHostTrackIndex + 1); props.setHideTrackInfo(true); }} disabled={props.currentHostTrackIndex === props.shuffledTracks.length - 1} className="w-14 h-14 bg-gray-800 rounded-full flex items-center justify-center text-white hover:bg-gray-700 disabled:opacity-30 transition"><SkipForward size={28} /></button>
-                  <div className="w-14" />
+                  <button
+                    onClick={() => props.extendCurrentTrack(10)}
+                    disabled={!isPlaying}
+                    title="Продлить трек на 10 секунд"
+                    className="w-14 h-14 bg-gray-800 rounded-full flex flex-col items-center justify-center text-white hover:bg-gray-700 disabled:opacity-30 transition leading-none"
+                  >
+                    <Plus size={18} />
+                    <span className="text-[10px] font-black">10с</span>
+                  </button>
                 </div>
                 <div className="w-48 text-right">
                    <span className="text-[10px] text-gray-500 uppercase font-black tracking-widest block">Осталось</span>

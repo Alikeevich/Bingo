@@ -39,7 +39,12 @@ export default function GlobalSearchTab({ playingTrackId, togglePlay, setTrackTo
 
   const parseDeezerTracks = (data: any[]) =>
     data.filter((t: any) => t.preview).map((t: any) => ({
-      id: t.id, title: t.title, artist: t.artist.name,
+      id: t.id, title: t.title,
+      // Deezer отдаёт всех артистов в contributors[]; в чарт/поиске их часто нет —
+      // тогда падаем на главного artist.name. Полный список добираем при добавлении в базу.
+      artist: Array.isArray(t.contributors) && t.contributors.length > 0
+        ? t.contributors.map((c: any) => c.name).filter(Boolean).join(', ')
+        : t.artist.name,
       cover: t.album.cover_xl || t.album.cover_medium,
       preview: t.preview, isCustom: false,
     }));
