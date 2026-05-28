@@ -42,6 +42,9 @@ export default function App() {
   // Флаг что fade-out уже запущен для текущего трека (чтобы не запускать повторно каждый onTimeUpdate)
   const fadeOutStartedRef = useRef(false);
   const [playingTrackId, setPlayingTrackId] = useState<string | number | null>(null);
+  // true когда текущий трек на паузе (но всё ещё «загружен»). Нужно чтобы resume
+  // продолжал с той же секунды, а не перезагружал трек с начала.
+  const [isPaused, setIsPaused] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isAutoPlay, setIsAutoPlay] = useState(false);
@@ -278,13 +281,15 @@ export default function App() {
     if (!audioEl) return;
     if (playingTrackId === track.id) {
       if (audioEl.paused) {
-        // На случай если пауза пришлась в момент fade-out — обнуляем активный fade и поднимаем громкость
+        // RESUME — продолжаем с текущей секунды, НЕ перезагружаем трек
         if (fadeIntervalRef.current) { clearInterval(fadeIntervalRef.current); fadeIntervalRef.current = null; }
         audioEl.volume = 1;
+        setIsPaused(false);
         audioEl.play().catch(console.error);
       } else {
+        // PAUSE — оставляем playingTrackId, чтобы следующий клик продолжил с места
         audioEl.pause();
-        setPlayingTrackId(null);
+        setIsPaused(true);
       }
       return;
     }
@@ -293,6 +298,7 @@ export default function App() {
     fadeOutStartedRef.current = false;
     audioEl.pause();
     setPlayingTrackId(track.id);
+    setIsPaused(false);
 
     // Запоминаем границы фрагмента для этого трека (использует onTimeUpdate глобального handler)
     currentSegmentRef.current = {
@@ -334,6 +340,7 @@ export default function App() {
   // Что делать когда трек дошёл до конца (или до preview_end)
   const handleTrackFinished = () => {
     setPlayingTrackId(null);
+    setIsPaused(false);
     if (isAutoPlay && hostSession && currentHostTrackIndex < shuffledTracks.length - 1) {
       playHostTrack(currentHostTrackIndex + 1);
       setHideTrackInfo(true);
@@ -630,7 +637,7 @@ export default function App() {
         <audio ref={audioRef} preload="auto" crossOrigin="anonymous" {...audioHandlers} />
         <audio ref={preloadAudioRef} preload="auto" crossOrigin="anonymous" muted aria-hidden="true" style={{ display: 'none' }} />
         <HostScreen
-          hostSession={hostSession} shuffledTracks={shuffledTracks} playedTrackIds={playedTrackIds} currentHostTrackIndex={currentHostTrackIndex} hideTrackInfo={hideTrackInfo} autoWinners={autoWinners} playingTrackId={playingTrackId} currentTime={currentTime} duration={duration} isAutoPlay={isAutoPlay} setIsAutoPlay={setIsAutoPlay} setHideTrackInfo={setHideTrackInfo} setIsProjectorMode={setIsProjectorMode} playHostTrack={playHostTrack} endHostSession={endHostSession} setAutoWinners={setAutoWinners} togglePlay={togglePlay} audioRef={audioRef}
+          hostSession={hostSession} shuffledTracks={shuffledTracks} playedTrackIds={playedTrackIds} currentHostTrackIndex={currentHostTrackIndex} hideTrackInfo={hideTrackInfo} autoWinners={autoWinners} playingTrackId={playingTrackId} isPaused={isPaused} currentTime={currentTime} duration={duration} isAutoPlay={isAutoPlay} setIsAutoPlay={setIsAutoPlay} setHideTrackInfo={setHideTrackInfo} setIsProjectorMode={setIsProjectorMode} playHostTrack={playHostTrack} endHostSession={endHostSession} setAutoWinners={setAutoWinners} togglePlay={togglePlay} audioRef={audioRef}
         />
       </>
     );
@@ -668,7 +675,7 @@ export default function App() {
         {activeTab === 'games' && <GamesTab games={games} setGames={setGames} playlists={playlists} templates={templates} showToast={showToast} startHostSession={startHostSession} setPrintViewCards={setPrintViewCards} />}
         {activeTab === 'mydatabase' && (
           <MyDatabaseTab
-            dbTracks={dbTracks} dbTags={dbTags} playingTrackId={playingTrackId} togglePlay={togglePlay}
+            dbTracks={dbTracks} dbTags={dbTags} playingTrackId={playingTrackId} isPaused={isPaused} togglePlay={togglePlay}
             setTrackToAdd={setTrackToAdd} deleteTrackFromDb={deleteTrackFromDb}
             deleteTagFromDb={deleteTagFromDb}
             onUploadCustomFile={handleUploadCustomFile}
@@ -681,12 +688,12 @@ export default function App() {
           />
         )}
         {activeTab === 'global_search' && (
-          <GlobalSearchTab 
-            playingTrackId={playingTrackId} togglePlay={togglePlay} setTrackToAdd={setTrackToAdd} 
+          <GlobalSearchTab
+            playingTrackId={playingTrackId} isPaused={isPaused} togglePlay={togglePlay} setTrackToAdd={setTrackToAdd}
             setTrackToAddToDb={(t) => { setIsEditingTrack(false); setTrackToAddToDb(t); setSelectedTagsForNewTrack([]); setNewTagInput(''); }}
           />
         )}
-        {activeTab === 'playlists' && <PlaylistsTab playlists={playlists} setPlaylists={setPlaylists} playingTrackId={playingTrackId} togglePlay={togglePlay} showToast={showToast} />}
+        {activeTab === 'playlists' && <PlaylistsTab playlists={playlists} setPlaylists={setPlaylists} playingTrackId={playingTrackId} isPaused={isPaused} togglePlay={togglePlay} showToast={showToast} />}
         {activeTab === 'templates' && <TemplatesTab templates={templates} setTemplates={setTemplates} showToast={showToast} />}
       </main>
 

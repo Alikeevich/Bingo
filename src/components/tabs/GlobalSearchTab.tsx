@@ -17,13 +17,14 @@ const ITEMS_PER_PAGE = 50;
 
 interface GlobalSearchTabProps {
   playingTrackId: string | number | null;
+  isPaused: boolean;
   togglePlay: (track: Track) => void;
   setTrackToAddToDb: (track: Track) => void;
   // ПРОПС ДЛЯ ДОБАВЛЕНИЯ В ПЛЕЙЛИСТ
-  setTrackToAdd: (track: Track) => void; 
+  setTrackToAdd: (track: Track) => void;
 }
 
-export default function GlobalSearchTab({ playingTrackId, togglePlay, setTrackToAddToDb, setTrackToAdd }: GlobalSearchTabProps) {
+export default function GlobalSearchTab({ playingTrackId, isPaused, togglePlay, setTrackToAddToDb, setTrackToAdd }: GlobalSearchTabProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Track[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -104,7 +105,7 @@ export default function GlobalSearchTab({ playingTrackId, togglePlay, setTrackTo
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
               {searchResults.map(track => {
-                const isPlaying = playingTrackId === track.id;
+                const isPlaying = playingTrackId === track.id && !isPaused;
                 return (
                   <div key={track.id} className={`bg-gray-900 p-3 rounded-xl flex gap-3 items-center border transition group ${isPlaying ? 'border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.2)]' : 'border-gray-800 hover:border-gray-600'}`}>
                     <div className="relative w-14 h-14 rounded-md overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => togglePlay(track)}>
