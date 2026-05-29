@@ -5,13 +5,13 @@
 // Локально — в .env.local, в проде — в Vercel → Settings → Environment Variables.
 
 // ⚠️ ЗАПОЛНИ: публичный Telegram-контакт владельца для футера (БЕЗ @).
-export const OWNER_TELEGRAM = 'muzbingo';
+export const OWNER_TELEGRAM = 'kazheke_12';
 
 // Контакты для футера (плейсхолдеры — поправь)
 export const CONTACTS = {
-  phone: '+7 (700) 000-00-00',
-  instagram: 'muzbingo',
-  city: 'Павлодар, Казахстан',
+  phone: '+7 (775) 000-30-07',
+  instagram: 'muzbingo_astana',
+  city: 'Астана, Казахстан',
 };
 
 // Поводы для игры — показываются в форме брони и в секции «для кого»
