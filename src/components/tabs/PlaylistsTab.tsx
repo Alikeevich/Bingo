@@ -8,11 +8,12 @@ interface PlaylistsTabProps {
   playlists: Playlist[];
   setPlaylists: (val: Playlist[]) => void;
   playingTrackId: string | number | null;
+  isPaused: boolean;
   togglePlay: (track: Track) => void;
   showToast: (msg: string) => void;
 }
 
-export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, togglePlay, showToast }: PlaylistsTabProps) {
+export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, isPaused, togglePlay, showToast }: PlaylistsTabProps) {
   const[viewingPlaylist, setViewingPlaylist] = useState<Playlist | null>(null);
   const[isCreatePlaylistModalOpen, setIsCreatePlaylistModalOpen] = useState(false);
   const[newPlaylistName, setNewPlaylistName] = useState('');
@@ -157,7 +158,7 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
             <div className="flex flex-col gap-2">
               <div className="text-sm text-gray-500 mb-2 font-medium bg-gray-900 p-3 rounded-lg border border-gray-800"><Timer size={16} className="inline mr-2 -mt-1" /> Подсказка: алгоритм берёт случайные 24 трека из всего плейлиста. Загрузите 60–80 треков для разнообразия.</div>
               {currentPlaylist.tracks.map((track, index) => {
-                const isPlaying = playingTrackId === track.id;
+                const isPlaying = playingTrackId === track.id && !isPaused;
                 return (
                   <div key={track.id} className={`flex items-center gap-4 p-3 rounded-xl border transition group ${isPlaying ? 'bg-gray-800 border-purple-500' : 'bg-gray-900 border-gray-800 hover:bg-gray-800'}`}>
                     <div className="w-8 text-center text-gray-500 font-medium">{index + 1}</div>

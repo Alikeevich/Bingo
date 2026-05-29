@@ -1,7 +1,32 @@
 import { useState } from 'react';
 import { supabase } from '../../supabase';
-import { Game, Round, Playlist, Template, BingoCard } from '../../types';
+import { Game, Round, Playlist, Template, BingoCard, Track } from '../../types';
 import { ChevronLeft, Calendar, Trash2, PlusCircle, ListMusic, LayoutTemplate, Play, Printer, PartyPopper } from 'lucide-react';
+
+// Все 12 выигрышных линий в сетке 5×5 (строки, столбцы, 2 диагонали)
+const WIN_LINES = [
+  [0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24],
+  [0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24],
+  [0,6,12,18,24],[4,8,12,16,20],
+];
+
+// На каком ИНДЕКСЕ воспроизведения карточка впервые выполнит условие победы.
+// playIndexOf: id трека → его позиция в очереди. Свободная клетка считается «отмеченной» всегда.
+function winIndexForCard(
+  cells: (Track | { isFreeSpace: true })[],
+  playIndexOf: Map<string, number>,
+  condition: Round['winCondition']
+): number {
+  const cellPlay = cells.map(c =>
+    'isFreeSpace' in c ? -1 : (playIndexOf.get(String((c as Track).id)) ?? Infinity)
+  );
+  // Линия «закрывается» на максимальном play-индексе среди её 5 клеток
+  const lineDoneAt = WIN_LINES.map(line => Math.max(...line.map(i => cellPlay[i])));
+  if (condition === '1_line') return Math.min(...lineDoneAt);
+  if (condition === '2_lines') return [...lineDoneAt].sort((a, b) => a - b)[1];
+  // full — все 24 клетки отмечены = максимальный play-индекс
+  return Math.max(...cellPlay);
+}
 
 interface GamesTabProps {
   games: Game[];
@@ -73,33 +98,62 @@ export default function GamesTab({ games, setGames, playlists, templates, showTo
     if (!cardGeneratorSetup || !selectedTemplateId) return;
     const { game, round } = cardGeneratorSetup;
     const playlist = playlists.find(p => p.id === round.playlistId);
-    if (!playlist) return;
+    if (!playlist || playlist.tracks.length < 24) return showToast('Ошибка: в плейлисте меньше 24 треков!');
     const template = templates.find(t => t.id === selectedTemplateId);
     if (!template) return;
-
-    // Уникализируем по id — иначе один и тот же трек, попавший в плейлист дважды,
-    // мог оказаться в одной карточке дважды (визуальный дубль) и ломал бинго.
+    
+    // Порядок воспроизведения = порядок треков в плейлисте (шафл на старте тура убран).
+    // Зная его заранее, раздаём карточки так, чтобы они «выстреливали» на РАЗНЫХ треках —
+    // тогда не будет 2-3 бинго одновременно.
+    // Уникализируем по id — один и тот же трек, попавший в плейлист дважды, мог оказаться
+    // в карточке дважды (визуальный дубль) и ломал бинго. Очередь воспроизведения
+    // дедуплицируется так же, поэтому play-индексы считаем по уникальным трекам.
     const uniqueTracks = Array.from(
       new Map(playlist.tracks.map(t => [String(t.id), t])).values()
     );
     if (uniqueTracks.length < 24) return showToast(`Ошибка: нужно минимум 24 уникальных трека (сейчас ${uniqueTracks.length})!`);
 
-    // Fisher–Yates — честный шафл (sort(()=>Math.random()-0.5) смещён и нестабилен).
-    const shuffle = <T,>(arr: T[]): T[] => {
+    const playIndexOf = new Map<string, number>();
+    uniqueTracks.forEach((t, idx) => playIndexOf.set(String(t.id), idx));
+
+    const fisherYates = (arr: Track[]) => {
       const a = [...arr];
-      for (let k = a.length - 1; k > 0; k--) {
-        const j = Math.floor(Math.random() * (k + 1));
-        [a[k], a[j]] = [a[j], a[k]];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
       }
       return a;
     };
 
-    const newCards: BingoCard[] =[];
+    const buildCells = (): (Track | { isFreeSpace: true })[] => {
+      const cardTracks = fisherYates(uniqueTracks).slice(0, 24);
+      return [...cardTracks.slice(0, 12), { isFreeSpace: true }, ...cardTracks.slice(12, 24)];
+    };
+
+    const newCards: BingoCard[] = [];
     const startId = 1000 + (round.cards?.length || 0) + 1;
+    // Учитываем точки победы уже существующих карточек этого раунда, чтобы новые не совпадали с ними
+    const usedWinIndices = new Set<number>();
+    (round.cards || []).forEach(c => usedWinIndices.add(winIndexForCard(c.cells, playIndexOf, round.winCondition)));
+
+    const MAX_TRIES = 40;
+    let collisions = 0;
     for (let i = 0; i < cardsCount; i++) {
-      const cardTracks = shuffle(uniqueTracks).slice(0, 24);
-      const cells: any[] =[...cardTracks.slice(0, 12), { isFreeSpace: true }, ...cardTracks.slice(12, 24)];
+      let cells = buildCells();
+      let winIdx = winIndexForCard(cells, playIndexOf, round.winCondition);
+      // Пытаемся подобрать раскладку с уникальной точкой победы
+      let tries = 0;
+      while (usedWinIndices.has(winIdx) && tries < MAX_TRIES) {
+        cells = buildCells();
+        winIdx = winIndexForCard(cells, playIndexOf, round.winCondition);
+        tries++;
+      }
+      if (usedWinIndices.has(winIdx)) collisions++;
+      usedWinIndices.add(winIdx);
       newCards.push({ id: String(startId + i), cells });
+    }
+    if (collisions > 0) {
+      showToast(`Сгенерировано. ${collisions} карточек могут выстрелить одновременно (мало треков в плейлисте для полного разнесения)`);
     }
     
     const updatedRounds = game.rounds.map(r => r.id === round.id ? { ...r, cards:[...(r.cards || []), ...newCards] } : r);
