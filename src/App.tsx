@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from './supabase';
-import { Music, ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, Loader2, X, Scissors } from 'lucide-react';
+import { useAuth } from './auth/AuthContext';
+import { Music, ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, Loader2, X, Scissors, LogOut } from 'lucide-react';
 import { Track, Playlist, Game, Round, Template, BingoCard, Tag } from './types';
 import { migrateTemplate } from './lib/migrateTemplate';
 import AudioTrimmer from './components/AudioTrimmer';
@@ -18,6 +20,13 @@ import HostScreen from './components/screens/HostScreen';
 import Projector from './components/screens/Projector';
 
 export default function App() {
+  const navigate = useNavigate();
+  const { profile, signOut } = useAuth();
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
+
   const [activeTab, setActiveTab] = useState<'games' | 'playlists' | 'mydatabase' | 'global_search' | 'templates'>('games');
 
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
@@ -722,6 +731,10 @@ export default function App() {
           <button onClick={() => setActiveTab('playlists')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === 'playlists' ? 'bg-purple-600 text-white font-bold' : 'text-gray-400 hover:bg-gray-800'}`}><ListMusic size={20} /> Плейлисты</button>
           <button onClick={() => setActiveTab('templates')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === 'templates' ? 'bg-purple-600 text-white font-bold' : 'text-gray-400 hover:bg-gray-800'}`}><LayoutTemplate size={20} /> Шаблоны</button>
         </nav>
+        <div className="px-4 pb-5 pt-2 border-t border-gray-800/50">
+          {profile?.email && <p className="px-4 pb-2 text-xs text-gray-500 truncate" title={profile.email}>{profile.email}</p>}
+          <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-gray-800 hover:text-white transition"><LogOut size={20} /> Выйти</button>
+        </div>
       </aside>
 
       <main className="flex-1 overflow-hidden p-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-gray-900 via-gray-950 to-gray-950">

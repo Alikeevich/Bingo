@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import BookingModal, { BookingMode } from '../landing/BookingModal';
 import { CONTACTS, OWNER_TELEGRAM } from '../landing/config';
 
 export default function Landing() {
+  const navigate = useNavigate();
   const [modal, setModal] = useState<BookingMode | null>(null);
   const openGame = () => setModal('game');
-  const openFranchise = () => setModal('franchise');
+  // Франшиза теперь ведёт на регистрацию аккаунта (доступ к инструменту — после одобрения владельца).
+  const openFranchise = () => navigate('/register');
 
   return (
     <div className="min-h-screen bg-ink text-cream font-sans overflow-x-hidden selection:bg-lime selection:text-ink">
@@ -334,7 +336,7 @@ function Franchise({ onFranchise }: { onFranchise: () => void }) {
             onClick={onFranchise}
             className="mt-8 rounded-full bg-lime px-8 py-4 font-display text-lg font-extrabold text-ink hover:scale-[1.03] active:scale-95 transition shadow-lg shadow-lime/20"
           >
-            Оставить заявку на франшизу
+            Зарегистрироваться по франшизе
           </button>
         </div>
       </div>
