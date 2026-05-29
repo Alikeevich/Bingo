@@ -7,7 +7,7 @@ export default function Register() {
   const { signUp } = useAuth();
   const navigate = useNavigate();
   const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState('+7 ');
   const [city, setCity] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

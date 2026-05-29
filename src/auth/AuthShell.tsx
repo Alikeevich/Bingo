@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import Logo from '../components/Logo';
 
 export const authInputCls =
   'w-full rounded-2xl bg-ink-soft border border-white/10 px-4 py-3.5 text-cream placeholder-white/35 ' +
@@ -24,9 +25,8 @@ export default function AuthShell({
       </div>
 
       <header className="px-5 h-16 flex items-center">
-        <Link to="/" className="flex items-center gap-2 font-display font-extrabold text-xl">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-magenta text-white text-lg rotate-[-6deg]">B</span>
-          <span>Muz<span className="text-lime">Bingo</span></span>
+        <Link to="/" className="flex items-center">
+          <Logo className="h-9 w-auto" />
         </Link>
       </header>
 

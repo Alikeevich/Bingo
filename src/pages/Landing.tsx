@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import BookingModal, { BookingMode } from '../landing/BookingModal';
+import Logo from '../components/Logo';
 import { CONTACTS, OWNER_TELEGRAM } from '../landing/config';
 
 export default function Landing() {
@@ -49,9 +50,8 @@ function Nav({ onBook }: { onBook: () => void }) {
   return (
     <header className="sticky top-0 z-40 backdrop-blur-md bg-ink/70 border-b border-white/5">
       <div className="mx-auto max-w-6xl px-5 h-16 flex items-center justify-between">
-        <a href="#top" className="flex items-center gap-2 font-display font-extrabold text-xl">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-magenta text-white text-lg rotate-[-6deg]">B</span>
-          <span>Muz<span className="text-lime">Bingo</span></span>
+        <a href="#top" className="flex items-center">
+          <Logo className="h-9 w-auto" />
         </a>
         <nav className="hidden md:flex items-center gap-7 text-sm font-semibold text-cream/70">
           <a href="#how" className="hover:text-cream transition">Как играем</a>
@@ -370,10 +370,7 @@ function Footer({ onBook }: { onBook: () => void }) {
     <footer className="border-t border-white/10 mt-10 pb-28 sm:pb-10">
       <div className="mx-auto max-w-6xl px-5 py-12 grid sm:grid-cols-2 gap-8">
         <div>
-          <div className="flex items-center gap-2 font-display font-extrabold text-2xl mb-3">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-magenta text-white rotate-[-6deg]">B</span>
-            Muz<span className="text-lime">Bingo</span>
-          </div>
+          <Logo className="h-11 w-auto mb-3" />
           <p className="text-cream/50 max-w-xs">
             Музыкальное бинго, которое превращает любой вечер в вечеринку. {CONTACTS.city}.
           </p>

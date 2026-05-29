@@ -17,7 +17,7 @@ const labelCls = 'block text-sm font-semibold text-cream/70 mb-1.5';
 
 export default function BookingModal({ mode, onClose }: Props) {
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState('+7 ');
   const [date, setDate] = useState('');
   const [people, setPeople] = useState('');
   const [occasion, setOccasion] = useState(OCCASIONS[0]);

@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from './supabase';
 import { useAuth } from './auth/AuthContext';
-import { Music, ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, Loader2, X, Scissors, LogOut } from 'lucide-react';
+import Logo from './components/Logo';
+import { ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, Loader2, X, Scissors, LogOut } from 'lucide-react';
 import { Track, Playlist, Game, Round, Template, BingoCard, Tag } from './types';
 import { migrateTemplate } from './lib/migrateTemplate';
 import AudioTrimmer from './components/AudioTrimmer';
@@ -718,9 +719,8 @@ export default function App() {
       )}
 
       <aside className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col z-10 flex-shrink-0">
-        <div className="p-6 flex items-center gap-3 border-b border-gray-800/50">
-          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg"><Music size={24} className="text-white" /></div>
-          <span className="text-xl font-black tracking-wider uppercase bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">MuzBingo</span>
+        <div className="p-6 flex items-center border-b border-gray-800/50">
+          <Logo className="h-9 w-auto" />
         </div>
         <nav className="flex-1 px-4 py-6 flex flex-col gap-2">
           <button onClick={() => setActiveTab('games')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === 'games' ? 'bg-purple-600 text-white font-bold' : 'text-gray-400 hover:bg-gray-800'}`}><PartyPopper size={20} /> Мероприятия</button>
