@@ -1,7 +1,8 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import type { Plugin } from 'vite'
 import type { IncomingMessage, ServerResponse } from 'http'
+import { formatBookingMessage, BookingPayload } from './src/landing/bookingMessage'
 
 // Прокси-плагин для аудио — добавляет CORS-заголовки, нужен для Cache API
 const audioProxyPlugin: Plugin = {
@@ -59,19 +60,80 @@ const audioProxyPlugin: Plugin = {
   },
 }
 
-export default defineConfig({
-  plugins: [react(), audioProxyPlugin],
-  // Полифиллы для @react-pdf/renderer (использует Node globals)
-  define: {
-    global: 'globalThis',
-  },
-  server: {
-    proxy: {
-      '/api/deezer': {
-        target: 'https://api.deezer.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/deezer/, ''),
+export default defineConfig(({ mode }) => {
+  // Грузим ВСЕ env (включая TELEGRAM_*, без префикса VITE_) для dev-обработчика заявок
+  const env = loadEnv(mode, process.cwd(), '')
+
+  // Локальный аналог serverless-функции api/booking.ts — чтобы форма брони
+  // работала и в `npm run dev`, не только в проде на Vercel.
+  const bookingDevPlugin: Plugin = {
+    name: 'booking-api-dev',
+    configureServer(server) {
+      server.middlewares.use(
+        '/api/booking',
+        async (req: IncomingMessage, res: ServerResponse) => {
+          if (req.method !== 'POST') {
+            res.statusCode = 405
+            res.end('Method not allowed')
+            return
+          }
+          let body = ''
+          for await (const chunk of req) body += chunk
+
+          const json = (status: number, obj: unknown) => {
+            res.statusCode = status
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify(obj))
+          }
+
+          try {
+            const payload = JSON.parse(body || '{}') as BookingPayload
+            if (!payload?.name?.trim() || !payload?.phone?.trim()) {
+              return json(400, { error: 'name and phone are required' })
+            }
+            const token = env.TELEGRAM_BOT_TOKEN
+            const chatId = env.TELEGRAM_CHAT_ID
+            if (!token || !chatId) {
+              return json(500, { error: 'Telegram bot is not configured' })
+            }
+            const tg = await fetch(
+              `https://api.telegram.org/bot${token}/sendMessage`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chat_id: chatId,
+                  text: formatBookingMessage(payload),
+                }),
+              }
+            )
+            if (!tg.ok) {
+              return json(502, { error: 'Failed to deliver to Telegram' })
+            }
+            return json(200, { ok: true })
+          } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : String(e)
+            return json(500, { error: msg })
+          }
+        }
+      )
+    },
+  }
+
+  return {
+    plugins: [react(), audioProxyPlugin, bookingDevPlugin],
+    // Полифиллы для @react-pdf/renderer (использует Node globals)
+    define: {
+      global: 'globalThis',
+    },
+    server: {
+      proxy: {
+        '/api/deezer': {
+          target: 'https://api.deezer.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/deezer/, ''),
+        },
       },
     },
-  },
+  }
 })
