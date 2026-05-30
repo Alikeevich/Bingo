@@ -25,7 +25,6 @@ export default function Landing() {
       <Marquee />
       <HowItWorks />
       <EventsSection onPick={setSelectedEvent} />
-      <Occasions />
       <VibeGallery />
       <Stats />
       <Partners />
@@ -254,43 +253,6 @@ function HowItWorks() {
             </span>
           </div>
         ))}
-      </div>
-    </section>
-  );
-}
-
-/* ---------- Occasions ---------- */
-function Occasions() {
-  const items: { title: string; accent: string; num: string }[] = [
-    { title: 'День рождения', accent: 'bg-magenta', num: '01' },
-    { title: 'Корпоратив', accent: 'bg-lime', num: '02' },
-    { title: 'Вечер с друзьями', accent: 'bg-grape', num: '03' },
-    { title: 'Девичник', accent: 'bg-lime', num: '04' },
-    { title: 'Свидание', accent: 'bg-magenta', num: '05' },
-    { title: 'Бар / площадка', accent: 'bg-grape', num: '06' },
-  ];
-  return (
-    <section id="occasions" className="mx-auto max-w-6xl px-5 py-16 sm:py-24">
-      <SectionTitle kicker="для кого" title="Заведём любой повод" />
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-10">
-        {items.map((it) => (
-          <div
-            key={it.title}
-            className="group relative overflow-hidden rounded-3xl bg-ink-soft border border-white/10 p-6 sm:p-7 hover:-translate-y-1 transition"
-          >
-            <span className={`block h-1.5 w-10 rounded-full ${it.accent} mb-5`} />
-            <span className="font-mono text-xs text-cream/30">{it.num}</span>
-            <div className="font-display font-extrabold text-base sm:text-xl leading-tight mt-1">{it.title}</div>
-          </div>
-        ))}
-      </div>
-      <div className="mt-10 text-center">
-        <a
-          href="#events"
-          className="inline-block rounded-full bg-lime px-8 py-4 font-display text-lg font-extrabold text-ink hover:scale-[1.03] active:scale-95 transition"
-        >
-          Записаться на игру
-        </a>
       </div>
     </section>
   );
