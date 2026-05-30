@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import BookingModal, { BookingMode } from '../landing/BookingModal';
 import Logo from '../components/Logo';
-import { CONTACTS, OWNER_TELEGRAM } from '../landing/config';
+import { CONTACTS, OWNER_TELEGRAM, PARTNERS, EVENT_PHOTOS } from '../landing/config';
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -25,9 +25,12 @@ export default function Landing() {
       <Marquee />
       <HowItWorks />
       <Occasions onBook={openGame} />
+      <VibeGallery />
       <Stats />
+      <Partners />
       <Franchise onFranchise={openFranchise} />
       <FinalCta onBook={openGame} />
+      <InstagramPreview />
       <Footer onBook={openGame} />
 
       {/* липкая кнопка брони на мобилке — бронь всегда в один тап */}
@@ -421,5 +424,142 @@ function SectionTitle({
       </div>
       <h2 className="font-display font-black text-3xl sm:text-5xl leading-tight">{title}</h2>
     </div>
+  );
+}
+
+/* ---------- VibeGallery: бесконечная лента фоток с реальных игр ---------- */
+function VibeGallery() {
+  // Дублируем массив, чтобы анимация -50% давала бесшовный цикл.
+  const strip = [...EVENT_PHOTOS, ...EVENT_PHOTOS];
+  return (
+    <section className="py-16 sm:py-24 overflow-hidden">
+      <div className="mx-auto max-w-6xl px-5">
+        <SectionTitle kicker="живьём" title="Так это выглядит вживую" />
+      </div>
+      <div className="mt-10 overflow-hidden">
+        <div className="flex w-max gap-4 sm:gap-6 animate-marquee" style={{ animationDuration: '38s' }}>
+          {strip.map((src, i) => (
+            <div
+              key={i}
+              className="shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-ink-card shadow-xl shadow-black/40"
+              style={{ transform: `rotate(${i % 2 === 0 ? -1.5 : 1.5}deg)` }}
+            >
+              <img
+                src={src}
+                alt="Атмосфера MuzBingo"
+                className="h-56 sm:h-80 w-auto object-cover block"
+                loading="lazy"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- Partners: с кем дружим (Instagram) ---------- */
+function Partners() {
+  const accents = ['bg-magenta', 'bg-lime', 'bg-grape'];
+  return (
+    <section className="mx-auto max-w-6xl px-5 py-16 sm:py-24">
+      <SectionTitle kicker="партнёры" title="С кем мы дружим" />
+      <p className="text-center text-cream/55 mt-4 max-w-xl mx-auto">
+        Они отдают свои сертификаты как призы на наших играх. Загляни — у них классно.
+      </p>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-10">
+        {PARTNERS.map((p, i) => (
+          <a
+            key={p.handle}
+            href={`https://instagram.com/${p.handle}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group relative overflow-hidden rounded-3xl bg-ink-card border border-white/10 p-6 hover:border-magenta/50 hover:-translate-y-1 transition"
+          >
+            <span className={`block h-1.5 w-10 rounded-full ${accents[i % accents.length]} mb-4`} />
+            <h3 className="font-display font-extrabold text-xl leading-tight">{p.name}</h3>
+            <p className="text-cream/60 text-sm mt-2 leading-relaxed">{p.description}</p>
+            <div className="mt-5 flex items-center justify-between">
+              <span className="text-lime font-mono text-sm truncate">@{p.handle}</span>
+              <span className="text-cream/40 group-hover:text-cream transition text-sm font-semibold shrink-0 ml-3">
+                Открыть
+              </span>
+            </div>
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ---------- InstagramPreview: мини-профиль с фотками вместо постов ---------- */
+function InstagramPreview() {
+  const tiles = EVENT_PHOTOS.slice(0, 6);
+  const igUrl = `https://instagram.com/${CONTACTS.instagram}`;
+  return (
+    <section className="mx-auto max-w-3xl px-5 py-16 sm:py-24">
+      <SectionTitle kicker="инстаграм" title="Подпишись и не пропусти" />
+      <div className="mt-10 rounded-[32px] bg-ink-card border border-white/10 overflow-hidden">
+        <div className="p-5 sm:p-7 flex items-center gap-4 sm:gap-5 border-b border-white/5">
+          <div className="relative shrink-0">
+            <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-full p-[3px] bg-gradient-to-tr from-magenta via-lime to-grape">
+              <div className="h-full w-full rounded-full bg-ink-card grid place-items-center overflow-hidden">
+                <img src="/logo.png" alt="MuzBingo" className="h-10 sm:h-12 w-auto" />
+              </div>
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-display font-extrabold text-base sm:text-xl truncate">@{CONTACTS.instagram}</p>
+            <p className="text-cream/55 text-xs sm:text-sm mt-0.5 leading-snug">
+              Музыкальное бинго — кадры с наших игр
+            </p>
+          </div>
+          <a
+            href={igUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:inline-flex rounded-full bg-magenta px-5 py-2.5 font-display font-bold text-white text-sm hover:scale-105 active:scale-95 transition shrink-0"
+          >
+            Подписаться
+          </a>
+        </div>
+        <div className="grid grid-cols-3 gap-0.5 bg-white/5">
+          {tiles.map((src, i) => (
+            <a
+              key={i}
+              href={igUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="aspect-square overflow-hidden bg-ink-card group"
+            >
+              <img
+                src={src}
+                alt="MuzBingo пост"
+                className="h-full w-full object-cover group-hover:scale-105 transition duration-500"
+                loading="lazy"
+              />
+            </a>
+          ))}
+        </div>
+        <div className="p-5 sm:p-6 flex items-center justify-between gap-3">
+          <a
+            href={igUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="sm:hidden rounded-full bg-magenta px-5 py-2.5 font-display font-bold text-white text-sm shrink-0"
+          >
+            Подписаться
+          </a>
+          <a
+            href={igUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-auto text-cream/60 hover:text-cream text-sm font-semibold"
+          >
+            Все посты в Instagram
+          </a>
+        </div>
+      </div>
+    </section>
   );
 }

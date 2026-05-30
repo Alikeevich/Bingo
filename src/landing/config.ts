@@ -23,3 +23,46 @@ export const OCCASIONS = [
   'Девичник / мальчишник',
   'Другое',
 ];
+
+// Фотографии с реальных игр (лежат в public/, отдаются по /1.jpg .. /8.jpg)
+export const EVENT_PHOTOS = ['/1.jpg', '/2.jpg', '/3.jpg', '/4.jpg', '/5.jpg', '/6.jpg', '/7.jpg', '/8.jpg'];
+
+export type Partner = {
+  name: string;
+  handle: string; // Instagram username без @
+  description: string;
+};
+
+// Партнёры — призы / коллаборации на играх. Описания — короткие, можно править.
+export const PARTNERS: Partner[] = [
+  {
+    name: 'Dr. Joys',
+    handle: 'drjoysoriginal',
+    description: 'Бренд интимного здоровья и заботы о себе.',
+  },
+  {
+    name: 'FitLab',
+    handle: 'fitlabkz',
+    description: 'Женская фитнес-студия — занятия для тех, кто заботится о теле.',
+  },
+  {
+    name: 'CashPro',
+    handle: 'cashpro.kz',
+    description: 'Подарочные сертификаты и денежные подарки — современный способ дарить.',
+  },
+  {
+    name: 'Drum Avenue',
+    handle: 'drum_avenue_astana',
+    description: 'Школа игры на барабанах — от первого ритма до сцены.',
+  },
+  {
+    name: 'Sound Era',
+    handle: 'sound_era_astana',
+    description: 'Студия вокала — поставим голос и научим петь.',
+  },
+  {
+    name: 'Victoria · psy',
+    handle: 'victoria__psy',
+    description: 'Психолог-сексолог. Онлайн-сессии о близости, честности и внутреннем комфорте.',
+  },
+];
