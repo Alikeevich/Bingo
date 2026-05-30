@@ -54,6 +54,10 @@ export default async function handler(req: any, res: any) {
     res.status(400).json({ error: 'event_id, name and phone are required' });
     return;
   }
+  if (phone.replace(/\D/g, '').length < 11) {
+    res.status(400).json({ error: 'phone must contain at least 11 digits' });
+    return;
+  }
 
   const supabase = createClient(supaUrl, supaAnon);
 

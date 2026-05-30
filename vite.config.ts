@@ -126,6 +126,9 @@ export default defineConfig(({ mode }) => {
             if (!Number.isFinite(eventId) || eventId <= 0 || !name || !phone) {
               return jsonRes(res, 400, { error: 'event_id, name and phone are required' })
             }
+            if (phone.replace(/\D/g, '').length < 11) {
+              return jsonRes(res, 400, { error: 'phone must contain at least 11 digits' })
+            }
             const supabase = createClient(url, anon)
             const { data: ev } = await supabase
               .from('events').select('id, starts_at, venue').eq('id', eventId).maybeSingle()

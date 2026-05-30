@@ -50,8 +50,13 @@ export default function SignupModal({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !phone.trim()) {
-      setError('Заполни имя и телефон.');
+    if (!name.trim()) {
+      setError('Введи имя.');
+      return;
+    }
+    const digits = phone.replace(/\D/g, '').length;
+    if (digits < 11) {
+      setError('Введи полный номер телефона (11 цифр).');
       return;
     }
     setError('');

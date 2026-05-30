@@ -17,8 +17,12 @@ export default function Register() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName.trim() || !phone.trim() || !email.trim() || !password) {
-      setError('Заполни имя, телефон, email и пароль.');
+    if (!fullName.trim() || !email.trim() || !password) {
+      setError('Заполни имя, email и пароль.');
+      return;
+    }
+    if (phone.replace(/\D/g, '').length < 11) {
+      setError('Введи полный номер телефона (11 цифр).');
       return;
     }
     if (password.length < 6) {
