@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import SignupModal from '../landing/SignupModal';
 import EventsSection, { EventItem } from '../landing/EventsSection';
@@ -456,10 +456,24 @@ function Partners() {
   );
 }
 
-/* ---------- InstagramPreview: мини-профиль с фотками вместо постов ---------- */
+/* ---------- InstagramPreview: реальные посты через виджет behold.so ---------- */
+const BEHOLD_FEED_ID = 'GzEUPHsYPSduDQncGK09';
+
 function InstagramPreview() {
-  const tiles = EVENT_PHOTOS.slice(0, 6);
   const igUrl = `https://instagram.com/${CONTACTS.instagram}`;
+
+  // Скрипт behold.so грузим ровно один раз, только когда секция реально на экране,
+  // чтобы не тащить виджет на /app и /login.
+  useEffect(() => {
+    const ID = 'behold-widget-script';
+    if (document.getElementById(ID)) return;
+    const s = document.createElement('script');
+    s.id = ID;
+    s.type = 'module';
+    s.src = 'https://w.behold.so/widget.js';
+    document.head.appendChild(s);
+  }, []);
+
   return (
     <section className="mx-auto max-w-3xl px-5 py-16 sm:py-24">
       <SectionTitle kicker="инстаграм" title="Подпишись и не пропусти" />
@@ -475,7 +489,7 @@ function InstagramPreview() {
           <div className="flex-1 min-w-0">
             <p className="font-display font-extrabold text-base sm:text-xl truncate">@{CONTACTS.instagram}</p>
             <p className="text-cream/55 text-xs sm:text-sm mt-0.5 leading-snug">
-              Музыкальное бинго — кадры с наших игр
+              Последние посты с наших игр
             </p>
           </div>
           <a
@@ -487,24 +501,11 @@ function InstagramPreview() {
             Подписаться
           </a>
         </div>
-        <div className="grid grid-cols-3 gap-0.5 bg-white/5">
-          {tiles.map((src, i) => (
-            <a
-              key={i}
-              href={igUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="aspect-square overflow-hidden bg-ink-card group"
-            >
-              <img
-                src={src}
-                alt="MuzBingo пост"
-                className="h-full w-full object-cover group-hover:scale-105 transition duration-500"
-                loading="lazy"
-              />
-            </a>
-          ))}
+
+        <div className="p-4 sm:p-5 bg-white/[0.02]">
+          <behold-widget feed-id={BEHOLD_FEED_ID}></behold-widget>
         </div>
+
         <div className="p-5 sm:p-6 flex items-center justify-between gap-3">
           <a
             href={igUrl}
