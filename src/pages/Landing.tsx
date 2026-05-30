@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import BookingModal, { BookingMode } from '../landing/BookingModal';
+import SignupModal from '../landing/SignupModal';
+import EventsSection, { EventItem } from '../landing/EventsSection';
 import Logo from '../components/Logo';
 import { CONTACTS, OWNER_TELEGRAM, PARTNERS, EVENT_PHOTOS } from '../landing/config';
 
 export default function Landing() {
   const navigate = useNavigate();
-  const [modal, setModal] = useState<BookingMode | null>(null);
-  const openGame = () => setModal('game');
-  // Франшиза теперь ведёт на регистрацию аккаунта (доступ к инструменту — после одобрения владельца).
+  const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
+  // Франшиза ведёт на регистрацию аккаунта (доступ к инструменту — после одобрения владельца).
   const openFranchise = () => navigate('/register');
 
   return (
@@ -20,36 +20,39 @@ export default function Landing() {
         <div className="absolute bottom-0 left-1/4 h-72 w-72 rounded-full bg-lime/10 blur-[120px]" />
       </div>
 
-      <Nav onBook={openGame} />
-      <Hero onBook={openGame} />
+      <Nav />
+      <Hero />
       <Marquee />
       <HowItWorks />
-      <Occasions onBook={openGame} />
+      <EventsSection onPick={setSelectedEvent} />
+      <Occasions />
       <VibeGallery />
       <Stats />
       <Partners />
       <Franchise onFranchise={openFranchise} />
-      <FinalCta onBook={openGame} />
+      <FinalCta />
       <InstagramPreview />
-      <Footer onBook={openGame} />
+      <Footer />
 
-      {/* липкая кнопка брони на мобилке — бронь всегда в один тап */}
+      {/* липкая кнопка записи на мобилке — всегда в один тап */}
       <div className="sm:hidden fixed bottom-0 inset-x-0 z-50 p-3 bg-gradient-to-t from-ink via-ink/95 to-transparent">
-        <button
-          onClick={openGame}
-          className="w-full rounded-full bg-magenta py-4 font-display text-lg font-extrabold text-white shadow-lg shadow-magenta/30 active:scale-95 transition"
+        <a
+          href="#events"
+          className="block text-center w-full rounded-full bg-magenta py-4 font-display text-lg font-extrabold text-white shadow-lg shadow-magenta/30 active:scale-95 transition"
         >
-          Забронировать игру
-        </button>
+          Записаться на игру
+        </a>
       </div>
 
-      {modal && <BookingModal mode={modal} onClose={() => setModal(null)} />}
+      {selectedEvent && (
+        <SignupModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+      )}
     </div>
   );
 }
 
 /* ---------- Nav ---------- */
-function Nav({ onBook }: { onBook: () => void }) {
+function Nav() {
   return (
     <header className="sticky top-0 z-40 backdrop-blur-md bg-ink/70 border-b border-white/5">
       <div className="mx-auto max-w-6xl px-5 h-16 flex items-center justify-between">
@@ -58,22 +61,22 @@ function Nav({ onBook }: { onBook: () => void }) {
         </a>
         <nav className="hidden md:flex items-center gap-7 text-sm font-semibold text-cream/70">
           <a href="#how" className="hover:text-cream transition">Как играем</a>
-          <a href="#occasions" className="hover:text-cream transition">Для кого</a>
+          <a href="#events" className="hover:text-cream transition">Расписание</a>
           <a href="#franchise" className="hover:text-cream transition">Франшиза</a>
         </nav>
-        <button
-          onClick={onBook}
+        <a
+          href="#events"
           className="hidden sm:block rounded-full bg-lime px-5 py-2.5 font-display font-bold text-ink text-sm hover:scale-105 active:scale-95 transition"
         >
-          Забронировать
-        </button>
+          Записаться
+        </a>
       </div>
     </header>
   );
 }
 
 /* ---------- Hero ---------- */
-function Hero({ onBook }: { onBook: () => void }) {
+function Hero() {
   return (
     <section id="top" className="relative mx-auto max-w-6xl px-5 pt-12 pb-16 sm:pt-20 sm:pb-24">
       <div className="grid lg:grid-cols-2 gap-10 lg:gap-6 items-center">
@@ -90,17 +93,16 @@ function Hero({ onBook }: { onBook: () => void }) {
             Кричи <span className="text-magenta">БИНГО!</span>
           </h1>
           <p className="mt-6 text-lg text-cream/70 max-w-md leading-relaxed">
-            Это бинго, но вместо скучных чисел — твои любимые треки. Ведущий включает хиты, ты
-            ловишь их на карточке. День рождения, корпоратив или вечер с друзьями — заведём любую
-            компанию.
+            Это бинго, но вместо скучных чисел — твои любимые треки. Мы сами проводим игры в
+            барах: приходи компанией, лови хиты на карточке и забирай призы.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={onBook}
-              className="rounded-full bg-magenta px-8 py-4 font-display text-lg font-extrabold text-white hover:scale-[1.03] active:scale-95 transition shadow-lg shadow-magenta/30"
+            <a
+              href="#events"
+              className="rounded-full bg-magenta px-8 py-4 font-display text-lg font-extrabold text-white text-center hover:scale-[1.03] active:scale-95 transition shadow-lg shadow-magenta/30"
             >
-              Забронировать игру
-            </button>
+              Записаться на игру
+            </a>
             <a
               href="#how"
               className="rounded-full border border-white/15 px-8 py-4 font-display text-lg font-bold text-cream text-center hover:bg-white/5 transition"
@@ -108,7 +110,7 @@ function Hero({ onBook }: { onBook: () => void }) {
               Как это работает
             </a>
           </div>
-          <p className="mt-4 text-sm text-cream/45">Заявка за минуту — дальше мы свяжемся с тобой сами</p>
+          <p className="mt-4 text-sm text-cream/45">Выбери дату в расписании — займём за тобой места</p>
         </div>
 
         <div className="relative flex justify-center lg:justify-end">
@@ -221,13 +223,13 @@ function HowItWorks() {
   const steps = [
     {
       n: '01',
-      title: 'Бронируешь дату',
-      text: 'Оставляешь заявку — мы связываемся, подтверждаем дату и берём небольшую предоплату.',
+      title: 'Выбираешь дату',
+      text: 'Смотришь расписание игр на сайте и записываешься на ближайшую — за минуту.',
     },
     {
       n: '02',
-      title: 'Раздаём карточки',
-      text: 'У каждого — карточка с обложками треков вместо чисел. Привозим всё: звук, экран, призы.',
+      title: 'Приходишь на игру',
+      text: 'Приезжаешь в указанный бар, получаешь карточку с обложками треков вместо чисел.',
     },
     {
       n: '03',
@@ -258,7 +260,7 @@ function HowItWorks() {
 }
 
 /* ---------- Occasions ---------- */
-function Occasions({ onBook }: { onBook: () => void }) {
+function Occasions() {
   const items: { title: string; accent: string; num: string }[] = [
     { title: 'День рождения', accent: 'bg-magenta', num: '01' },
     { title: 'Корпоратив', accent: 'bg-lime', num: '02' },
@@ -283,12 +285,12 @@ function Occasions({ onBook }: { onBook: () => void }) {
         ))}
       </div>
       <div className="mt-10 text-center">
-        <button
-          onClick={onBook}
-          className="rounded-full bg-lime px-8 py-4 font-display text-lg font-extrabold text-ink hover:scale-[1.03] active:scale-95 transition"
+        <a
+          href="#events"
+          className="inline-block rounded-full bg-lime px-8 py-4 font-display text-lg font-extrabold text-ink hover:scale-[1.03] active:scale-95 transition"
         >
-          Хочу такую вечеринку
-        </button>
+          Записаться на игру
+        </a>
       </div>
     </section>
   );
@@ -348,27 +350,27 @@ function Franchise({ onFranchise }: { onFranchise: () => void }) {
 }
 
 /* ---------- Final CTA ---------- */
-function FinalCta({ onBook }: { onBook: () => void }) {
+function FinalCta() {
   return (
     <section className="mx-auto max-w-6xl px-5 py-16 sm:py-24 text-center">
       <h2 className="font-display font-black text-4xl sm:text-6xl leading-tight">
-        Готов устроить <span className="text-magenta">лучшую</span> вечеринку?
+        Готов <span className="text-magenta">сыграть</span>?
       </h2>
       <p className="mt-5 text-cream/60 text-lg max-w-md mx-auto">
-        Свободные даты разлетаются быстро. Забронируй свою прямо сейчас.
+        Места на ближайшие игры разлетаются быстро. Займи своё прямо сейчас.
       </p>
-      <button
-        onClick={onBook}
-        className="mt-8 rounded-full bg-magenta px-10 py-5 font-display text-xl font-extrabold text-white hover:scale-[1.03] active:scale-95 transition shadow-xl shadow-magenta/30"
+      <a
+        href="#events"
+        className="inline-block mt-8 rounded-full bg-magenta px-10 py-5 font-display text-xl font-extrabold text-white hover:scale-[1.03] active:scale-95 transition shadow-xl shadow-magenta/30"
       >
-        Забронировать игру
-      </button>
+        Записаться на игру
+      </a>
     </section>
   );
 }
 
 /* ---------- Footer ---------- */
-function Footer({ onBook }: { onBook: () => void }) {
+function Footer() {
   return (
     <footer className="border-t border-white/10 mt-10 pb-28 sm:pb-10">
       <div className="mx-auto max-w-6xl px-5 py-12 grid sm:grid-cols-2 gap-8">
@@ -379,9 +381,9 @@ function Footer({ onBook }: { onBook: () => void }) {
           </p>
         </div>
         <div className="sm:text-right space-y-2">
-          <button onClick={onBook} className="font-display font-bold text-lime hover:underline">
-            Забронировать игру
-          </button>
+          <a href="#events" className="block font-display font-bold text-lime hover:underline">
+            Записаться на игру
+          </a>
           <div className="text-cream/60 space-y-1.5 text-sm">
             <p>
               <a href={`https://t.me/${OWNER_TELEGRAM}`} target="_blank" rel="noopener noreferrer" className="hover:text-cream">
