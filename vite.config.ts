@@ -112,8 +112,8 @@ export default defineConfig(({ mode }) => {
         async (req: IncomingMessage, res: ServerResponse) => {
           if (req.method !== 'POST') return jsonRes(res, 405, { error: 'Method not allowed' })
           const url = env.VITE_SUPABASE_URL
-          const anon = env.VITE_SUPABASE_ANON_KEY
-          if (!url || !anon) return jsonRes(res, 500, { error: 'Supabase is not configured' })
+          const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY
+          if (!url || !serviceKey) return jsonRes(res, 500, { error: 'Supabase is not configured' })
           try {
             const body = await readBody(req)
             const p = JSON.parse(body || '{}') as {
@@ -129,7 +129,9 @@ export default defineConfig(({ mode }) => {
             if (phone.replace(/\D/g, '').length < 11) {
               return jsonRes(res, 400, { error: 'phone must contain at least 11 digits' })
             }
-            const supabase = createClient(url, anon)
+            const supabase = createClient(url, serviceKey, {
+              auth: { persistSession: false, autoRefreshToken: false },
+            })
             const { data: ev } = await supabase
               .from('events').select('id, starts_at, venue').eq('id', eventId).maybeSingle()
             if (!ev) return jsonRes(res, 404, { error: 'Event not found' })

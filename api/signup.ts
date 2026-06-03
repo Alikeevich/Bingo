@@ -28,11 +28,13 @@ export default async function handler(req: any, res: any) {
   }
 
   const supaUrl = process.env.VITE_SUPABASE_URL;
-  const supaAnon = process.env.VITE_SUPABASE_ANON_KEY;
+  // Используем service_role, чтобы обходить RLS: anon не имеет INSERT-привилегии
+  // на signups, а добавлять SELECT-политику для anon небезопасно (видимость чужих записей).
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
 
-  if (!supaUrl || !supaAnon) {
+  if (!supaUrl || !serviceKey) {
     res.status(500).json({ error: 'Supabase is not configured' });
     return;
   }
@@ -59,7 +61,9 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const supabase = createClient(supaUrl, supaAnon);
+  const supabase = createClient(supaUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 
   // Проверяем, что игра существует и ещё не прошла
   const { data: ev, error: evErr } = await supabase
