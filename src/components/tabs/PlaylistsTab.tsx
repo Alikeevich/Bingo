@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../../supabase';
 import { Playlist, Track } from '../../types';
-import { ChevronLeft, CheckCircle2, UploadCloud, HardDriveDownload, Loader2, Music, Timer, PauseCircle, PlayCircle, Trash2, FolderPlus, Shuffle } from 'lucide-react';
+import { ChevronLeft, CheckCircle2, UploadCloud, HardDriveDownload, Loader2, Music, Timer, PauseCircle, PlayCircle, Trash2, FolderPlus, Shuffle, Search, X } from 'lucide-react';
 import { getProxiedUrl } from '../../utils';
 
 interface PlaylistsTabProps {
@@ -19,6 +19,7 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
   const[newPlaylistName, setNewPlaylistName] = useState('');
   const [isUploadingMp3, setIsUploadingMp3] = useState(false);
   const [offlineProgress, setOfflineProgress] = useState<{ current: number; total: number } | null>(null);
+  const [trackSearch, setTrackSearch] = useState('');
 
   const createPlaylist = async () => {
     if (!newPlaylistName.trim()) return;
@@ -118,15 +119,39 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
   if (viewingPlaylist) {
     const currentPlaylist = playlists.find(p => p.id === viewingPlaylist.id) || viewingPlaylist;
     const isReadyForGame = currentPlaylist.tracks.length >= 24;
+    const q = trackSearch.trim().toLowerCase();
+    const filteredTracks = q
+      ? currentPlaylist.tracks.filter(t =>
+          t.title.toLowerCase().includes(q) ||
+          t.artist.toLowerCase().includes(q) ||
+          (t.tags || []).some(tag => tag.toLowerCase().includes(q))
+        )
+      : currentPlaylist.tracks;
     return (
       <div className="animate-in slide-in-from-right-8 duration-300 flex flex-col h-full">
-        <button onClick={() => setViewingPlaylist(null)} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition w-fit"><ChevronLeft size={20} /> Назад к списку</button>
+        <button onClick={() => { setTrackSearch(''); setViewingPlaylist(null); }} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition w-fit"><ChevronLeft size={20} /> Назад к списку</button>
         <div className="flex items-end justify-between mb-8 border-b border-gray-800 pb-8">
           <div>
             <h1 className="text-4xl font-black mb-2">{currentPlaylist.name}</h1>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <span className="text-gray-400">{currentPlaylist.tracks.length} треков</span>
               {isReadyForGame ? <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium flex items-center gap-1"><CheckCircle2 size={16} /> Готов к генерации</span> : <span className="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-sm font-medium">Нужно минимум 24 трека</span>}
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                <input
+                  type="text"
+                  value={trackSearch}
+                  onChange={(e) => setTrackSearch(e.target.value)}
+                  placeholder="Поиск: трек, исполнитель, тег…"
+                  className="bg-gray-900 border border-gray-800 rounded-full pl-8 pr-8 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 w-64"
+                />
+                {trackSearch && (
+                  <button onClick={() => setTrackSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white" title="Сбросить">
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              {q && <span className="text-xs text-gray-500">найдено: {filteredTracks.length}</span>}
             </div>
           </div>
           <div className="flex gap-4">
@@ -154,10 +179,15 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
         <div className="flex-1 overflow-y-auto pr-2 pb-10 custom-scrollbar">
           {currentPlaylist.tracks.length === 0 ? (
             <div className="text-center py-20 text-gray-500 bg-gray-900/50 rounded-2xl border border-dashed border-gray-800 flex flex-col items-center"><Music size={48} className="mb-4 opacity-50" /><p className="text-lg">Пусто. Загрузите свои MP3 или найдите треки в интернете.</p></div>
+          ) : filteredTracks.length === 0 ? (
+            <div className="text-center py-12 text-gray-500 bg-gray-900/50 rounded-2xl border border-dashed border-gray-800">
+              <p className="text-base">Ничего не нашли по запросу «{trackSearch}».</p>
+              <button onClick={() => setTrackSearch('')} className="mt-3 text-purple-400 hover:text-purple-300 text-sm font-medium">Сбросить поиск</button>
+            </div>
           ) : (
             <div className="flex flex-col gap-2">
               <div className="text-sm text-gray-500 mb-2 font-medium bg-gray-900 p-3 rounded-lg border border-gray-800"><Timer size={16} className="inline mr-2 -mt-1" /> Подсказка: алгоритм берёт случайные 24 трека из всего плейлиста. Загрузите 60–80 треков для разнообразия.</div>
-              {currentPlaylist.tracks.map((track, index) => {
+              {filteredTracks.map((track, index) => {
                 const isPlaying = playingTrackId === track.id && !isPaused;
                 return (
                   <div key={track.id} className={`flex items-center gap-4 p-3 rounded-xl border transition group ${isPlaying ? 'bg-gray-800 border-purple-500' : 'bg-gray-900 border-gray-800 hover:bg-gray-800'}`}>
