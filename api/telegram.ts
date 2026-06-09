@@ -215,10 +215,20 @@ export default async function handler(req: any, res: any) {
 
   const msg = update?.message ?? update?.edited_message;
   const chatId = String(msg?.chat?.id || '');
-  const text: string = typeof msg?.text === 'string' ? msg.text : '';
+  let text: string = typeof msg?.text === 'string' ? msg.text.trim() : '';
 
-  // На всё кроме команд владельца — молча 200 (Telegram не должен ретраить)
-  if (!chatId || chatId !== ownerChatId || !text.startsWith('/')) {
+  // Чужие чаты игнорируем молча
+  if (!chatId || chatId !== ownerChatId) {
+    res.status(200).json({ ok: true });
+    return;
+  }
+
+  // Чиним типичную опечатку "./command" → "/command"
+  if (text.startsWith('./')) text = text.slice(1);
+
+  // Владельцу всегда отвечаем — если это не команда, даём подсказку, а не тишину
+  if (!text.startsWith('/')) {
+    await send(token, chatId, 'Не понял. Напиши /help, чтобы увидеть команды.');
     res.status(200).json({ ok: true });
     return;
   }
