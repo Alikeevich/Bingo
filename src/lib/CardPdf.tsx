@@ -6,6 +6,14 @@ function pickSource(track: Track, source: CellTextSource): string {
   return source === 'artist' ? (track.artist ?? '') : (track.title ?? '');
 }
 
+// Защита от бага @react-pdf, который в некоторых шаблонах «съедает» ПЕРВЫЙ глиф
+// текстового рана (заметно на ведущей H: «HI-FI» → «I-FI»). Невидимый word-joiner
+// (U+2060, нулевой ширины, не даёт переноса) становится «первым» глифом — съедается он,
+// а реальная буква остаётся. На корректных шаблонах это no-op.
+function guard(s: string): string {
+  return s ? '⁠' + s : s;
+}
+
 // ────────────────────────────────────────────────────────────────────────
 // РЕГИСТРАЦИЯ ШРИФТОВ (один раз, при импорте модуля)
 // TTF лежат в public/fonts → доступны по абсолютному пути от origin.
@@ -137,11 +145,11 @@ function GridSlotView({ grid, cells, template }: {
                   ) : (
                     <>
                       <Text style={cellTitleStyle}>
-                        {clamp(pickSource(cell as Track, trackTitle.source), trackTitle.lineClamp)}
+                        {guard(clamp(pickSource(cell as Track, trackTitle.source), trackTitle.lineClamp))}
                       </Text>
                       {trackArtist.enabled && (
                         <Text style={[cellArtistStyle, { marginTop: mm(0.4) }]}>
-                          {clamp(pickSource(cell as Track, trackArtist.source), trackArtist.lineClamp)}
+                          {guard(clamp(pickSource(cell as Track, trackArtist.source), trackArtist.lineClamp))}
                         </Text>
                       )}
                     </>
