@@ -12,3 +12,36 @@ export const getProxiedUrl = (url: string): string => {
   if (!url) return url;
   return url.replace('http://', 'https://');
 };
+
+// Разбивает строку артиста на отдельных исполнителей, чтобы фиты не обходили
+// правило уникальности. "Justin Bieber, Daniel Caesar & Giveon (feat. X)" →
+// ["justin bieber", "daniel caesar", "giveon", "x"].
+export const splitArtists = (artist: string): string[] => {
+  if (!artist) return [];
+  return artist
+    .toLowerCase()
+    // убираем скобки вокруг feat-блоков, но оставляем их содержимое
+    .replace(/[()[\]]/g, ' ')
+    // слова-разделители соавторов → запятая
+    .replace(/\b(feat|ft|featuring|with|vs|versus)\b\.?/gi, ',')
+    // коллаб-«x» и «/» только в окружении пробелов (чтобы не ломать "Charli XCX", "AC/DC")
+    .replace(/\s+x\s+/gi, ',')
+    .replace(/\s+\/\s+/g, ',')
+    .replace(/\s+и\s+/gi, ',')
+    // однозначные символы-разделители
+    .replace(/[&×;]/g, ',')
+    .split(',')
+    .map((a) => a.trim())
+    .filter(Boolean);
+};
+
+// Множество всех артистов плейлиста (с учётом фитов) — для проверки пересечений.
+export const playlistArtistSet = (tracks: { artist: string }[]): Set<string> => {
+  const set = new Set<string>();
+  for (const t of tracks) for (const a of splitArtists(t.artist)) set.add(a);
+  return set;
+};
+
+// Есть ли у трека артист (или фит-артист), уже присутствующий в плейлисте.
+export const sharesArtist = (artist: string, present: Set<string>): boolean =>
+  splitArtists(artist).some((a) => present.has(a));

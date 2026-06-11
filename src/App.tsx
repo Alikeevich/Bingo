@@ -6,6 +6,7 @@ import Logo from './components/Logo';
 import { ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, Loader2, X, Scissors, LogOut } from 'lucide-react';
 import { Track, Playlist, Game, Round, Template, BingoCard, Tag } from './types';
 import { migrateTemplate } from './lib/migrateTemplate';
+import { playlistArtistSet, sharesArtist, splitArtists } from './utils';
 import AudioTrimmer from './components/AudioTrimmer';
 
 // Вкладки
@@ -412,10 +413,23 @@ export default function App() {
     // Берём треки в том порядке, который задан в плейлисте — пользователь может
     // отдельно «перемешать» в Плейлистах, если хочет. Авто-шафл на старте убрали
     // чтобы случайные комбинации не давали бинго на рандомных карточках.
-    // Уникализируем по id — повтор одного трека в очереди звучал бы дважды за тур.
-    const uniqueQueue = Array.from(
-      new Map(playlist.tracks.map(t => [String(t.id), t])).values()
-    );
+    // Уникализируем дважды: по id И по «название + главный артист» — чтобы одна
+    // и та же песня, попавшая в плейлист под разными id (разные релизы / фит-дубли),
+    // не звучала в туре дважды.
+    const norm = (s: string) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const seenIds = new Set<string>();
+    const seenSongs = new Set<string>();
+    const uniqueQueue: Track[] = [];
+    for (const t of playlist.tracks) {
+      const id = String(t.id);
+      if (seenIds.has(id)) continue;
+      const primary = splitArtists(t.artist)[0] || norm(t.artist);
+      const songKey = norm(t.title) + '|' + primary;
+      if (seenSongs.has(songKey)) continue;
+      seenIds.add(id);
+      seenSongs.add(songKey);
+      uniqueQueue.push(t);
+    }
     setShuffledTracks(uniqueQueue);
     setPlayedTrackIds(new Set());
     setCurrentHostTrackIndex(0);
@@ -952,8 +966,13 @@ export default function App() {
             {playlists.length === 0 ? (
                <div className="text-center py-6 text-gray-500">Нет плейлистов. Создайте их во вкладке "Плейлисты".</div>
             ) : (
-              <div className="max-h-60 overflow-y-auto pr-2 flex flex-col gap-2 custom-scrollbar">{playlists.map(p => { 
-                const isAdded = p.tracks.some(t => t.id === trackToAdd.id || t.artist.toLowerCase() === trackToAdd.artist.toLowerCase()); 
+              <div className="max-h-60 overflow-y-auto pr-2 flex flex-col gap-2 custom-scrollbar">{playlists.map(p => {
+                // Уникальность исполнителя считаем по ОТДЕЛЬНЫМ артистам (фиты тоже учитываются),
+                // иначе "Justin Bieber" и "Justin Bieber, Giveon" считались бы разными.
+                const present = playlistArtistSet(p.tracks);
+                const alreadyById = p.tracks.some(t => String(t.id) === String(trackToAdd.id));
+                const artistClash = sharesArtist(trackToAdd.artist, present);
+                const isAdded = alreadyById || artistClash;
                 return (
                   <button key={p.id} onClick={async () => {
                     if (isAdded) return;
@@ -965,10 +984,10 @@ export default function App() {
                   }} disabled={isAdded} className={`flex justify-between p-4 rounded-xl border text-left ${isAdded ? 'bg-gray-800/50 border-gray-800 opacity-50' : 'bg-gray-800 border-gray-700 hover:border-purple-500'}`}>
                     <span className="font-bold truncate pr-4">{p.name}</span>
                     <span className="text-xs text-gray-400 whitespace-nowrap">
-                      {p.tracks.some(t => t.id === trackToAdd.id) ? 'Уже добавлен' : p.tracks.some(t => t.artist.toLowerCase() === trackToAdd.artist.toLowerCase()) ? `Исполнитель есть` : `${p.tracks.length} треков`}
+                      {alreadyById ? 'Уже добавлен' : artistClash ? `Исполнитель есть` : `${p.tracks.length} треков`}
                     </span>
                   </button>
-                ); 
+                );
               })}</div>
             )}
           </div>
