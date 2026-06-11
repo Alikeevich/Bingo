@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { supabase } from '../../supabase';
 import { Playlist, Track } from '../../types';
-import { ChevronLeft, CheckCircle2, UploadCloud, HardDriveDownload, Loader2, Music, Timer, PauseCircle, PlayCircle, Trash2, FolderPlus, Shuffle, Search, X } from 'lucide-react';
-import { getProxiedUrl } from '../../utils';
+import { ChevronLeft, CheckCircle2, UploadCloud, HardDriveDownload, Loader2, Music, Timer, PauseCircle, PlayCircle, Trash2, FolderPlus, Shuffle, Search, X, SearchCheck } from 'lucide-react';
+import { getProxiedUrl, splitArtists } from '../../utils';
 
 interface PlaylistsTabProps {
   playlists: Playlist[];
@@ -20,6 +20,7 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
   const [isUploadingMp3, setIsUploadingMp3] = useState(false);
   const [offlineProgress, setOfflineProgress] = useState<{ current: number; total: number } | null>(null);
   const [trackSearch, setTrackSearch] = useState('');
+  const [dupesOnly, setDupesOnly] = useState(false);
 
   const createPlaylist = async () => {
     if (!newPlaylistName.trim()) return;
@@ -120,16 +121,31 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
     const currentPlaylist = playlists.find(p => p.id === viewingPlaylist.id) || viewingPlaylist;
     const isReadyForGame = currentPlaylist.tracks.length >= 24;
     const q = trackSearch.trim().toLowerCase();
-    const filteredTracks = q
-      ? currentPlaylist.tracks.filter(t =>
-          t.title.toLowerCase().includes(q) ||
-          t.artist.toLowerCase().includes(q) ||
-          (t.tags || []).some(tag => tag.toLowerCase().includes(q))
-        )
-      : currentPlaylist.tracks;
+
+    // Детектор дублей: считаем каждого отдельного артиста (с учётом фитов); если он
+    // встречается в 2+ треках — все эти треки помечаем как дубль-артистов.
+    const artistCount = new Map<string, number>();
+    for (const t of currentPlaylist.tracks)
+      for (const a of new Set(splitArtists(t.artist))) artistCount.set(a, (artistCount.get(a) || 0) + 1);
+    const dupArtists = new Set([...artistCount.entries()].filter(([, c]) => c > 1).map(([a]) => a));
+    const isDupTrack = (t: Track) => splitArtists(t.artist).some(a => dupArtists.has(a));
+    const dupCount = currentPlaylist.tracks.filter(isDupTrack).length;
+
+    let list = currentPlaylist.tracks;
+    if (q)
+      list = list.filter(t =>
+        t.title.toLowerCase().includes(q) ||
+        t.artist.toLowerCase().includes(q) ||
+        (t.tags || []).some(tag => tag.toLowerCase().includes(q))
+      );
+    if (dupesOnly) {
+      const sharedOf = (t: Track) => splitArtists(t.artist).find(a => dupArtists.has(a)) || '';
+      list = list.filter(isDupTrack).slice().sort((a, b) => sharedOf(a).localeCompare(sharedOf(b)));
+    }
+    const filteredTracks = list;
     return (
       <div className="animate-in slide-in-from-right-8 duration-300 flex flex-col h-full">
-        <button onClick={() => { setTrackSearch(''); setViewingPlaylist(null); }} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition w-fit"><ChevronLeft size={20} /> Назад к списку</button>
+        <button onClick={() => { setTrackSearch(''); setDupesOnly(false); setViewingPlaylist(null); }} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition w-fit"><ChevronLeft size={20} /> Назад к списку</button>
         <div className="flex items-end justify-between mb-8 border-b border-gray-800 pb-8">
           <div>
             <h1 className="text-4xl font-black mb-2">{currentPlaylist.name}</h1>
@@ -151,7 +167,16 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
                   </button>
                 )}
               </div>
+              <button
+                onClick={() => setDupesOnly(v => !v)}
+                disabled={dupCount === 0}
+                title="Показать треки, у которых исполнитель (или фит) повторяется в плейлисте"
+                className={`px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5 transition disabled:opacity-40 ${dupesOnly ? 'bg-yellow-500 text-gray-900' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
+              >
+                <SearchCheck size={14} /> {dupesOnly ? 'Показать все' : `Найти дубли${dupCount ? ` (${dupCount})` : ''}`}
+              </button>
               {q && <span className="text-xs text-gray-500">найдено: {filteredTracks.length}</span>}
+              {dupesOnly && <span className="text-xs text-yellow-500/80">дублей-артистов: {dupCount} — удали лишние</span>}
             </div>
           </div>
           <div className="flex gap-4">
@@ -181,12 +206,21 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
             <div className="text-center py-20 text-gray-500 bg-gray-900/50 rounded-2xl border border-dashed border-gray-800 flex flex-col items-center"><Music size={48} className="mb-4 opacity-50" /><p className="text-lg">Пусто. Загрузите свои MP3 или найдите треки в интернете.</p></div>
           ) : filteredTracks.length === 0 ? (
             <div className="text-center py-12 text-gray-500 bg-gray-900/50 rounded-2xl border border-dashed border-gray-800">
-              <p className="text-base">Ничего не нашли по запросу «{trackSearch}».</p>
-              <button onClick={() => setTrackSearch('')} className="mt-3 text-purple-400 hover:text-purple-300 text-sm font-medium">Сбросить поиск</button>
+              {dupesOnly ? (
+                <>
+                  <p className="text-base">Дублей-артистов не найдено — плейлист чистый.</p>
+                  <button onClick={() => setDupesOnly(false)} className="mt-3 text-purple-400 hover:text-purple-300 text-sm font-medium">Показать все</button>
+                </>
+              ) : (
+                <>
+                  <p className="text-base">Ничего не нашли по запросу «{trackSearch}».</p>
+                  <button onClick={() => setTrackSearch('')} className="mt-3 text-purple-400 hover:text-purple-300 text-sm font-medium">Сбросить поиск</button>
+                </>
+              )}
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              <div className="text-sm text-gray-500 mb-2 font-medium bg-gray-900 p-3 rounded-lg border border-gray-800"><Timer size={16} className="inline mr-2 -mt-1" /> Подсказка: алгоритм берёт случайные 24 трека из всего плейлиста. Загрузите 60–80 треков для разнообразия.</div>
+              <div className="text-sm text-gray-500 mb-2 font-medium bg-gray-900 p-3 rounded-lg border border-gray-800"><Timer size={16} className="inline mr-2 -mt-1" /> {dupesOnly ? 'Это треки, у которых исполнитель (или фит) повторяется. Удали лишние, чтобы не было повторов в игре.' : 'Подсказка: алгоритм берёт случайные 24 трека из всего плейлиста. Загрузите 60–80 треков для разнообразия.'}</div>
               {filteredTracks.map((track, index) => {
                 const isPlaying = playingTrackId === track.id && !isPaused;
                 return (
