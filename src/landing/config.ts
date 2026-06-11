@@ -55,4 +55,14 @@ export const PARTNERS: Partner[] = [
     handle: 'victoria__psy',
     description: 'Психолог-сексолог. Онлайн-сессии о близости, честности и внутреннем комфорте.',
   },
+  {
+    name: 'Photo Art',
+    handle: 'photoartstudio.kz',
+    description: 'Фотостудия в Астане: два зала, 3D-циклорама с тёплым полом и зал автопортрета.',
+  },
+  {
+    name: 'Sky Cinema',
+    handle: 'skycinema.astana',
+    description: 'Купольный кинотеатр в Астане — LED-экран на 180° и полное погружение. ТРЦ «Сарыарка».',
+  },
 ];
