@@ -6,7 +6,7 @@ import Logo from './components/Logo';
 import { ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, Loader2, X, Scissors, LogOut } from 'lucide-react';
 import { Track, Playlist, Game, Round, Template, BingoCard, Tag } from './types';
 import { migrateTemplate } from './lib/migrateTemplate';
-import { playlistArtistSet, sharesArtist, splitArtists } from './utils';
+import { playlistArtistSet, sharesArtist, songKey } from './utils';
 import AudioTrimmer from './components/AudioTrimmer';
 
 // Вкладки
@@ -50,6 +50,9 @@ export default function App() {
   const currentSegmentRef = useRef<{ start?: number; end?: number; finished?: boolean }>({});
   // Интервал плавного изменения громкости (fade-in / fade-out)
   const fadeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Защита от двойного авто-перехода: onTimeUpdate (preview_end) и onEnded могут
+  // оба вызвать handleTrackFinished для одного трека → трек проскакивал/перезапускался.
+  const finishingRef = useRef(false);
   // Флаг что fade-out уже запущен для текущего трека (чтобы не запускать повторно каждый onTimeUpdate)
   const fadeOutStartedRef = useRef(false);
   const [playingTrackId, setPlayingTrackId] = useState<string | number | null>(null);
@@ -329,6 +332,7 @@ export default function App() {
     // Сбрасываем активный fade и флаги
     if (fadeIntervalRef.current) { clearInterval(fadeIntervalRef.current); fadeIntervalRef.current = null; }
     fadeOutStartedRef.current = false;
+    finishingRef.current = false; // новый трек — снова разрешаем авто-переход
     audioEl.pause();
     setPlayingTrackId(track.id);
     setIsPaused(false);
@@ -372,6 +376,9 @@ export default function App() {
 
   // Что делать когда трек дошёл до конца (или до preview_end)
   const handleTrackFinished = () => {
+    // Не даём отработать дважды для одного и того же трека (onTimeUpdate + onEnded)
+    if (finishingRef.current) return;
+    finishingRef.current = true;
     setPlayingTrackId(null);
     setIsPaused(false);
     if (isAutoPlay && hostSession && currentHostTrackIndex < shuffledTracks.length - 1) {
@@ -413,21 +420,20 @@ export default function App() {
     // Берём треки в том порядке, который задан в плейлисте — пользователь может
     // отдельно «перемешать» в Плейлистах, если хочет. Авто-шафл на старте убрали
     // чтобы случайные комбинации не давали бинго на рандомных карточках.
-    // Уникализируем дважды: по id И по «название + главный артист» — чтобы одна
-    // и та же песня, попавшая в плейлист под разными id (разные релизы / фит-дубли),
+    // Уникализируем дважды: по id И по «ключу песни» (название без скобок/feat-хвостов +
+    // главный артист) — чтобы одна и та же песня, попавшая в плейлист под разными id или
+    // с разными хвостами в названии (Peaches / Peaches (feat. …) / … - Radio Edit),
     // не звучала в туре дважды.
-    const norm = (s: string) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
     const seenIds = new Set<string>();
     const seenSongs = new Set<string>();
     const uniqueQueue: Track[] = [];
     for (const t of playlist.tracks) {
       const id = String(t.id);
       if (seenIds.has(id)) continue;
-      const primary = splitArtists(t.artist)[0] || norm(t.artist);
-      const songKey = norm(t.title) + '|' + primary;
-      if (seenSongs.has(songKey)) continue;
+      const key = songKey(t.title, t.artist);
+      if (seenSongs.has(key)) continue;
       seenIds.add(id);
-      seenSongs.add(songKey);
+      seenSongs.add(key);
       uniqueQueue.push(t);
     }
     setShuffledTracks(uniqueQueue);

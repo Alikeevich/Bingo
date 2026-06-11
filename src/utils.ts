@@ -45,3 +45,22 @@ export const playlistArtistSet = (tracks: { artist: string }[]): Set<string> => 
 // Есть ли у трека артист (или фит-артист), уже присутствующий в плейлисте.
 export const sharesArtist = (artist: string, present: Set<string>): boolean =>
   splitArtists(artist).some((a) => present.has(a));
+
+// Ключ «песни» для дедупа очереди воспроизведения. Deezer часто отдаёт одну и ту же
+// песню с разными хвостами в названии — «Peaches», «Peaches (feat. …)», «… (Remastered)»,
+// «… - Radio Edit». Срезаем скобки и хвосты после « - », берём главного артиста.
+export const songKey = (title: string, artist: string): string => {
+  const full = (title || '').toLowerCase().replace(/[^a-zа-яё0-9]+/gi, ' ').trim().replace(/\s+/g, ' ');
+  const stripped = (title || '')
+    .toLowerCase()
+    .replace(/[([{].*$/, '')   // всё от первой открывающей скобки
+    .replace(/\s-\s.*$/, '')   // хвост после " - " (Remastered, Radio Edit и т.п.)
+    .replace(/\b(feat|ft|featuring|with)\b.*$/i, '') // на всякий случай — feat без скобок
+    .replace(/[^a-zа-яё0-9]+/gi, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+  // Если после срезки ничего не осталось (название целиком в скобках) — берём полное.
+  const baseTitle = stripped || full;
+  const primary = splitArtists(artist)[0] || (artist || '').trim().toLowerCase();
+  return baseTitle + '|' + primary;
+};
