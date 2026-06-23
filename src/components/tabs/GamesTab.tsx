@@ -22,8 +22,10 @@ function winIndexForCard(
   );
   // Линия «закрывается» на максимальном play-индексе среди её 5 клеток
   const lineDoneAt = WIN_LINES.map(line => Math.max(...line.map(i => cellPlay[i])));
-  if (condition === '1_line') return Math.min(...lineDoneAt);
-  if (condition === '2_lines') return [...lineDoneAt].sort((a, b) => a - b)[1];
+  const sorted = [...lineDoneAt].sort((a, b) => a - b);
+  if (condition === '1_line') return sorted[0];        // первая закрытая линия
+  if (condition === '2_lines') return sorted[1];       // вторая
+  if (condition === '3_lines') return sorted[2];       // третья
   // full — все 24 клетки отмечены = максимальный play-индекс
   return Math.max(...cellPlay);
 }
@@ -136,7 +138,9 @@ export default function GamesTab({ games, setGames, playlists, templates, showTo
     const usedWinIndices = new Set<number>();
     (round.cards || []).forEach(c => usedWinIndices.add(winIndexForCard(c.cells, playIndexOf, round.winCondition)));
 
-    const MAX_TRIES = 40;
+    // Больше попыток = плотнее заполняем доступные «моменты победы» (это просто
+    // перетасовки массива, быстро даже на сотне карточек).
+    const MAX_TRIES = 300;
     let collisions = 0;
     for (let i = 0; i < cardsCount; i++) {
       let cells = buildCells();
@@ -153,7 +157,12 @@ export default function GamesTab({ games, setGames, playlists, templates, showTo
       newCards.push({ id: String(startId + i), cells });
     }
     if (collisions > 0) {
-      showToast(`Сгенерировано. ${collisions} карточек могут выстрелить одновременно (мало треков в плейлисте для полного разнесения)`);
+      const lineHint = round.winCondition === '1_line'
+        ? ' Совет: 1 линия закрывается рано и кучно — выбери 2–3 линии и/или добавь треков в плейлист.'
+        : ` Совет: добавь больше треков в плейлист (сейчас ${uniqueTracks.length}) — тогда «моментов победы» хватит на все карточки.`;
+      showToast(`Готово. ${collisions} из ${cardsCount} карточек могут выстрелить одновременно (мало уникальных «моментов победы»).${lineHint}`);
+    } else {
+      showToast(`Готово. Все ${cardsCount} карточек выстрелят в разные моменты — толпы не будет.`);
     }
     
     const updatedRounds = game.rounds.map(r => r.id === round.id ? { ...r, cards:[...(r.cards || []), ...newCards] } : r);
@@ -189,7 +198,7 @@ export default function GamesTab({ games, setGames, playlists, templates, showTo
               {currentGame.rounds.map((round, index) => {
                 const playlist = playlists.find(p => p.id === round.playlistId);
                 const cardsCountLabel = round.cards?.length ? `${round.cards.length} карточек` : 'Нет карточек';
-                const conditionText = round.winCondition === 'full' ? 'Бинго' : round.winCondition === '2_lines' ? '2 Линии' : '1 Линия';
+                const conditionText = round.winCondition === 'full' ? 'Вся карточка' : round.winCondition === '3_lines' ? '3 Линии' : round.winCondition === '2_lines' ? '2 Линии' : '1 Линия';
                 return (
                   <div key={round.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-6 flex flex-col group relative shadow-lg">
                     <div className="flex justify-between items-start mb-4">
@@ -223,6 +232,7 @@ export default function GamesTab({ games, setGames, playlists, templates, showTo
                 <select value={newRound.winCondition || '1_line'} onChange={e => setNewRound({ ...newRound, winCondition: e.target.value as any })} className="w-full bg-gray-950 border border-gray-800 rounded-xl py-3 px-4 text-white focus:border-purple-500 mb-4">
                   <option value="1_line">1 Линия</option>
                   <option value="2_lines">2 Линии</option>
+                  <option value="3_lines">3 Линии</option>
                   <option value="full">Вся карточка</option>
                 </select>
                 <div className="flex gap-4">

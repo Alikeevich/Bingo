@@ -35,7 +35,7 @@ export interface Round {
   id: string;
   name: string;
   playlistId: string;
-  winCondition: '1_line' | '2_lines' | 'full';
+  winCondition: '1_line' | '2_lines' | '3_lines' | 'full';
   cards?: BingoCard[];
 }
 

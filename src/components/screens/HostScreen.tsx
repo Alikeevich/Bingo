@@ -54,7 +54,7 @@ export default function HostScreen(props: HostScreenProps) {
     linesIndices.forEach(line => { if (line.every(idx => matches[idx])) linesCount++; });
     
     const cond = props.hostSession.round.winCondition;
-    const isWinner = (cond === '1_line' && linesCount >= 1) || (cond === '2_lines' && linesCount >= 2) || (cond === 'full' && matches.every(m => m));
+    const isWinner = (cond === '1_line' && linesCount >= 1) || (cond === '2_lines' && linesCount >= 2) || (cond === '3_lines' && linesCount >= 3) || (cond === 'full' && matches.every(m => m));
     setVerifyResult({ card, matches, linesCount, isWinner });
   };
 
@@ -65,7 +65,7 @@ export default function HostScreen(props: HostScreenProps) {
           <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg"><PartyPopper size={28} className="text-white" /></div>
           <div>
             <h2 className="text-xl font-black uppercase tracking-wider">{props.hostSession.game.name}</h2>
-            <p className="text-gray-400 text-sm font-medium">{props.hostSession.round.name} • {props.hostSession.round.winCondition === 'full' ? 'Бинго' : props.hostSession.round.winCondition === '2_lines' ? '2 Линии' : '1 Линия'}</p>
+            <p className="text-gray-400 text-sm font-medium">{props.hostSession.round.name} • {props.hostSession.round.winCondition === 'full' ? 'Вся карточка' : props.hostSession.round.winCondition === '3_lines' ? '3 Линии' : props.hostSession.round.winCondition === '2_lines' ? '2 Линии' : '1 Линия'}</p>
           </div>
         </div>
         <div className="flex items-center gap-4">

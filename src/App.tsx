@@ -189,6 +189,7 @@ export default function App() {
       linesIndices.forEach(line => { if (line.every(idx => matches[idx])) linesCount++; });
       if (condition === '1_line' && linesCount >= 1) return true;
       if (condition === '2_lines' && linesCount >= 2) return true;
+      if (condition === '3_lines' && linesCount >= 3) return true;
       if (condition === 'full' && matches.every(m => m)) return true;
       return false;
     });
