@@ -5,6 +5,10 @@
       "destination": "https://api.deezer.com/:path*"
     },
     {
+      "source": "/api/itunes/:path*",
+      "destination": "https://itunes.apple.com/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

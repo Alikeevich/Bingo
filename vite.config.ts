@@ -190,6 +190,12 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api\/deezer/, ''),
         },
+        // iTunes Search API (поиск/lookup/rss-чарты) — обход CORS через прокси
+        '/api/itunes': {
+          target: 'https://itunes.apple.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/itunes/, ''),
+        },
       },
     },
   }

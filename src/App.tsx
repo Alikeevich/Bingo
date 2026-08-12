@@ -124,28 +124,8 @@ export default function App() {
       // глушим глобальный плеер чтобы не пересекался со встроенным в триммер
       audioRef.current?.pause();
       setPlayingTrackId(null);
-
-      // Поиск/чарт Deezer часто отдаёт только главного артиста. При добавлении НОВОГО
-      // Deezer-трека добираем полный список соавторов (contributors[]) из /track/{id}
-      // и подставляем в поле — feat-артисты больше не теряются. Правку существующих
-      // записей не трогаем (там артист уже мог быть исправлен вручную).
-      const enrichId = trackToAddToDb.id;
-      if (!isEditingTrack && !trackToAddToDb.isCustom && /^\d+$/.test(String(enrichId))) {
-        const original = trackToAddToDb.artist;
-        (async () => {
-          try {
-            const res = await fetch(`/api/deezer/track/${enrichId}`);
-            const data = await res.json();
-            const all = Array.isArray(data?.contributors)
-              ? data.contributors.map((c: any) => c?.name).filter(Boolean).join(', ')
-              : '';
-            // Обновляем только если так и не редактировали поле вручную и список реально полнее.
-            if (all && all !== original) {
-              setEditedArtist(prev => (prev === original ? all : prev));
-            }
-          } catch { /* офлайн / нет соавторов — оставляем как есть */ }
-        })();
-      }
+      // iTunes Search уже отдаёт полное имя артиста (с фитами) в artistName —
+      // отдельное «обогащение» соавторов больше не нужно (было для Deezer).
     } else {
       setEditedTitle('');
       setEditedArtist('');
