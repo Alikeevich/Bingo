@@ -15,7 +15,10 @@ const FILTERS: { name: string; kind: 'chart' | 'search'; query?: string; genre?:
 ];
 
 const PAGE = 50;
-const COUNTRY = 'kz'; // магазин Казахстана — есть и рус/каз артисты
+// Поиск — по стору US: там полный западный каталог И рус/каз артисты (в kz-сторе
+// западное урезано лицензиями). Чарт — по kz (локальный топ). lookup по id — глобально.
+const COUNTRY_SEARCH = 'us';
+const COUNTRY_CHART = 'kz';
 
 interface GlobalSearchTabProps {
   playingTrackId: string | number | null;
@@ -59,13 +62,13 @@ export default function GlobalSearchTab({ playingTrackId, isPaused, togglePlay, 
     const rid = ++reqIdRef.current;
     setIsSearching(true); setActiveFilter(filterName); setSearchQuery(''); setPage(0);
     try {
-      const rssRes = await fetch(`/api/itunes/${COUNTRY}/rss/topsongs/limit=100/json`);
+      const rssRes = await fetch(`/api/itunes/${COUNTRY_CHART}/rss/topsongs/limit=100/json`);
       const rss = await rssRes.json();
       const entriesRaw = rss?.feed?.entry;
       const entries = Array.isArray(entriesRaw) ? entriesRaw : entriesRaw ? [entriesRaw] : [];
       const ids = entries.map((e: any) => e?.id?.attributes?.['im:id']).filter(Boolean);
       if (ids.length === 0) { if (rid === reqIdRef.current) setAllResults([]); return; }
-      const lookupRes = await fetch(`/api/itunes/lookup?id=${ids.join(',')}&country=${COUNTRY}&entity=song`);
+      const lookupRes = await fetch(`/api/itunes/lookup?id=${ids.join(',')}&country=${COUNTRY_CHART}&entity=song`);
       const lookup = await lookupRes.json();
       const tracks = parseITunes((lookup.results || []).filter((r: any) => r.wrapperType === 'track'));
       if (rid === reqIdRef.current) setAllResults(tracks);
@@ -78,7 +81,7 @@ export default function GlobalSearchTab({ playingTrackId, isPaused, togglePlay, 
     const rid = ++reqIdRef.current;
     setIsSearching(true); setActiveFilter(filterName); setPage(0);
     try {
-      const res = await fetch(`/api/itunes/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=200&country=${COUNTRY}`);
+      const res = await fetch(`/api/itunes/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=200&country=${COUNTRY_SEARCH}`);
       const data = await res.json();
       if (rid === reqIdRef.current) setAllResults(parseITunes(data.results || []));
     } catch (e) { console.error(e); if (rid === reqIdRef.current) setAllResults([]); }
