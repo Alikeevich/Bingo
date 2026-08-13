@@ -39,7 +39,9 @@ export default function HostScreen(props: HostScreenProps) {
   const isTrackLoaded = props.playingTrackId === currentTrack?.id;  // трек загружен (играет ИЛИ на паузе)
   const isPlaying = isTrackLoaded && !props.isPaused;               // реально играет прямо сейчас
   // Полная версия доступна если это свой MP3 (офлайн) или есть ссылка на YouTube
-  const hasFullVersion = !!(currentTrack?.isCustom || currentTrack?.youtubeId);
+  const hasFullVersion = !!(currentTrack?.mp3Path || currentTrack?.isCustom || currentTrack?.youtubeId);
+  // Своя полная версия = точная позиция и офлайн; YouTube = запасной вариант онлайн
+  const fullIsLocal = !!(currentTrack?.mp3Path || currentTrack?.isCustom);
 
   const handleVerifyCard = () => {
     if (!verifyCardId.trim()) return;
@@ -167,18 +169,18 @@ export default function HostScreen(props: HostScreenProps) {
                     disabled={!isTrackLoaded || !hasFullVersion}
                     title={
                       !hasFullVersion
-                        ? 'У этого трека нет полной версии (нужен свой MP3 или ссылка YouTube)'
-                        : currentTrack?.isCustom
-                          ? 'Доиграть свой MP3 целиком (работает офлайн)'
-                          : 'Продолжить полную версию с YouTube (нужен интернет)'
+                        ? 'У этого трека нет полной версии — загрузи MP3 во вкладке «Миграция»'
+                        : fullIsLocal
+                          ? 'Доиграть свой MP3 целиком, точно с этого места (работает офлайн)'
+                          : 'Открыть песню на YouTube. Внимание: начнётся с начала — превью это отрывок из середины'
                     }
                     className={`h-14 px-5 rounded-full flex items-center gap-2 font-bold transition disabled:opacity-30 ${
-                      currentTrack?.isCustom
+                      fullIsLocal
                         ? 'bg-green-600 hover:bg-green-500 text-white'
                         : 'bg-red-600 hover:bg-red-500 text-white'
                     }`}
                   >
-                    {currentTrack?.isCustom ? <Music size={20} /> : <Youtube size={20} />}
+                    {fullIsLocal ? <Music size={20} /> : <Youtube size={20} />}
                     <span className="text-sm whitespace-nowrap">Полная</span>
                   </button>
                 </div>

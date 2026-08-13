@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from './supabase';
 import { useAuth } from './auth/AuthContext';
 import Logo from './components/Logo';
-import { ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, Loader2, X, Scissors, LogOut, Youtube } from 'lucide-react';
+import { ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, Loader2, X, Scissors, LogOut, Youtube, HardDriveDownload } from 'lucide-react';
 import { Track, Playlist, Game, Round, Template, BingoCard, Tag } from './types';
 import { migrateTemplate } from './lib/migrateTemplate';
 import { playlistArtistSet, sharesArtist, songKey, parseYouTubeId } from './utils';
@@ -15,6 +15,7 @@ import PlaylistsTab from './components/tabs/PlaylistsTab';
 import TemplatesTab from './components/tabs/TemplatesTab';
 import GlobalSearchTab from './components/tabs/GlobalSearchTab';
 import MyDatabaseTab from './components/tabs/MyDatabaseTab';
+import MigrationTab from './components/tabs/MigrationTab';
 
 // Экраны
 import PrintView from './components/screens/PrintView';
@@ -30,7 +31,7 @@ export default function App() {
     navigate('/');
   };
 
-  const [activeTab, setActiveTab] = useState<'games' | 'playlists' | 'mydatabase' | 'global_search' | 'templates'>('games');
+  const [activeTab, setActiveTab] = useState<'games' | 'playlists' | 'mydatabase' | 'global_search' | 'templates' | 'migration'>('games');
 
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [games, setGames] = useState<Game[]>([]);
@@ -207,6 +208,7 @@ export default function App() {
         previewStart: t.preview_start != null ? Number(t.preview_start) : undefined,
         previewEnd:   t.preview_end   != null ? Number(t.preview_end)   : undefined,
         youtubeId:    t.youtube_id || undefined,
+        mp3Path:      t.mp3_path   || undefined,
       }));
       setDbTracks(mappedTracks);
     }
@@ -282,8 +284,16 @@ export default function App() {
     return promise;
   };
 
-  // Резолвит готовый-к-воспроизведению URL для трека. Для Deezer — через refresh, для кастомных — из supabase storage.
+  // Резолвит готовый-к-воспроизведению URL. Приоритет:
+  //   1) mp3Path — своя полная версия (офлайн, точная позиция для «Продолжить»)
+  //   2) isCustom — старая схема, где id трека = имя файла в Storage
+  //   3) preview — 30 сек из iTunes/Deezer (у Deezer ещё и протухает, поэтому refresh)
   const resolveTrackUrl = async (track: Track): Promise<string | null> => {
+    if (track.mp3Path) {
+      return /^https?:\/\//i.test(track.mp3Path)
+        ? track.mp3Path // внешнее хранилище (Cloudflare R2 / CDN)
+        : supabase.storage.from('audio-tracks').getPublicUrl(track.mp3Path).data.publicUrl;
+    }
     if (track.isCustom) {
       return supabase.storage.from('audio-tracks').getPublicUrl(String(track.id)).data.publicUrl;
     }
@@ -457,10 +467,10 @@ export default function App() {
     const track = shuffledTracks[currentHostTrackIndex];
     if (!track) return;
     const el = audioRef.current;
-    const at = el?.currentTime ?? 0;
 
-    // 1) Свой MP3: снимаем границу фрагмента — файл доиграет до конца, без интернета
-    if (track.isCustom) {
+    // 1) Своя полная версия (залитый MP3): снимаем границу фрагмента —
+    //    файл доиграет до конца ровно с текущей секунды, без интернета
+    if (track.mp3Path || track.isCustom) {
       const seg = currentSegmentRef.current;
       seg.end = undefined;
       seg.finished = false;
@@ -475,11 +485,16 @@ export default function App() {
       return;
     }
 
-    // 2) YouTube: глушим превью и открываем полную с той же секунды
+    // 2) YouTube: глушим превью и открываем полную версию С НАЧАЛА.
+    //    Почему не «с текущей секунды»: превью iTunes/Deezer — это отрывок,
+    //    вырезанный из СЕРЕДИНЫ песни, а его смещение относительно оригинала
+    //    ни один API не отдаёт. Продолжать «с 25-й секунды» было бы враньём —
+    //    попали бы в совсем другое место трека. Точное продолжение возможно
+    //    только на своём MP3 (ветка выше), где мы знаем позицию точно.
     if (track.youtubeId) {
       el?.pause();
       setIsPaused(true);
-      setFullPlayTrack({ track, startAt: at });
+      setFullPlayTrack({ track, startAt: 0 });
       return;
     }
 
@@ -693,6 +708,7 @@ export default function App() {
            previewStart: data[0].preview_start != null ? Number(data[0].preview_start) : undefined,
            previewEnd:   data[0].preview_end   != null ? Number(data[0].preview_end)   : undefined,
            youtubeId:    data[0].youtube_id || undefined,
+           mp3Path:      data[0].mp3_path   || undefined,
          };
          return [addedTrack, ...filtered];
        });
@@ -788,6 +804,7 @@ export default function App() {
           <div className="h-px bg-gray-800 my-2 mx-4" />
           <button onClick={() => setActiveTab('mydatabase')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === 'mydatabase' ? 'bg-purple-600 text-white font-bold' : 'text-gray-400 hover:bg-gray-800'}`}><Database size={20} /> Моя База</button>
           <button onClick={() => setActiveTab('global_search')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === 'global_search' ? 'bg-purple-600 text-white font-bold' : 'text-gray-400 hover:bg-gray-800'}`}><Globe size={20} /> Глобальный Поиск</button>
+          <button onClick={() => setActiveTab('migration')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === 'migration' ? 'bg-purple-600 text-white font-bold' : 'text-gray-400 hover:bg-gray-800'}`}><HardDriveDownload size={20} /> Миграция MP3</button>
           <div className="h-px bg-gray-800 my-2 mx-4" />
           <button onClick={() => setActiveTab('playlists')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === 'playlists' ? 'bg-purple-600 text-white font-bold' : 'text-gray-400 hover:bg-gray-800'}`}><ListMusic size={20} /> Плейлисты</button>
           <button onClick={() => setActiveTab('templates')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === 'templates' ? 'bg-purple-600 text-white font-bold' : 'text-gray-400 hover:bg-gray-800'}`}><LayoutTemplate size={20} /> Шаблоны</button>
@@ -821,6 +838,7 @@ export default function App() {
           />
         )}
         {activeTab === 'playlists' && <PlaylistsTab playlists={playlists} setPlaylists={setPlaylists} playingTrackId={playingTrackId} isPaused={isPaused} togglePlay={togglePlay} showToast={showToast} />}
+        {activeTab === 'migration' && <MigrationTab dbTracks={dbTracks} setDbTracks={setDbTracks} showToast={showToast} />}
         {activeTab === 'templates' && <TemplatesTab templates={templates} setTemplates={setTemplates} showToast={showToast} />}
       </main>
 

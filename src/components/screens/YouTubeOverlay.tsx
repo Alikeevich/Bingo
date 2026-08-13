@@ -61,7 +61,9 @@ export default function YouTubeOverlay({
       </div>
 
       <div className="pb-6 text-center text-sm text-gray-500 shrink-0">
-        Продолжили с {Math.floor(start / 60)}:{String(start % 60).padStart(2, '0')} · закрой окно, чтобы вернуться к туру
+        {start > 0
+          ? <>Продолжили с {Math.floor(start / 60)}:{String(start % 60).padStart(2, '0')} · закрой окно, чтобы вернуться к туру</>
+          : <>Играет с начала песни · закрой окно, чтобы вернуться к туру</>}
       </div>
     </div>
   );

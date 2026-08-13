@@ -20,6 +20,9 @@ export interface Track {
   // YouTube video ID (11 символов) с ПОЛНОЙ версией песни — для кнопки
   // «Продолжить (полная)» в игре, когда толпа подпевает. Требует интернет.
   youtubeId?: string;
+  // Полная версия песни своим файлом: имя в bucket audio-tracks ИЛИ полный https-URL
+  // (Cloudflare R2 / CDN). Играет офлайн и даёт точную позицию для «Продолжить».
+  mp3Path?: string;
 }
 
 export interface Playlist {
