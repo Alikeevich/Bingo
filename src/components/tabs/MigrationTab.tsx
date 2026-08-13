@@ -4,8 +4,9 @@ import { Track } from '../../types';
 import { compressAudioToMp3, fmtMB } from '../../lib/compressAudio';
 import {
   Search, X, UploadCloud, Loader2, CheckCircle2, HardDriveDownload,
-  Music, Trash2, AlertTriangle,
+  Music, Trash2, AlertTriangle, Scissors,
 } from 'lucide-react';
+import AudioTrimmer from '../AudioTrimmer';
 
 interface Props {
   dbTracks: Track[];
@@ -25,6 +26,10 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
   // id трека → прогресс (0..1) во время сжатия/загрузки
   const [busy, setBusy] = useState<Record<string, { phase: string; ratio: number }>>({});
   const inputsRef = useRef<Record<string, HTMLInputElement | null>>({});
+  // Выбранный файл, ожидающий подтверждения фрагмента (модалка с триммером)
+  const [pending, setPending] = useState<{ track: Track; file: File; url: string } | null>(null);
+  const [trimStart, setTrimStart] = useState(0);
+  const [trimEnd, setTrimEnd] = useState(0);
 
   const hasFull = (t: Track) => !!t.mp3Path || !!t.isCustom;
   const doneCount = useMemo(() => dbTracks.filter(hasFull).length, [dbTracks]);
@@ -44,7 +49,23 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
   const clearPhase = (id: string) =>
     setBusy(prev => { const n = { ...prev }; delete n[id]; return n; });
 
-  const handleFile = async (track: Track, file: File) => {
+  // Файл выбран — сначала даём послушать и выбрать фрагмент для угадайки,
+  // и только потом сжимаем и грузим (чтобы не гонять файл дважды).
+  const pickFile = (track: Track, file: File) => {
+    setTrimStart(track.previewStart ?? 0);
+    setTrimEnd(track.previewEnd ?? 0);
+    setPending({ track, file, url: URL.createObjectURL(file) });
+  };
+
+  const closePending = () => {
+    if (pending) URL.revokeObjectURL(pending.url);
+    const id = pending ? String(pending.track.id) : '';
+    setPending(null);
+    const el = inputsRef.current[id];
+    if (el) el.value = '';
+  };
+
+  const handleFile = async (track: Track, file: File, seg: { start: number; end: number }) => {
     const id = String(track.id);
     try {
       setPhase(id, 'Сжимаем', 0);
@@ -82,12 +103,20 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
         stored = safeName; // в mp3_path ляжет имя файла в Supabase Storage
       }
 
-      const { error: dbErr } = await supabase
-        .from('tracks').update({ mp3_path: stored }).eq('id', id);
+      // Вместе с файлом сохраняем выбранный фрагмент: в игре трек зазвучит
+      // именно с этого момента, а кнопка «Полная» снимет ограничение и доиграет до конца.
+      const patch = {
+        mp3_path: stored,
+        preview_start: seg.start > 0 ? seg.start : null,
+        preview_end:   seg.end   > 0 ? seg.end   : null,
+      };
+      const { error: dbErr } = await supabase.from('tracks').update(patch).eq('id', id);
       if (dbErr) throw dbErr;
 
       setDbTracks(prev => prev.map(t =>
-        String(t.id) === id ? { ...t, mp3Path: stored } : t));
+        String(t.id) === id
+          ? { ...t, mp3Path: stored, previewStart: seg.start || undefined, previewEnd: seg.end || undefined }
+          : t));
 
       const saved = res.originalBytes - res.compressedBytes;
       showToast(
@@ -240,7 +269,7 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
                         type="file"
                         accept="audio/*"
                         className="hidden"
-                        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(track, f); }}
+                        onChange={e => { const f = e.target.files?.[0]; if (f) pickFile(track, f); }}
                       />
                     </label>
                   )}
@@ -250,6 +279,57 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
           </div>
         )}
       </div>
+
+      {/* ─── МОДАЛКА: ВЫБОР ФРАГМЕНТА ПЕРЕД ЗАГРУЗКОЙ ─── */}
+      {pending && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4 animate-in fade-in">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div className="flex justify-between items-start mb-5">
+              <div className="flex items-center gap-4 overflow-hidden">
+                <img src={pending.track.cover} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                <div className="overflow-hidden">
+                  <h3 className="text-lg font-bold truncate">{pending.track.title}</h3>
+                  <p className="text-sm text-gray-400 truncate">{pending.track.artist}</p>
+                </div>
+              </div>
+              <button onClick={closePending} className="text-gray-400 hover:text-white flex-shrink-0"><X size={22} /></button>
+            </div>
+
+            <label className="text-sm font-bold text-gray-400 mb-2 flex items-center gap-2">
+              <Scissors size={14} className="text-purple-400" />
+              С какого момента играть в игре
+            </label>
+            <AudioTrimmer
+              src={pending.url}
+              start={trimStart}
+              end={trimEnd}
+              onChange={(s, e) => { setTrimStart(s); setTrimEnd(e); }}
+            />
+            <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+              Трек начнётся с зелёной метки и остановится на красной — ставь на узнаваемый
+              момент (припев). Кнопка «Полная» в игре снимет ограничение и доиграет песню
+              до конца. Не трогай — будет играть с начала.
+            </p>
+
+            <div className="flex gap-3 mt-6">
+              <button onClick={closePending} className="flex-1 py-3 bg-gray-800 rounded-xl font-bold hover:bg-gray-700 transition">
+                Отмена
+              </button>
+              <button
+                onClick={() => {
+                  const { track, file } = pending;
+                  const seg = { start: trimStart, end: trimEnd };
+                  closePending();
+                  handleFile(track, file, seg);
+                }}
+                className="flex-[2] py-3 bg-purple-600 hover:bg-purple-500 rounded-xl font-bold text-white transition flex items-center justify-center gap-2"
+              >
+                <UploadCloud size={18} /> Сжать и загрузить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
