@@ -130,7 +130,7 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
     <div className="animate-in fade-in duration-300 flex flex-col h-full">
       <h1 className="text-3xl font-bold mb-2">Миграция на свои MP3</h1>
       <p className="text-gray-400 mb-6">
-        Заливай полные версии песен — файл сжимается до {BITRATE} kbps прямо в браузере.
+        Заливай полные версии песен бірақ файл сжимается до {BITRATE} kbps прямо в браузере.
         Полная версия играет <span className="text-green-400 font-medium">офлайн</span> и
         позволяет «Продолжить» песню точно с того места, где остановились.
       </p>
@@ -154,8 +154,7 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
         </div>
         <p className="text-[11px] text-gray-500 mt-3 leading-relaxed">
           <AlertTriangle size={12} className="inline mr-1 -mt-0.5 text-yellow-500" />
-          Не обязательно заливать всё. Начни с хитов, которые зал подпевает —
-          именно им нужна полная версия.
+          Не обязательно заливать всё. Хитовый музыкадан бастай бер бауырым.
         </p>
       </div>
 
