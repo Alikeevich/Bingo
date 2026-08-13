@@ -17,6 +17,9 @@ export interface Track {
   // Применяется в основном к кастомным MP3. NULL/undefined = с начала до конца.
   previewStart?: number;
   previewEnd?: number;
+  // YouTube video ID (11 символов) с ПОЛНОЙ версией песни — для кнопки
+  // «Продолжить (полная)» в игре, когда толпа подпевает. Требует интернет.
+  youtubeId?: string;
 }
 
 export interface Playlist {

@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from './supabase';
 import { useAuth } from './auth/AuthContext';
 import Logo from './components/Logo';
-import { ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, Loader2, X, Scissors, LogOut } from 'lucide-react';
+import { ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, Loader2, X, Scissors, LogOut, Youtube } from 'lucide-react';
 import { Track, Playlist, Game, Round, Template, BingoCard, Tag } from './types';
 import { migrateTemplate } from './lib/migrateTemplate';
-import { playlistArtistSet, sharesArtist, songKey } from './utils';
+import { playlistArtistSet, sharesArtist, songKey, parseYouTubeId } from './utils';
 import AudioTrimmer from './components/AudioTrimmer';
 
 // Вкладки
@@ -20,6 +20,7 @@ import MyDatabaseTab from './components/tabs/MyDatabaseTab';
 import PrintView from './components/screens/PrintView';
 import HostScreen from './components/screens/HostScreen';
 import Projector from './components/screens/Projector';
+import YouTubeOverlay from './components/screens/YouTubeOverlay';
 
 export default function App() {
   const navigate = useNavigate();
@@ -70,6 +71,8 @@ export default function App() {
   const [hideTrackInfo, setHideTrackInfo] = useState(true);
   const [isProjectorMode, setIsProjectorMode] = useState(false);
   const [autoWinners, setAutoWinners] = useState<string[]>([]);
+  // Открытый оверлей с полной версией на YouTube (null = закрыт)
+  const [fullPlayTrack, setFullPlayTrack] = useState<{ track: Track; startAt: number } | null>(null);
 
   const [printViewCards, setPrintViewCards] = useState<{ cards: BingoCard[]; template: Template } | null>(null);
   const [trackToAdd, setTrackToAdd] = useState<Track | null>(null); 
@@ -87,6 +90,8 @@ export default function App() {
   const [dupWarning, setDupWarning] = useState<Track | null>(null);
   const [editedPreviewStart, setEditedPreviewStart] = useState(0);
   const [editedPreviewEnd,   setEditedPreviewEnd]   = useState(0);
+  // Ссылка на YouTube с полной версией песни (для кнопки «Продолжить» в игре)
+  const [editedYoutube, setEditedYoutube] = useState('');
   const [customFileUrl, setCustomFileUrl] = useState<string | null>(null);
   const [customFile, setCustomFile] = useState<File | null>(null);
   const [selectedTagsForNewTrack, setSelectedTagsForNewTrack] = useState<string[]>([]);
@@ -121,6 +126,7 @@ export default function App() {
       setEditedArtist(trackToAddToDb.artist);
       setEditedPreviewStart(trackToAddToDb.previewStart ?? 0);
       setEditedPreviewEnd(trackToAddToDb.previewEnd ?? 0);
+      setEditedYoutube(trackToAddToDb.youtubeId ?? '');
       // глушим глобальный плеер чтобы не пересекался со встроенным в триммер
       audioRef.current?.pause();
       setPlayingTrackId(null);
@@ -131,6 +137,7 @@ export default function App() {
       setEditedArtist('');
       setEditedPreviewStart(0);
       setEditedPreviewEnd(0);
+      setEditedYoutube('');
     }
   }, [trackToAddToDb]);
 
@@ -199,6 +206,7 @@ export default function App() {
         preview: t.preview, isCustom: t.is_custom, tags: t.tags,
         previewStart: t.preview_start != null ? Number(t.preview_start) : undefined,
         previewEnd:   t.preview_end   != null ? Number(t.preview_end)   : undefined,
+        youtubeId:    t.youtube_id || undefined,
       }));
       setDbTracks(mappedTracks);
     }
@@ -435,6 +443,41 @@ export default function App() {
     if (isAutoPlay) prefetchTrack(shuffledTracks[index + 1]);
   };
 
+  // «Продолжить (полная)» — когда зал подпевает и надо доиграть песню целиком.
+  // Приоритет: свой MP3 (полная версия, ОФЛАЙН) → YouTube (нужен интернет).
+  const playFullVersion = () => {
+    const track = shuffledTracks[currentHostTrackIndex];
+    if (!track) return;
+    const el = audioRef.current;
+    const at = el?.currentTime ?? 0;
+
+    // 1) Свой MP3: снимаем границу фрагмента — файл доиграет до конца, без интернета
+    if (track.isCustom) {
+      const seg = currentSegmentRef.current;
+      seg.end = undefined;
+      seg.finished = false;
+      fadeOutStartedRef.current = false;
+      finishingRef.current = false;
+      if (fadeIntervalRef.current) { clearInterval(fadeIntervalRef.current); fadeIntervalRef.current = null; }
+      if (el) {
+        el.volume = 1;
+        if (el.paused) el.play().catch(() => {});
+      }
+      showToast('Играем полную версию');
+      return;
+    }
+
+    // 2) YouTube: глушим превью и открываем полную с той же секунды
+    if (track.youtubeId) {
+      el?.pause();
+      setIsPaused(true);
+      setFullPlayTrack({ track, startAt: at });
+      return;
+    }
+
+    showToast('У этого трека нет полной версии — добавь свой MP3 или ссылку YouTube в Моей Базе');
+  };
+
   const endHostSession = () => { if (confirm('Точно завершить тур?')) setHostSession(null); };
 
   const audioHandlers = {
@@ -625,6 +668,7 @@ export default function App() {
       tags: finalTags,
       preview_start: editedPreviewStart > 0 ? editedPreviewStart : null,
       preview_end:   editedPreviewEnd   > 0 ? editedPreviewEnd   : null,
+      youtube_id:    parseYouTubeId(editedYoutube) || null,
     };
 
     const { data, error } = await supabase.from('tracks').upsert(newTrackRow).select();
@@ -640,6 +684,7 @@ export default function App() {
            cover: data[0].cover, preview: data[0].preview, isCustom: data[0].is_custom, tags: data[0].tags,
            previewStart: data[0].preview_start != null ? Number(data[0].preview_start) : undefined,
            previewEnd:   data[0].preview_end   != null ? Number(data[0].preview_end)   : undefined,
+           youtubeId:    data[0].youtube_id || undefined,
          };
          return [addedTrack, ...filtered];
        });
@@ -701,8 +746,15 @@ export default function App() {
         <audio ref={audioRef} preload="auto" crossOrigin="anonymous" {...audioHandlers} />
         <audio ref={preloadAudioRef} preload="auto" crossOrigin="anonymous" muted aria-hidden="true" style={{ display: 'none' }} />
         <HostScreen
-          hostSession={hostSession} shuffledTracks={shuffledTracks} playedTrackIds={playedTrackIds} currentHostTrackIndex={currentHostTrackIndex} hideTrackInfo={hideTrackInfo} autoWinners={autoWinners} playingTrackId={playingTrackId} isPaused={isPaused} currentTime={currentTime} duration={duration} isAutoPlay={isAutoPlay} setIsAutoPlay={setIsAutoPlay} setHideTrackInfo={setHideTrackInfo} setIsProjectorMode={setIsProjectorMode} playHostTrack={playHostTrack} endHostSession={endHostSession} setAutoWinners={setAutoWinners} togglePlay={togglePlay} audioRef={audioRef} extendCurrentTrack={extendCurrentTrack}
+          hostSession={hostSession} shuffledTracks={shuffledTracks} playedTrackIds={playedTrackIds} currentHostTrackIndex={currentHostTrackIndex} hideTrackInfo={hideTrackInfo} autoWinners={autoWinners} playingTrackId={playingTrackId} isPaused={isPaused} currentTime={currentTime} duration={duration} isAutoPlay={isAutoPlay} setIsAutoPlay={setIsAutoPlay} setHideTrackInfo={setHideTrackInfo} setIsProjectorMode={setIsProjectorMode} playHostTrack={playHostTrack} endHostSession={endHostSession} setAutoWinners={setAutoWinners} togglePlay={togglePlay} audioRef={audioRef} extendCurrentTrack={extendCurrentTrack} playFullVersion={playFullVersion}
         />
+        {fullPlayTrack && (
+          <YouTubeOverlay
+            track={fullPlayTrack.track}
+            startAt={fullPlayTrack.startAt}
+            onClose={() => setFullPlayTrack(null)}
+          />
+        )}
       </>
     );
   }
@@ -809,6 +861,28 @@ export default function App() {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* ─── YOUTUBE: ПОЛНАЯ ВЕРСИЯ ПЕСНИ ─── */}
+            <div className="mb-6">
+              <label className="text-sm font-bold text-gray-400 mb-2 flex items-center gap-2">
+                <Youtube size={14} className="text-red-500" />
+                Полная версия (YouTube)
+              </label>
+              <input
+                type="text"
+                value={editedYoutube}
+                onChange={e => setEditedYoutube(e.target.value)}
+                className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-white focus:border-purple-500 outline-none"
+                placeholder="https://youtu.be/... или ссылка с youtube.com"
+              />
+              <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+                {editedYoutube.trim()
+                  ? (parseYouTubeId(editedYoutube)
+                      ? <span className="text-green-400">Ссылка распознана — в игре будет кнопка «Продолжить (полная)».</span>
+                      : <span className="text-yellow-500">Не похоже на ссылку YouTube — проверь ещё раз.</span>)
+                  : 'Необязательно. Нужна, чтобы в игре продолжить песню целиком, когда зал подпевает. Требует интернет.'}
+              </p>
             </div>
 
             {/* ─── ТРИММЕР АУДИО (только для кастомных MP3) ─── */}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { 
   PartyPopper, MonitorPlay, CheckCircle2, Power, Music, EyeOff, Eye,
-  SkipBack, SkipForward, PauseCircle, Play, ListChecks, Loader2, Trophy, SearchCheck, Plus
+  SkipBack, SkipForward, PauseCircle, Play, ListChecks, Loader2, Trophy, SearchCheck, Plus, Youtube
 } from 'lucide-react';
 import { Track, Game, Round, Playlist, BingoCard } from '../../types';
 import { formatTime } from '../../utils';
@@ -27,6 +27,7 @@ interface HostScreenProps {
   togglePlay: (track: Track) => void;
   audioRef: React.RefObject<HTMLAudioElement>;
   extendCurrentTrack: (seconds?: number) => void;
+  playFullVersion: () => void;
 }
 
 export default function HostScreen(props: HostScreenProps) {
@@ -37,6 +38,8 @@ export default function HostScreen(props: HostScreenProps) {
   const currentTrack = props.shuffledTracks[props.currentHostTrackIndex];
   const isTrackLoaded = props.playingTrackId === currentTrack?.id;  // трек загружен (играет ИЛИ на паузе)
   const isPlaying = isTrackLoaded && !props.isPaused;               // реально играет прямо сейчас
+  // Полная версия доступна если это свой MP3 (офлайн) или есть ссылка на YouTube
+  const hasFullVersion = !!(currentTrack?.isCustom || currentTrack?.youtubeId);
 
   const handleVerifyCard = () => {
     if (!verifyCardId.trim()) return;
@@ -157,6 +160,26 @@ export default function HostScreen(props: HostScreenProps) {
                   >
                     <Plus size={18} />
                     <span className="text-[10px] font-black">10с</span>
+                  </button>
+                  {/* Полная версия — когда зал подпевает. MP3 доиграет офлайн, иначе YouTube */}
+                  <button
+                    onClick={props.playFullVersion}
+                    disabled={!isTrackLoaded || !hasFullVersion}
+                    title={
+                      !hasFullVersion
+                        ? 'У этого трека нет полной версии (нужен свой MP3 или ссылка YouTube)'
+                        : currentTrack?.isCustom
+                          ? 'Доиграть свой MP3 целиком (работает офлайн)'
+                          : 'Продолжить полную версию с YouTube (нужен интернет)'
+                    }
+                    className={`h-14 px-5 rounded-full flex items-center gap-2 font-bold transition disabled:opacity-30 ${
+                      currentTrack?.isCustom
+                        ? 'bg-green-600 hover:bg-green-500 text-white'
+                        : 'bg-red-600 hover:bg-red-500 text-white'
+                    }`}
+                  >
+                    {currentTrack?.isCustom ? <Music size={20} /> : <Youtube size={20} />}
+                    <span className="text-sm whitespace-nowrap">Полная</span>
                   </button>
                 </div>
                 <div className="w-48 text-right">
