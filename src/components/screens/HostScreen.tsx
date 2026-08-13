@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { 
   PartyPopper, MonitorPlay, CheckCircle2, Power, Music, EyeOff, Eye,
-  SkipBack, SkipForward, PauseCircle, Play, ListChecks, Loader2, Trophy, SearchCheck, Plus, Youtube
+  SkipBack, SkipForward, PauseCircle, Play, ListChecks, Loader2, Trophy, SearchCheck, Plus
 } from 'lucide-react';
 import { Track, Game, Round, Playlist, BingoCard } from '../../types';
 import { formatTime } from '../../utils';
@@ -38,10 +38,9 @@ export default function HostScreen(props: HostScreenProps) {
   const currentTrack = props.shuffledTracks[props.currentHostTrackIndex];
   const isTrackLoaded = props.playingTrackId === currentTrack?.id;  // трек загружен (играет ИЛИ на паузе)
   const isPlaying = isTrackLoaded && !props.isPaused;               // реально играет прямо сейчас
-  // Полная версия доступна если это свой MP3 (офлайн) или есть ссылка на YouTube
-  const hasFullVersion = !!(currentTrack?.mp3Path || currentTrack?.isCustom || currentTrack?.youtubeId);
-  // Своя полная версия = точная позиция и офлайн; YouTube = запасной вариант онлайн
-  const fullIsLocal = !!(currentTrack?.mp3Path || currentTrack?.isCustom);
+  // Полная версия доступна, если для трека загружен свой MP3 (играет офлайн,
+  // позиция известна точно — поэтому «Продолжить» попадает ровно в то же место)
+  const hasFullVersion = !!(currentTrack?.mp3Path || currentTrack?.isCustom);
 
   const handleVerifyCard = () => {
     if (!verifyCardId.trim()) return;
@@ -163,24 +162,18 @@ export default function HostScreen(props: HostScreenProps) {
                     <Plus size={18} />
                     <span className="text-[10px] font-black">10с</span>
                   </button>
-                  {/* Полная версия — когда зал подпевает. MP3 доиграет офлайн, иначе YouTube */}
+                  {/* Полная версия — когда зал подпевает: свой MP3 доигрывает целиком, офлайн */}
                   <button
                     onClick={props.playFullVersion}
                     disabled={!isTrackLoaded || !hasFullVersion}
                     title={
-                      !hasFullVersion
-                        ? 'У этого трека нет полной версии — загрузи MP3 во вкладке «Миграция»'
-                        : fullIsLocal
-                          ? 'Доиграть свой MP3 целиком, точно с этого места (работает офлайн)'
-                          : 'Открыть песню на YouTube. Внимание: начнётся с начала — превью это отрывок из середины'
+                      hasFullVersion
+                        ? 'Доиграть песню целиком, точно с этого места (работает офлайн)'
+                        : 'У этого трека нет полной версии — загрузи MP3 во вкладке «Миграция MP3»'
                     }
-                    className={`h-14 px-5 rounded-full flex items-center gap-2 font-bold transition disabled:opacity-30 ${
-                      fullIsLocal
-                        ? 'bg-green-600 hover:bg-green-500 text-white'
-                        : 'bg-red-600 hover:bg-red-500 text-white'
-                    }`}
+                    className="h-14 px-5 rounded-full flex items-center gap-2 font-bold transition disabled:opacity-30 bg-green-600 hover:bg-green-500 text-white"
                   >
-                    {fullIsLocal ? <Music size={20} /> : <Youtube size={20} />}
+                    <Music size={20} />
                     <span className="text-sm whitespace-nowrap">Полная</span>
                   </button>
                 </div>

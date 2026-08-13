@@ -17,9 +17,6 @@ export interface Track {
   // Применяется в основном к кастомным MP3. NULL/undefined = с начала до конца.
   previewStart?: number;
   previewEnd?: number;
-  // YouTube video ID (11 символов) с ПОЛНОЙ версией песни — для кнопки
-  // «Продолжить (полная)» в игре, когда толпа подпевает. Требует интернет.
-  youtubeId?: string;
   // Полная версия песни своим файлом: имя в bucket audio-tracks ИЛИ полный https-URL
   // (Cloudflare R2 / CDN). Играет офлайн и даёт точную позицию для «Продолжить».
   mp3Path?: string;

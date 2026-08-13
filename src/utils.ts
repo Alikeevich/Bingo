@@ -46,28 +46,6 @@ export const playlistArtistSet = (tracks: { artist: string }[]): Set<string> => 
 export const sharesArtist = (artist: string, present: Set<string>): boolean =>
   splitArtists(artist).some((a) => present.has(a));
 
-// Достаёт YouTube video ID из любой формы ссылки, которую может вставить ведущий:
-// youtu.be/ID, /watch?v=ID, /embed/ID, /shorts/ID, music.youtube.com, или сам ID.
-// Возвращает null если это не похоже на YouTube-видео.
-export const parseYouTubeId = (input: string): string | null => {
-  const s = (input || '').trim();
-  if (!s) return null;
-  // Уже голый ID
-  if (/^[A-Za-z0-9_-]{11}$/.test(s)) return s;
-  const patterns = [
-    /[?&]v=([A-Za-z0-9_-]{11})/,        // watch?v=ID
-    /youtu\.be\/([A-Za-z0-9_-]{11})/,   // youtu.be/ID
-    /\/embed\/([A-Za-z0-9_-]{11})/,     // /embed/ID
-    /\/shorts\/([A-Za-z0-9_-]{11})/,    // /shorts/ID
-    /\/live\/([A-Za-z0-9_-]{11})/,      // /live/ID
-  ];
-  for (const re of patterns) {
-    const m = s.match(re);
-    if (m) return m[1];
-  }
-  return null;
-};
-
 // Ключ «песни» для дедупа очереди воспроизведения. Deezer часто отдаёт одну и ту же
 // песню с разными хвостами в названии — «Peaches», «Peaches (feat. …)», «… (Remastered)»,
 // «… - Radio Edit». Срезаем скобки и хвосты после « - », берём главного артиста.
