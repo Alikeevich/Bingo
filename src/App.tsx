@@ -413,12 +413,20 @@ export default function App() {
     // главный артист) — чтобы одна и та же песня, попавшая в плейлист под разными id или
     // с разными хвостами в названии (Peaches / Peaches (feat. …) / … - Radio Edit),
     // не звучала в туре дважды.
+    // Плейлист хранит СНАПШОТ трека (JSONB) на момент добавления. Если трек потом
+    // редактировали в Моей Базе (добавили ссылку YouTube, обрезку, обновили preview) —
+    // в снапшоте этих полей нет. Поэтому подмешиваем свежую запись из базы по id.
+    const freshById = new Map(dbTracks.map(t => [String(t.id), t]));
+
     const seenIds = new Set<string>();
     const seenSongs = new Set<string>();
     const uniqueQueue: Track[] = [];
-    for (const t of playlist.tracks) {
-      const id = String(t.id);
+    for (const raw of playlist.tracks) {
+      const id = String(raw.id);
       if (seenIds.has(id)) continue;
+      const fresh = freshById.get(id);
+      // свежие поля из базы перекрывают устаревший снапшот
+      const t: Track = fresh ? { ...raw, ...fresh } : raw;
       const key = songKey(t.title, t.artist);
       if (seenSongs.has(key)) continue;
       seenIds.add(id);
