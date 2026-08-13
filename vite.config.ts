@@ -177,8 +177,54 @@ export default defineConfig(({ mode }) => {
     },
   }
 
+  // POST /api/r2-sign — локальный аналог serverless-функции api/r2-sign.ts
+  const r2SignDevPlugin: Plugin = {
+    name: 'r2-sign-dev',
+    configureServer(server) {
+      server.middlewares.use(
+        '/api/r2-sign',
+        async (req: IncomingMessage, res: ServerResponse) => {
+          if (req.method !== 'POST') return jsonRes(res, 405, { error: 'Method not allowed' })
+          const endpoint = env.R2_ENDPOINT
+          const accessKeyId = env.R2_ACCESS_KEY_ID
+          const secretAccessKey = env.R2_SECRET_ACCESS_KEY
+          const bucket = env.R2_BUCKET
+          const publicUrl = (env.R2_PUBLIC_URL || '').replace(/\/+$/, '')
+          if (!endpoint || !accessKeyId || !secretAccessKey || !bucket || !publicUrl) {
+            return jsonRes(res, 500, { error: 'R2 is not configured' })
+          }
+          try {
+            const { S3Client, PutObjectCommand, DeleteObjectCommand } = await import('@aws-sdk/client-s3')
+            const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner')
+            const s3 = new S3Client({ region: 'auto', endpoint, credentials: { accessKeyId, secretAccessKey } })
+            const body = JSON.parse((await readBody(req)) || '{}')
+
+            if (body.action === 'delete') {
+              const key = String(body.key || '')
+              if (!key || key.includes('..') || key.startsWith('/')) return jsonRes(res, 400, { error: 'bad key' })
+              await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
+              return jsonRes(res, 200, { ok: true })
+            }
+
+            const trackId = String(body.trackId || '').replace(/[^A-Za-z0-9_-]/g, '')
+            if (!trackId) return jsonRes(res, 400, { error: 'trackId is required' })
+            const key = `tracks/${trackId}_${Date.now()}.mp3`
+            const signedUrl = await getSignedUrl(
+              s3,
+              new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: 'audio/mpeg' }),
+              { expiresIn: 900 }
+            )
+            jsonRes(res, 200, { signedUrl, key, publicUrl: `${publicUrl}/${key}` })
+          } catch (e: unknown) {
+            jsonRes(res, 500, { error: e instanceof Error ? e.message : String(e) })
+          }
+        }
+      )
+    },
+  }
+
   return {
-    plugins: [react(), audioProxyPlugin, eventsDevPlugin, signupDevPlugin],
+    plugins: [react(), audioProxyPlugin, eventsDevPlugin, signupDevPlugin, r2SignDevPlugin],
     // Полифиллы для @react-pdf/renderer (использует Node globals)
     define: {
       global: 'globalThis',

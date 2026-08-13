@@ -54,18 +54,40 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
       });
 
       setPhase(id, 'Загружаем', 1);
-      const safeName = `full_${id}_${Date.now()}.mp3`;
-      const { error: upErr } = await supabase.storage
-        .from('audio-tracks')
-        .upload(safeName, res.blob, { upsert: true, contentType: 'audio/mpeg' });
-      if (upErr) throw upErr;
+      // Пробуем Cloudflare R2 (10 ГБ бесплатно, трафик бесплатный). Если он ещё
+      // не настроен — молча падаем обратно в Supabase Storage, чтобы миграцию
+      // можно было начинать не дожидаясь настройки R2.
+      let stored = '';
+      try {
+        const signRes = await fetch('/api/r2-sign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trackId: id }),
+        });
+        if (!signRes.ok) throw new Error('r2 not configured');
+        const { signedUrl, publicUrl } = await signRes.json();
+        const put = await fetch(signedUrl, {
+          method: 'PUT',
+          body: res.blob,
+          headers: { 'Content-Type': 'audio/mpeg' },
+        });
+        if (!put.ok) throw new Error(`R2 отказал (${put.status})`);
+        stored = publicUrl; // в mp3_path ляжет полный https-URL
+      } catch {
+        const safeName = `full_${id}_${Date.now()}.mp3`;
+        const { error: upErr } = await supabase.storage
+          .from('audio-tracks')
+          .upload(safeName, res.blob, { upsert: true, contentType: 'audio/mpeg' });
+        if (upErr) throw upErr;
+        stored = safeName; // в mp3_path ляжет имя файла в Supabase Storage
+      }
 
       const { error: dbErr } = await supabase
-        .from('tracks').update({ mp3_path: safeName }).eq('id', id);
+        .from('tracks').update({ mp3_path: stored }).eq('id', id);
       if (dbErr) throw dbErr;
 
       setDbTracks(prev => prev.map(t =>
-        String(t.id) === id ? { ...t, mp3Path: safeName } : t));
+        String(t.id) === id ? { ...t, mp3Path: stored } : t));
 
       const saved = res.originalBytes - res.compressedBytes;
       showToast(
@@ -86,8 +108,15 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
     const id = String(track.id);
     if (!track.mp3Path) return;
     if (!confirm(`Убрать полную версию у «${track.title}»?`)) return;
-    // Файл из Storage удаляем только если это наш загруженный файл, а не внешняя ссылка
-    if (!/^https?:\/\//i.test(track.mp3Path)) {
+    // Чистим сам файл: R2 (внешний URL) — через serverless, иначе Supabase Storage
+    if (/^https?:\/\//i.test(track.mp3Path)) {
+      const key = track.mp3Path.split('/').slice(-2).join('/'); // tracks/<file>.mp3
+      await fetch('/api/r2-sign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', key }),
+      }).catch(() => {});
+    } else {
       await supabase.storage.from('audio-tracks').remove([track.mp3Path]);
     }
     await supabase.from('tracks').update({ mp3_path: null }).eq('id', id);
