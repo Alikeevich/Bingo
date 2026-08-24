@@ -28,6 +28,10 @@ interface HostScreenProps {
   audioRef: React.RefObject<HTMLAudioElement>;
   extendCurrentTrack: (seconds?: number) => void;
   playFullVersion: () => void;
+  /** Границы играющего фрагмента в секундах. end === 0 — играем до конца файла. */
+  segment: { start: number; end: number };
+  /** true — ведущий включил полную версию, ограничение фрагмента снято */
+  isFullMode: boolean;
 }
 
 export default function HostScreen(props: HostScreenProps) {
@@ -41,6 +45,18 @@ export default function HostScreen(props: HostScreenProps) {
   // Полная версия доступна, если для трека загружен свой MP3 (играет офлайн,
   // позиция известна точно — поэтому «Продолжить» попадает ровно в то же место)
   const hasFullVersion = !!(currentTrack?.mp3Path || currentTrack?.isCustom);
+
+  // Таймлайн показываем ПО ФРАГМЕНТУ, а не по всему файлу: у полных MP3 длительность
+  // файла 3-4 минуты, а в игре звучит только вырезанный кусок — ведущему важно
+  // видеть, сколько осталось именно до конца фрагмента.
+  const segStart = props.segment.start > 0 ? props.segment.start : 0;
+  const segEnd   = props.segment.end   > 0 ? props.segment.end   : props.duration;
+  const segLength = Math.max(0, segEnd - segStart);
+  const segPos = Math.min(segLength, Math.max(0, props.currentTime - segStart));
+  const progressPct = segLength > 0 ? (segPos / segLength) * 100 : 0;
+  const segLeft = Math.max(0, segLength - segPos);
+  // Играем ли урезанный кусок (есть смысл показать «фрагмент из N:NN»)
+  const isTrimmed = !props.isFullMode && (props.segment.start > 0 || props.segment.end > 0);
 
   const handleVerifyCard = () => {
     if (!verifyCardId.trim()) return;
@@ -115,11 +131,27 @@ export default function HostScreen(props: HostScreenProps) {
             <div className="max-w-4xl mx-auto flex flex-col gap-6">
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-500 w-12">{formatTime(props.currentTime)}</span>
+                  <span className="text-xs font-bold text-gray-500 w-12">{formatTime(segPos)}</span>
                   <div className="flex-1 h-2.5 bg-gray-800 rounded-full overflow-hidden relative mx-4">
-                    <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-purple-600 to-pink-500 transition-all duration-300 ease-linear" style={{ width: `${props.duration ? (props.currentTime / props.duration) * 100 : 0}%` }} />
+                    <div
+                      className={`absolute top-0 left-0 h-full transition-all duration-300 ease-linear ${props.isFullMode ? 'bg-gradient-to-r from-green-500 to-emerald-400' : 'bg-gradient-to-r from-purple-600 to-pink-500'}`}
+                      style={{ width: `${progressPct}%` }}
+                    />
                   </div>
-                  <span className="text-xs font-bold text-gray-500 w-12 text-right">{formatTime(props.duration)}</span>
+                  <span className="text-xs font-bold text-gray-500 w-12 text-right">{formatTime(segLength)}</span>
+                </div>
+                {/* Подпись под шкалой: что именно сейчас звучит и сколько осталось */}
+                <div className="flex items-center justify-between text-[11px] -mt-2">
+                  <span className={props.isFullMode ? 'text-green-400 font-bold' : 'text-gray-500'}>
+                    {props.isFullMode
+                      ? 'Полная версия — играет до конца песни'
+                      : isTrimmed
+                        ? `Фрагмент ${formatTime(segStart)}–${formatTime(segEnd)} из ${formatTime(props.duration)}`
+                        : 'Трек целиком'}
+                  </span>
+                  {isTrackLoaded && segLength > 0 && (
+                    <span className="text-gray-500">осталось {formatTime(segLeft)}</span>
+                  )}
                 </div>
               </div>
 
@@ -155,8 +187,12 @@ export default function HostScreen(props: HostScreenProps) {
                   <button onClick={() => { props.playHostTrack(props.currentHostTrackIndex + 1); props.setHideTrackInfo(true); }} disabled={props.currentHostTrackIndex === props.shuffledTracks.length - 1} className="w-14 h-14 bg-gray-800 rounded-full flex items-center justify-center text-white hover:bg-gray-700 disabled:opacity-30 transition"><SkipForward size={28} /></button>
                   <button
                     onClick={() => props.extendCurrentTrack(10)}
-                    disabled={!isPlaying}
-                    title="Продлить трек на 10 секунд"
+                    disabled={!isTrackLoaded || props.isFullMode}
+                    title={
+                      props.isFullMode
+                        ? 'Уже играет полная версия — продлевать нечего'
+                        : 'Продлить фрагмент на 10 секунд'
+                    }
                     className="w-14 h-14 bg-gray-800 rounded-full flex flex-col items-center justify-center text-white hover:bg-gray-700 disabled:opacity-30 transition leading-none"
                   >
                     <Plus size={18} />
@@ -165,16 +201,24 @@ export default function HostScreen(props: HostScreenProps) {
                   {/* Полная версия — когда зал подпевает: свой MP3 доигрывает целиком, офлайн */}
                   <button
                     onClick={props.playFullVersion}
-                    disabled={!isTrackLoaded || !hasFullVersion}
+                    disabled={!isTrackLoaded || !hasFullVersion || props.isFullMode}
                     title={
-                      hasFullVersion
-                        ? 'Доиграть песню целиком, точно с этого места (работает офлайн)'
-                        : 'У этого трека нет полной версии — загрузи MP3 во вкладке «Миграция MP3»'
+                      props.isFullMode
+                        ? 'Полная версия уже играет'
+                        : hasFullVersion
+                          ? 'Доиграть песню целиком, точно с этого места (работает офлайн)'
+                          : 'У этого трека нет полной версии — загрузи MP3 во вкладке «Миграция MP3»'
                     }
-                    className="h-14 px-5 rounded-full flex items-center gap-2 font-bold transition disabled:opacity-30 bg-green-600 hover:bg-green-500 text-white"
+                    className={`h-14 px-5 rounded-full flex items-center gap-2 font-bold transition disabled:opacity-40 text-white ${
+                      props.isFullMode
+                        ? 'bg-green-800 ring-2 ring-green-400'
+                        : 'bg-green-600 hover:bg-green-500'
+                    }`}
                   >
                     <Music size={20} />
-                    <span className="text-sm whitespace-nowrap">Полная</span>
+                    <span className="text-sm whitespace-nowrap">
+                      {props.isFullMode ? 'Играет' : 'Полная'}
+                    </span>
                   </button>
                 </div>
                 <div className="w-48 text-right">

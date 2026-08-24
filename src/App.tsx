@@ -62,6 +62,12 @@ export default function App() {
   const [isPaused, setIsPaused] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  // Границы играющего фрагмента — копия currentSegmentRef, но в стейте, чтобы плеер
+  // мог показывать прогресс именно по фрагменту и реагировать на «+10с» / «Полная».
+  // end === 0 означает «до конца файла».
+  const [segment, setSegment] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
+  // true, когда ведущий включил полную версию и ограничение фрагмента снято
+  const [isFullMode, setIsFullMode] = useState(false);
   const [isAutoPlay, setIsAutoPlay] = useState(false);
 
   const [hostSession, setHostSession] = useState<{ game: Game; round: Round; playlist: Playlist } | null>(null);
@@ -329,11 +335,11 @@ export default function App() {
     setIsPaused(false);
 
     // Запоминаем границы фрагмента для этого трека (использует onTimeUpdate глобального handler)
-    currentSegmentRef.current = {
-      start: typeof track.previewStart === 'number' && track.previewStart > 0 ? track.previewStart : undefined,
-      end:   typeof track.previewEnd   === 'number' && track.previewEnd   > 0 ? track.previewEnd   : undefined,
-      finished: false,
-    };
+    const segStart = typeof track.previewStart === 'number' && track.previewStart > 0 ? track.previewStart : undefined;
+    const segEnd   = typeof track.previewEnd   === 'number' && track.previewEnd   > 0 ? track.previewEnd   : undefined;
+    currentSegmentRef.current = { start: segStart, end: segEnd, finished: false };
+    setSegment({ start: segStart ?? 0, end: segEnd ?? 0 });
+    setIsFullMode(false);
 
     try {
       const currentUrl = await resolveTrackUrl(track);
@@ -378,6 +384,15 @@ export default function App() {
     }
   };
 
+  // Возвращает громкость на место ПЛАВНО. Нужен для «+10с» и «Полная»: если в этот
+  // момент уже шёл fade-out перед концом фрагмента, резкий volume = 1 слышен как щелчок.
+  // Плавное восстановление за ~120мс для зала незаметно.
+  const restoreVolumeSmoothly = (el: HTMLAudioElement) => {
+    if (fadeIntervalRef.current) { clearInterval(fadeIntervalRef.current); fadeIntervalRef.current = null; }
+    if (el.volume >= 0.99) { el.volume = 1; return; }
+    fadeVolume(el, el.volume, 1, 120);
+  };
+
   // Продлевает текущий трек на `seconds` секунд — для случаев когда песня
   // обрывается на припеве. Сдвигает границу фрагмента, но не дальше реальной
   // длины аудио-файла: у 30-секундных превью Deezer продлевать нечего, у своих
@@ -397,11 +412,13 @@ export default function App() {
     }
     seg.end = newEnd;
     seg.finished = false;
+    setSegment(prev => ({ ...prev, end: newEnd }));
     // Отменяем запущенный fade-out и возвращаем громкость на место.
     fadeOutStartedRef.current = false;
-    if (fadeIntervalRef.current) { clearInterval(fadeIntervalRef.current); fadeIntervalRef.current = null; }
-    el.volume = 1;
+    // Трек НЕ перезагружаем — просто отодвигаем границу и мягко возвращаем громкость,
+    // поэтому для слушателя песня продолжается без единой паузы.
     if (el.paused) el.play().catch(() => {});
+    restoreVolumeSmoothly(el);
     showToast(`+${seconds} секунд`);
   };
 
@@ -468,11 +485,16 @@ export default function App() {
       seg.finished = false;
       fadeOutStartedRef.current = false;
       finishingRef.current = false;
-      if (fadeIntervalRef.current) { clearInterval(fadeIntervalRef.current); fadeIntervalRef.current = null; }
       if (el) {
-        el.volume = 1;
+        // Источник не трогаем (el.src тот же) — песня продолжает играть с той же
+        // секунды, просто больше не обрывается на границе фрагмента.
         if (el.paused) el.play().catch(() => {});
+        restoreVolumeSmoothly(el);
       }
+      // Снимаем и старт-границу: дальше плеер показывает позицию по всему файлу
+      setSegment({ start: 0, end: 0 });
+      setIsFullMode(true);
+      setIsPaused(false);
       showToast('Играем полную версию');
       return;
     }
@@ -747,7 +769,7 @@ export default function App() {
         <audio ref={audioRef} preload="auto" crossOrigin="anonymous" {...audioHandlers} />
         <audio ref={preloadAudioRef} preload="auto" crossOrigin="anonymous" muted aria-hidden="true" style={{ display: 'none' }} />
         <HostScreen
-          hostSession={hostSession} shuffledTracks={shuffledTracks} playedTrackIds={playedTrackIds} currentHostTrackIndex={currentHostTrackIndex} hideTrackInfo={hideTrackInfo} autoWinners={autoWinners} playingTrackId={playingTrackId} isPaused={isPaused} currentTime={currentTime} duration={duration} isAutoPlay={isAutoPlay} setIsAutoPlay={setIsAutoPlay} setHideTrackInfo={setHideTrackInfo} setIsProjectorMode={setIsProjectorMode} playHostTrack={playHostTrack} endHostSession={endHostSession} setAutoWinners={setAutoWinners} togglePlay={togglePlay} audioRef={audioRef} extendCurrentTrack={extendCurrentTrack} playFullVersion={playFullVersion}
+          hostSession={hostSession} shuffledTracks={shuffledTracks} playedTrackIds={playedTrackIds} currentHostTrackIndex={currentHostTrackIndex} hideTrackInfo={hideTrackInfo} autoWinners={autoWinners} playingTrackId={playingTrackId} isPaused={isPaused} currentTime={currentTime} duration={duration} isAutoPlay={isAutoPlay} setIsAutoPlay={setIsAutoPlay} setHideTrackInfo={setHideTrackInfo} setIsProjectorMode={setIsProjectorMode} playHostTrack={playHostTrack} endHostSession={endHostSession} setAutoWinners={setAutoWinners} togglePlay={togglePlay} audioRef={audioRef} extendCurrentTrack={extendCurrentTrack} playFullVersion={playFullVersion} segment={segment} isFullMode={isFullMode}
         />
       </>
     );
