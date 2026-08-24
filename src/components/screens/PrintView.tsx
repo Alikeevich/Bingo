@@ -16,12 +16,33 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
   // Шрифты качаются асинхронно. Пока не докачались — рендер PDF не начинаем,
   // иначе часть глифов не попадёт в subset и пропадут первые буквы слов.
   const [fontsReady, setFontsReady] = useState(false);
+  // Фон шаблона — картинка ~1.5 МБ. Если начать рендер до её загрузки,
+  // @react-pdf МОЛЧА пропускает изображение и печатается пустой лист без макета.
+  // Поэтому ждём картинку так же, как шрифты, и честно сообщаем, если не удалось.
+  const [bgReady, setBgReady] = useState(false);
+  const [bgError, setBgError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     preloadPdfFonts().finally(() => { if (!cancelled) setFontsReady(true); });
     return () => { cancelled = true; };
   }, []);
+
+  const bgUrl = printViewCards?.template.config.backgroundImageUrl || '';
+  useEffect(() => {
+    let cancelled = false;
+    setBgReady(false);
+    setBgError(null);
+    if (!bgUrl) { setBgReady(true); return; }   // шаблон без фона — печатаем на белом
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => { if (!cancelled) setBgReady(true); };
+    img.onerror = () => {
+      if (!cancelled) setBgError('Не удалось загрузить фон шаблона. Проверь интернет и попробуй снова — без фона карточки печатать нельзя.');
+    };
+    img.src = bgUrl;
+    return () => { cancelled = true; };
+  }, [bgUrl]);
 
   // Генерим QR-коды локально, параллельно. Без сетевых вызовов — оффлайн ок.
   useEffect(() => {
@@ -64,7 +85,7 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
           </div>
         </div>
 
-        {qrs && fontsReady && !qrError ? (
+        {qrs && fontsReady && bgReady && !qrError && !bgError ? (
           <BlobProvider document={<CardsDocument cards={cards} template={template} qrPngDataUrls={qrs} />}>
             {({ url, blob, loading, error }) => (
               <div className="flex items-center gap-3">
@@ -103,8 +124,10 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
 
       {/* ПРЕВЬЮ PDF */}
       <div className="flex-1 bg-gray-800/50 relative overflow-hidden">
-        {!qrs || !fontsReady ? (
-          <CenterLoader text={!fontsReady ? 'Загружаем шрифты…' : 'Готовим карточки…'} />
+        {bgError ? (
+          <CenterError text={bgError} />
+        ) : !qrs || !fontsReady || !bgReady ? (
+          <CenterLoader text={!fontsReady ? 'Загружаем шрифты…' : !bgReady ? 'Загружаем фон шаблона…' : 'Готовим карточки…'} />
         ) : qrError ? (
           <CenterError text={qrError} />
         ) : (
