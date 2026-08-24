@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '../../supabase';
+import { flattenToOpaquePng } from '../../lib/flattenImage';
 import { Template, TemplateConfig, GridSlot, QrSlot, SlotRect, TextStyle, CellTextSource, DEFAULT_TEMPLATE_CONFIG } from '../../types';
 import { migrateTemplateConfig } from '../../lib/migrateTemplate';
 import { Palette, Upload, Save, Trash2, X, LayoutGrid, Hash, QrCode, Type, Eye, EyeOff, Bold, Italic, Plus, Pencil } from 'lucide-react';
@@ -88,9 +89,11 @@ export default function TemplatesTab({ templates, setTemplates, showToast }: Tem
   const uploadBg = async (file: File) => {
     if (file.size > 15 * 1024 * 1024) return showToast('Файл слишком большой (>15МБ)');
     setIsUploadingBg(true);
-    const ext = file.name.split('.').pop() ?? 'png';
-    const fileName = `template_bg_${Date.now()}.${ext}`;
-    const { data, error } = await supabase.storage.from('template-backgrounds').upload(fileName, file, { upsert: true });
+    // Убираем альфа-канал: из-за него в PDF появляется SMask, и принтер печатает
+    // макет тускло, с серым «слоем». Картинка визуально не меняется.
+    const flat = await flattenToOpaquePng(file);
+    const fileName = `template_bg_${Date.now()}.png`;
+    const { data, error } = await supabase.storage.from('template-backgrounds').upload(fileName, flat, { upsert: true, contentType: 'image/png' });
     if (error) { setIsUploadingBg(false); return showToast('Ошибка загрузки: ' + error.message); }
     const { data: urlData } = supabase.storage.from('template-backgrounds').getPublicUrl(data.path);
     setConfig(c => ({ ...c, backgroundImageUrl: urlData.publicUrl }));
