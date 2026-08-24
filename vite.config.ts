@@ -229,6 +229,12 @@ export default defineConfig(({ mode }) => {
     define: {
       global: 'globalThis',
     },
+    build: {
+      // Транспилируем под Safari 14: у ведущих бывают старые макбуки, а из-за
+      // современного синтаксиса чанк инструмента падал с белым экраном.
+      // API-методы (Object.hasOwn/.at) target не чинит — они в src/lib/polyfills.ts.
+      target: ['es2019', 'safari14', 'chrome80', 'firefox78', 'edge88'],
+    },
     server: {
       proxy: {
         '/api/deezer': {
