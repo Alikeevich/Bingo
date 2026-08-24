@@ -6,14 +6,6 @@ function pickSource(track: Track, source: CellTextSource): string {
   return source === 'artist' ? (track.artist ?? '') : (track.title ?? '');
 }
 
-// Защита от бага @react-pdf, который в некоторых шаблонах «съедает» ПЕРВЫЙ глиф
-// текстового рана (заметно на ведущей H: «HI-FI» → «I-FI»). Невидимый word-joiner
-// (U+2060, нулевой ширины, не даёт переноса) становится «первым» глифом — съедается он,
-// а реальная буква остаётся. На корректных шаблонах это no-op.
-function guard(s: string): string {
-  return s ? '⁠' + s : s;
-}
-
 // ────────────────────────────────────────────────────────────────────────
 // РЕГИСТРАЦИЯ ШРИФТОВ (один раз, при импорте модуля)
 // TTF лежат в public/fonts → доступны по абсолютному пути от origin.
@@ -51,6 +43,29 @@ if (typeof window !== 'undefined' && !window[FONTS_REGISTERED_KEY]) {
   // Отключаем хитрый перенос — нам нужны простые предсказуемые переносы по словам
   Font.registerHyphenationCallback(word => [word]);
   window[FONTS_REGISTERED_KEY] = true;
+}
+
+/**
+ * Дожидается, пока ВСЕ начертания шрифтов реально скачаются.
+ *
+ * Зачем: Font.register() только запоминает URL, качается шрифт асинхронно.
+ * Если начать рендер PDF раньше — часть глифов не попадает в subset шрифта,
+ * и в готовом файле пропадает первая буква слова («Orda» → «rda», «HI-FI» → «I-FI»).
+ * Баг плавающий: при повторной печати шрифт уже в кеше и всё выглядит нормально —
+ * именно поэтому «если ещё раз распечатать, то норм».
+ */
+export async function preloadPdfFonts(): Promise<void> {
+  const variants: { fontFamily: string; fontWeight?: string; fontStyle?: string }[] = [
+    { fontFamily: 'Roboto' },
+    { fontFamily: 'Roboto', fontWeight: 'bold' },
+    { fontFamily: 'Roboto', fontStyle: 'italic' },
+    { fontFamily: 'Roboto', fontWeight: 'bold', fontStyle: 'italic' },
+    { fontFamily: 'RobotoMono' },
+    { fontFamily: 'RobotoMono', fontWeight: 'bold' },
+  ];
+  await Promise.all(
+    variants.map((v) => (Font.load as any)(v).catch(() => { /* начертание не критично */ }))
+  );
 }
 
 export const ALLOWED_FONTS = ['Roboto', 'RobotoMono'] as const;
@@ -145,11 +160,11 @@ function GridSlotView({ grid, cells, template }: {
                   ) : (
                     <>
                       <Text style={cellTitleStyle}>
-                        {guard(clamp(pickSource(cell as Track, trackTitle.source), trackTitle.lineClamp))}
+                        {clamp(pickSource(cell as Track, trackTitle.source), trackTitle.lineClamp)}
                       </Text>
                       {trackArtist.enabled && (
                         <Text style={[cellArtistStyle, { marginTop: mm(0.4) }]}>
-                          {guard(clamp(pickSource(cell as Track, trackArtist.source), trackArtist.lineClamp))}
+                          {clamp(pickSource(cell as Track, trackArtist.source), trackArtist.lineClamp)}
                         </Text>
                       )}
                     </>

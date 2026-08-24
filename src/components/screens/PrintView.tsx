@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { BlobProvider } from '@react-pdf/renderer';
 import { ChevronLeft, Printer, Download, Loader2, AlertTriangle } from 'lucide-react';
 import { BingoCard, Template } from '../../types';
-import { CardsDocument } from '../../lib/CardPdf';
+import { CardsDocument, preloadPdfFonts } from '../../lib/CardPdf';
 import { qrDataUrl, buildQrPayload } from '../../lib/qr';
 
 interface PrintViewProps {
@@ -13,6 +13,15 @@ interface PrintViewProps {
 export default function PrintView({ printViewCards, setPrintViewCards }: PrintViewProps) {
   const [qrs, setQrs] = useState<(string | null)[] | null>(null);
   const [qrError, setQrError] = useState<string | null>(null);
+  // Шрифты качаются асинхронно. Пока не докачались — рендер PDF не начинаем,
+  // иначе часть глифов не попадёт в subset и пропадут первые буквы слов.
+  const [fontsReady, setFontsReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    preloadPdfFonts().finally(() => { if (!cancelled) setFontsReady(true); });
+    return () => { cancelled = true; };
+  }, []);
 
   // Генерим QR-коды локально, параллельно. Без сетевых вызовов — оффлайн ок.
   useEffect(() => {
@@ -55,7 +64,7 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
           </div>
         </div>
 
-        {qrs && !qrError ? (
+        {qrs && fontsReady && !qrError ? (
           <BlobProvider document={<CardsDocument cards={cards} template={template} qrPngDataUrls={qrs} />}>
             {({ url, blob, loading, error }) => (
               <div className="flex items-center gap-3">
@@ -94,8 +103,8 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
 
       {/* ПРЕВЬЮ PDF */}
       <div className="flex-1 bg-gray-800/50 relative overflow-hidden">
-        {!qrs ? (
-          <CenterLoader text="Готовим карточки…" />
+        {!qrs || !fontsReady ? (
+          <CenterLoader text={!fontsReady ? 'Загружаем шрифты…' : 'Готовим карточки…'} />
         ) : qrError ? (
           <CenterError text={qrError} />
         ) : (
