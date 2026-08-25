@@ -69,7 +69,15 @@ export default async function handler(req: any, res: any) {
   try {
     const signedUrl = await getSignedUrl(
       s3,
-      new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: 'audio/mpeg' }),
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        ContentType: 'audio/mpeg',
+        // Имя файла уникально (id + timestamp), содержимое не меняется — можно
+        // кэшировать навсегда. Без этого браузер каждый раз переспрашивал файл,
+        // что на слабом интернете в заведении давало паузы между треками.
+        CacheControl: 'public, max-age=31536000, immutable',
+      }),
       { expiresIn: 900 } // 15 минут на загрузку — с запасом даже на медленном интернете
     );
     res.status(200).json({ signedUrl, key, publicUrl: `${publicUrl}/${key}` });

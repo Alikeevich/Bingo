@@ -166,6 +166,7 @@ for (const [i, item] of todo.entries()) {
     await s3.send(new PutObjectCommand({
       Bucket: val('R2_BUCKET'), Key: key,
       Body: fs.readFileSync(out), ContentType: 'audio/mpeg',
+      CacheControl: 'public, max-age=31536000, immutable',
     }));
 
     const publicUrl = `${val('R2_PUBLIC_URL').replace(/\/+$/, '')}/${key}`;

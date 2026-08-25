@@ -97,7 +97,12 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
         const put = await fetch(signedUrl, {
           method: 'PUT',
           body: res.blob,
-          headers: { 'Content-Type': 'audio/mpeg' },
+          // Cache-Control обязан совпадать с тем, что заложено в подпись,
+          // иначе R2 отклонит загрузку с ошибкой подписи.
+          headers: {
+            'Content-Type': 'audio/mpeg',
+            'Cache-Control': 'public, max-age=31536000, immutable',
+          },
         });
         if (!put.ok) throw new Error(`R2 отказал (${put.status})`);
         stored = publicUrl; // в mp3_path ляжет полный https-URL

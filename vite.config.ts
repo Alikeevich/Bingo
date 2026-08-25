@@ -211,7 +211,7 @@ export default defineConfig(({ mode }) => {
             const key = `tracks/${trackId}_${Date.now()}.mp3`
             const signedUrl = await getSignedUrl(
               s3,
-              new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: 'audio/mpeg' }),
+              new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: 'audio/mpeg', CacheControl: 'public, max-age=31536000, immutable' }),
               { expiresIn: 900 }
             )
             jsonRes(res, 200, { signedUrl, key, publicUrl: `${publicUrl}/${key}` })
