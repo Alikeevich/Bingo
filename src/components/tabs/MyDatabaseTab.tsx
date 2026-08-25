@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Track, Tag } from '../../types';
 import { PlayCircle, PauseCircle, Plus, Trash2, Tags, Search, Edit3, UploadCloud, X } from 'lucide-react';
 
@@ -20,14 +20,27 @@ export default function MyDatabaseTab({
 }: MyDatabaseTabProps) {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  // Показываем список порциями: в базе больше тысячи треков, и отрисовка их всех
+  // разом вешала интерфейс (тысячи DOM-узлов с обложками).
+  const PAGE = 60;
+  const [visibleCount, setVisibleCount] = useState(PAGE);
 
   // Фильтруем треки по активному тегу и строке поиска
-  const filteredTracks = dbTracks.filter(t => {
-    const matchesTag = activeTag ? (t.tags || []).includes(activeTag) : true;
-    const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          t.artist.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesTag && matchesSearch;
-  });
+  const filteredTracks = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return dbTracks.filter(t => {
+      const matchesTag = activeTag ? (t.tags || []).includes(activeTag) : true;
+      if (!matchesTag) return false;
+      if (!q) return true;
+      return t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q);
+    });
+  }, [dbTracks, activeTag, searchQuery]);
+
+  // При смене фильтра начинаем показ заново
+  useEffect(() => { setVisibleCount(PAGE); }, [activeTag, searchQuery]);
+
+  const visibleTracks = filteredTracks.slice(0, visibleCount);
+  const hasMore = filteredTracks.length > visibleCount;
 
   return (
     <div className="animate-in fade-in duration-300 flex flex-col h-full">
@@ -102,7 +115,7 @@ export default function MyDatabaseTab({
           <div className="text-center py-10 text-gray-500">По вашему запросу ничего не найдено.</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredTracks.map(track => {
+            {visibleTracks.map(track => {
               const isPlaying = playingTrackId === track.id && !isPaused;
               return (
                 <div key={track.id} className={`bg-gray-900 p-3 rounded-xl flex gap-3 items-center border transition group ${isPlaying ? 'border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.2)]' : 'border-gray-800 hover:border-gray-600'}`}>
@@ -129,6 +142,20 @@ export default function MyDatabaseTab({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {hasMore && (
+          <div className="flex flex-col items-center gap-2 py-8">
+            <button
+              onClick={() => setVisibleCount(c => c + PAGE)}
+              className="px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-xl font-bold transition"
+            >
+              Показать ещё {Math.min(PAGE, filteredTracks.length - visibleCount)}
+            </button>
+            <span className="text-xs text-gray-500">
+              показано {visibleTracks.length} из {filteredTracks.length}
+            </span>
           </div>
         )}
       </div>

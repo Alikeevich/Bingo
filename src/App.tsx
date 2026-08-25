@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './supabase';
 import { useAuth } from './auth/AuthContext';
 import Logo from './components/Logo';
@@ -30,7 +30,12 @@ export default function App() {
     navigate('/');
   };
 
-  const [activeTab, setActiveTab] = useState<'games' | 'playlists' | 'mydatabase' | 'global_search' | 'templates' | 'migration'>('games');
+  // Раздел определяется адресом (/app/games, /app/playlists, ...), а не внутренним
+  // состоянием: работают ссылки, кнопка «назад» браузера и обновление страницы.
+  const location = useLocation();
+  const activeTab = (location.pathname.split('/')[2] || 'games') as
+    'games' | 'playlists' | 'mydatabase' | 'global_search' | 'templates' | 'migration';
+  const setActiveTab = (tab: string) => navigate(`/app/${tab}`);
 
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [games, setGames] = useState<Game[]>([]);
@@ -77,6 +82,8 @@ export default function App() {
   const [hideTrackInfo, setHideTrackInfo] = useState(true);
   const [isProjectorMode, setIsProjectorMode] = useState(false);
   const [autoWinners, setAutoWinners] = useState<string[]>([]);
+  // Прогрев очереди: сколько ссылок уже обновлено перед игрой (null — прогрев не идёт)
+  const [prewarm, setPrewarm] = useState<{ done: number; total: number } | null>(null);
 
   const [printViewCards, setPrintViewCards] = useState<{ cards: BingoCard[]; template: Template } | null>(null);
   const [trackToAdd, setTrackToAdd] = useState<Track | null>(null); 
@@ -237,6 +244,42 @@ export default function App() {
     }, stepMs);
   };
 
+  // Свежие ссылки, полученные во время игры. Копим здесь и разливаем в состояние
+  // и в базу ПАЧКОЙ — иначе каждый трек вызывал пересборку списка на 1000 записей.
+  const freshUrlsRef = useRef<Map<string, string>>(new Map());
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flushFreshUrls = () => {
+    const map = freshUrlsRef.current;
+    if (map.size === 0) return;
+    const entries = Array.from(map.entries());
+    map.clear();
+    const patch = <T extends Track>(list: T[]) => {
+      let changed = false;
+      const next = list.map(t => {
+        const fresh = entries.find(([id]) => id === String(t.id))?.[1];
+        if (!fresh || t.preview === fresh) return t;
+        changed = true;
+        return { ...t, preview: fresh };
+      });
+      return changed ? next : list;
+    };
+    setShuffledTracks(prev => patch(prev));
+    setDbTracks(prev => patch(prev));
+    // в базу — одной пачкой, в фоне; если не получится, ссылки просто обновятся в следующий раз
+    void (async () => {
+      for (const [id, preview] of entries) {
+        try { await supabase.from('tracks').update({ preview }).eq('id', id); } catch { /* не критично */ }
+      }
+    })();
+  };
+
+  const scheduleFreshFlush = () => {
+    if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
+    // 2 секунды тишины — значит ведущий не переключает треки, можно спокойно обновить
+    flushTimerRef.current = setTimeout(flushFreshUrls, 2000);
+  };
+
   // Проверяет URL Deezer по exp= токену и при необходимости обновляет через API.
   // Возвращает свежий URL или null если трек больше не доступен.
   // Кеширует параллельные вызовы для одного track.id.
@@ -260,12 +303,11 @@ export default function App() {
         const data = await res.json();
         if (data?.preview && typeof data.preview === 'string' && data.preview.length > 0) {
           const fresh: string = data.preview;
-          // 1) в supabase tracks (fire-and-forget)
-          supabase.from('tracks').update({ preview: fresh }).eq('id', String(track.id)).then(() => {});
-          // 2) в стейте Моей Базы
-          setDbTracks(prev => prev.map(t => String(t.id) === String(track.id) ? { ...t, preview: fresh } : t));
-          // 3) в текущей host-сессии (важно — иначе следующий togglePlay снова с протухшим)
-          setShuffledTracks(prev => prev.map(t => String(t.id) === String(track.id) ? { ...t, preview: fresh } : t));
+          // Складываем свежую ссылку в ref и обновляем состояние ОДИН раз, отложенно.
+          // Раньше каждый refresh дёргал setDbTracks на 1000 треков и писал в Supabase —
+          // во время тура это давало по тяжёлому ререндеру и запросу на каждый трек.
+          freshUrlsRef.current.set(String(track.id), fresh);
+          scheduleFreshFlush();
           return fresh;
         }
         return null; // Deezer убрал превью — трек больше не играбелен
@@ -300,13 +342,23 @@ export default function App() {
 
   // Пре-кеширует следующий трек на скрытом audio-элементе — браузер скачает данные в фоне.
   // Для Deezer-треков с протухшим URL — заранее делает refresh, чтобы preload-элемент не упёрся в 403.
+  const prefetchedRef = useRef<Set<string>>(new Set());
+
   const prefetchTrack = async (track: Track | undefined) => {
-    const el = preloadAudioRef.current;
-    if (!el || !track || !track.preview) return;
+    if (!track || !track.preview) return;
+    const key = String(track.id);
+    if (prefetchedRef.current.has(key)) return;   // уже грели — не тратим сеть повторно
     const url = await resolveTrackUrl(track);
-    if (!url) return; // трек недоступен, нет смысла грузить
-    if (el.src && el.src.endsWith(url)) return;
-    try { el.src = url; el.load(); } catch {}
+    if (!url) return;
+    prefetchedRef.current.add(key);
+
+    // Ближайший трек кладём в скрытый <audio> — он буферизует данные,
+    // остальные просто прогреваем HTTP-кешем браузера.
+    const el = preloadAudioRef.current;
+    if (el && !(el.src && el.src.endsWith(url))) {
+      try { el.src = url; el.load(); return; } catch { /* ниже фолбэк */ }
+    }
+    try { await fetch(url, { mode: 'cors', cache: 'force-cache' }); } catch { /* не критично */ }
   };
 
   const togglePlay = async (track: Track) => {
@@ -422,6 +474,47 @@ export default function App() {
     showToast(`+${seconds} секунд`);
   };
 
+  // Прогрев очереди перед игрой.
+  // Ссылки Deezer живут ограниченное время и почти всегда протухшие. Если обновлять их
+  // в момент нажатия на трек, каждый трек получает лишний сетевой запрос — отсюда паузы
+  // «стопится и грузится». Здесь обновляем всю очередь заранее, пока ведущий готовится,
+  // и параллельно прогреваем HTTP-кеш браузера, чтобы аудио стартовало мгновенно.
+  const prewarmQueue = async (queue: Track[]) => {
+    const needsRefresh = (t: Track) => {
+      if (t.mp3Path || t.isCustom) return false;         // свои файлы не протухают
+      const url = t.preview || '';
+      if (!url.includes('exp=')) return false;           // стабильная ссылка
+      const exp = parseInt(url.match(/exp=(\d+)/)?.[1] || '0', 10);
+      return exp - 30 <= Date.now() / 1000;
+    };
+
+    const stale = queue.filter(needsRefresh);
+    if (stale.length === 0) { setPrewarm(null); return; }
+
+    setPrewarm({ done: 0, total: stale.length });
+    let done = 0;
+    const BATCH = 6; // бережно к Deezer API и к сети заведения
+
+    for (let i = 0; i < stale.length; i += BATCH) {
+      const chunk = stale.slice(i, i + BATCH);
+      await Promise.all(chunk.map(async (t) => {
+        try {
+          const res = await fetch(`/api/deezer/track/${t.id}`);
+          const data = await res.json();
+          const fresh = data?.preview;
+          if (typeof fresh === 'string' && fresh.length > 0) {
+            freshUrlsRef.current.set(String(t.id), fresh);
+          }
+        } catch { /* трек просто останется со старой ссылкой */ }
+        done++;
+      }));
+      setPrewarm({ done, total: stale.length });
+    }
+
+    flushFreshUrls();      // разливаем всё разом — один ререндер вместо десятков
+    setPrewarm(null);
+  };
+
   const startHostSession = (game: Game, round: Round) => {
     const playlist = playlists.find(p => p.id === round.playlistId);
     if (!playlist) return showToast('Плейлист не найден!');
@@ -453,6 +546,7 @@ export default function App() {
       uniqueQueue.push(t);
     }
     setShuffledTracks(uniqueQueue);
+    void prewarmQueue(uniqueQueue);   // фоном, старт игры не блокируем
     setPlayedTrackIds(new Set());
     setCurrentHostTrackIndex(0);
     setHideTrackInfo(true);
@@ -466,8 +560,10 @@ export default function App() {
     const track = shuffledTracks[index];
     setPlayedTrackIds(prev => new Set(prev).add(track.id));
     togglePlay(track);
-    // Параллельно — пре-кешим СЛЕДУЮЩИЙ трек, чтобы переход был мгновенным
-    if (isAutoPlay) prefetchTrack(shuffledTracks[index + 1]);
+    // Пре-кешим следующие треки ВСЕГДА, а не только при авто-ходе: ведущий чаще
+    // переключает вручную, и раньше каждый такой трек качался с нуля.
+    void prefetchTrack(shuffledTracks[index + 1]);
+    void prefetchTrack(shuffledTracks[index + 2]);
   };
 
   // «Продолжить (полная)» — когда зал подпевает и надо доиграть песню целиком.
@@ -769,7 +865,7 @@ export default function App() {
         <audio ref={audioRef} preload="auto" crossOrigin="anonymous" {...audioHandlers} />
         <audio ref={preloadAudioRef} preload="auto" crossOrigin="anonymous" muted aria-hidden="true" style={{ display: 'none' }} />
         <HostScreen
-          hostSession={hostSession} shuffledTracks={shuffledTracks} playedTrackIds={playedTrackIds} currentHostTrackIndex={currentHostTrackIndex} hideTrackInfo={hideTrackInfo} autoWinners={autoWinners} playingTrackId={playingTrackId} isPaused={isPaused} currentTime={currentTime} duration={duration} isAutoPlay={isAutoPlay} setIsAutoPlay={setIsAutoPlay} setHideTrackInfo={setHideTrackInfo} setIsProjectorMode={setIsProjectorMode} playHostTrack={playHostTrack} endHostSession={endHostSession} setAutoWinners={setAutoWinners} togglePlay={togglePlay} audioRef={audioRef} extendCurrentTrack={extendCurrentTrack} playFullVersion={playFullVersion} segment={segment} isFullMode={isFullMode}
+          hostSession={hostSession} shuffledTracks={shuffledTracks} playedTrackIds={playedTrackIds} currentHostTrackIndex={currentHostTrackIndex} hideTrackInfo={hideTrackInfo} autoWinners={autoWinners} playingTrackId={playingTrackId} isPaused={isPaused} currentTime={currentTime} duration={duration} isAutoPlay={isAutoPlay} setIsAutoPlay={setIsAutoPlay} setHideTrackInfo={setHideTrackInfo} setIsProjectorMode={setIsProjectorMode} playHostTrack={playHostTrack} endHostSession={endHostSession} setAutoWinners={setAutoWinners} togglePlay={togglePlay} audioRef={audioRef} extendCurrentTrack={extendCurrentTrack} playFullVersion={playFullVersion} segment={segment} isFullMode={isFullMode} prewarm={prewarm}
         />
       </>
     );
@@ -808,9 +904,10 @@ export default function App() {
       </aside>
 
       <main className="flex-1 overflow-hidden p-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-gray-900 via-gray-950 to-gray-950">
-        {activeTab === 'games' && <GamesTab games={games} setGames={setGames} playlists={playlists} templates={templates} showToast={showToast} startHostSession={startHostSession} setPrintViewCards={setPrintViewCards} />}
-        {activeTab === 'mydatabase' && (
-          <MyDatabaseTab
+        <Routes>
+          <Route index element={<Navigate to="games" replace />} />
+          <Route path="games" element={<GamesTab games={games} setGames={setGames} playlists={playlists} templates={templates} showToast={showToast} startHostSession={startHostSession} setPrintViewCards={setPrintViewCards} />} />
+          <Route path="mydatabase" element={<MyDatabaseTab
             dbTracks={dbTracks} dbTags={dbTags} playingTrackId={playingTrackId} isPaused={isPaused} togglePlay={togglePlay}
             setTrackToAdd={setTrackToAdd} deleteTrackFromDb={deleteTrackFromDb}
             deleteTagFromDb={deleteTagFromDb}
@@ -821,17 +918,17 @@ export default function App() {
               setSelectedTagsForNewTrack(track.tags || []);
               setNewTagInput('');
             }}
-          />
-        )}
-        {activeTab === 'global_search' && (
-          <GlobalSearchTab
+          />} />
+          <Route path="global_search" element={<GlobalSearchTab
             playingTrackId={playingTrackId} isPaused={isPaused} togglePlay={togglePlay} setTrackToAdd={setTrackToAdd}
             setTrackToAddToDb={(t) => { setIsEditingTrack(false); setTrackToAddToDb(t); setSelectedTagsForNewTrack([]); setNewTagInput(''); }}
-          />
-        )}
-        {activeTab === 'playlists' && <PlaylistsTab playlists={playlists} setPlaylists={setPlaylists} playingTrackId={playingTrackId} isPaused={isPaused} togglePlay={togglePlay} showToast={showToast} />}
-        {activeTab === 'migration' && <MigrationTab dbTracks={dbTracks} setDbTracks={setDbTracks} showToast={showToast} />}
-        {activeTab === 'templates' && <TemplatesTab templates={templates} setTemplates={setTemplates} showToast={showToast} />}
+          />} />
+          <Route path="playlists" element={<PlaylistsTab playlists={playlists} setPlaylists={setPlaylists} playingTrackId={playingTrackId} isPaused={isPaused} togglePlay={togglePlay} showToast={showToast} resolveTrackUrl={resolveTrackUrl} />} />
+          <Route path="migration" element={<MigrationTab dbTracks={dbTracks} setDbTracks={setDbTracks} showToast={showToast} />} />
+          <Route path="templates" element={<TemplatesTab templates={templates} setTemplates={setTemplates} showToast={showToast} />} />
+          {/* неизвестный адрес внутри инструмента — возвращаем к мероприятиям */}
+          <Route path="*" element={<Navigate to="/app/games" replace />} />
+        </Routes>
       </main>
 
       {/* --- МОДАЛКА: СОХРАНЕНИЕ / РЕДАКТИРОВАНИЕ ТРЕКА В БАЗУ --- */}

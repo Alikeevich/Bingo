@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../supabase';
 import { Track } from '../../types';
 import { compressAudioToMp3, fmtMB } from '../../lib/compressAudio';
@@ -30,6 +30,9 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
   const [pending, setPending] = useState<{ track: Track; file: File; url: string } | null>(null);
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(0);
+  // Список отдаём порциями — в базе больше тысячи треков, и полная отрисовка тормозила
+  const PAGE = 50;
+  const [visibleCount, setVisibleCount] = useState(PAGE);
 
   const hasFull = (t: Track) => !!t.mp3Path || !!t.isCustom;
   const doneCount = useMemo(() => dbTracks.filter(hasFull).length, [dbTracks]);
@@ -43,6 +46,10 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
       return t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q);
     });
   }, [dbTracks, search, filter]);
+
+  useEffect(() => { setVisibleCount(PAGE); }, [search, filter]);
+  const shown = visible.slice(0, visibleCount);
+  const hasMore = visible.length > visibleCount;
 
   const setPhase = (id: string, phase: string, ratio: number) =>
     setBusy(prev => ({ ...prev, [id]: { phase, ratio } }));
@@ -226,7 +233,7 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            {visible.map(track => {
+            {shown.map(track => {
               const id = String(track.id);
               const state = busy[id];
               const done = hasFull(track);
@@ -275,6 +282,18 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {hasMore && (
+          <div className="flex flex-col items-center gap-2 py-8">
+            <button
+              onClick={() => setVisibleCount(c => c + PAGE)}
+              className="px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-xl font-bold transition"
+            >
+              Показать ещё {Math.min(PAGE, visible.length - visibleCount)}
+            </button>
+            <span className="text-xs text-gray-500">показано {shown.length} из {visible.length}</span>
           </div>
         )}
       </div>

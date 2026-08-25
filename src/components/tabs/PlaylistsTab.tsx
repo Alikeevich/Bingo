@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { supabase } from '../../supabase';
 import { Playlist, Track } from '../../types';
 import { ChevronLeft, CheckCircle2, UploadCloud, HardDriveDownload, Loader2, Music, Timer, PauseCircle, PlayCircle, Trash2, FolderPlus, Shuffle, Search, X, SearchCheck } from 'lucide-react';
-import { getProxiedUrl, splitArtists } from '../../utils';
+import { splitArtists } from '../../utils';
+import { cacheTracks, isOfflineCacheReady } from '../../lib/offlineCache';
 
 interface PlaylistsTabProps {
   playlists: Playlist[];
@@ -11,9 +12,11 @@ interface PlaylistsTabProps {
   isPaused: boolean;
   togglePlay: (track: Track) => void;
   showToast: (msg: string) => void;
+  /** Даёт ссылку, которую реально играет плеер (свой MP3 / R2 / свежий Deezer) */
+  resolveTrackUrl: (track: Track) => Promise<string | null>;
 }
 
-export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, isPaused, togglePlay, showToast }: PlaylistsTabProps) {
+export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, isPaused, togglePlay, showToast, resolveTrackUrl }: PlaylistsTabProps) {
   const[viewingPlaylist, setViewingPlaylist] = useState<Playlist | null>(null);
   const[isCreatePlaylistModalOpen, setIsCreatePlaylistModalOpen] = useState(false);
   const[newPlaylistName, setNewPlaylistName] = useState('');
@@ -95,26 +98,41 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
   };
 
   const cachePlaylistForOffline = async (playlist: Playlist) => {
+    if (!isOfflineCacheReady()) {
+      showToast('Офлайн-режим ещё готовится. Обнови страницу и попробуй снова.');
+      return;
+    }
     try {
-      const cache = await caches.open('muzbingo-audio-v1');
-      let count = 0;
       setOfflineProgress({ current: 0, total: playlist.tracks.length });
+
+      // Берём именно те ссылки, которые будет играть плеер: свой MP3 / R2 /
+      // свежий Deezer. Раньше кэшировалось поле preview, а игралось другое —
+      // поэтому кэш никогда не совпадал и треки качались заново.
+      const urls: string[] = [];
+      let resolved = 0;
       for (const track of playlist.tracks) {
-        if (!track.preview) { count++; continue; }
-        const proxyUrl = getProxiedUrl(track.preview);
-        const existing = await cache.match(proxyUrl).catch(() => null);
-        if (!existing) {
-          try {
-            const resp = await fetch(proxyUrl);
-            if (resp.ok) await cache.put(proxyUrl, resp);
-          } catch (e) { console.warn('Ошибка кэширования:', track.title, e); }
-        }
-        count++;
-        setOfflineProgress({ current: count, total: playlist.tracks.length });
+        try {
+          const url = await resolveTrackUrl(track);
+          if (url) urls.push(url);
+        } catch { /* трек недоступен — пропускаем */ }
+        resolved++;
+        setOfflineProgress({ current: Math.round(resolved / 2), total: playlist.tracks.length });
       }
-      showToast('Плейлист загружен для офлайн-игры!');
+
+      await cacheTracks(urls, (done, total) => {
+        // вторая половина шкалы — собственно скачивание
+        setOfflineProgress({
+          current: Math.round(playlist.tracks.length / 2 + (done / total) * (playlist.tracks.length / 2)),
+          total: playlist.tracks.length,
+        });
+      });
+
+      showToast(`Готово: ${urls.length} треков доступны офлайн`);
       setTimeout(() => setOfflineProgress(null), 2000);
-    } catch (e) { showToast('Ошибка кэширования.'); setOfflineProgress(null); }
+    } catch (e) {
+      showToast('Ошибка кэширования.');
+      setOfflineProgress(null);
+    }
   };
 
   if (viewingPlaylist) {

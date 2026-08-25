@@ -24,6 +24,11 @@ import Landing from './pages/Landing.tsx';
 import Login from './pages/Login.tsx';
 import Register from './pages/Register.tsx';
 import './index.css';
+import { registerOfflineCache } from './lib/offlineCache';
+
+// Офлайн-кэш аудио: без Service Worker тег <audio> всегда ходит в сеть,
+// и на слабом интернете в заведении каждый трек качается заново.
+registerOfflineCache();
 
 // Инструмент ведущего (вкладки, плеер, PDF-рендерер) грузим лениво — на лендинге он не нужен.
 const App = lazy(() => import('./App.tsx'));

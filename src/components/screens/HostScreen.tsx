@@ -32,6 +32,8 @@ interface HostScreenProps {
   segment: { start: number; end: number };
   /** true — ведущий включил полную версию, ограничение фрагмента снято */
   isFullMode: boolean;
+  /** Прогресс подготовки ссылок перед игрой (null — подготовка завершена) */
+  prewarm: { done: number; total: number } | null;
 }
 
 export default function HostScreen(props: HostScreenProps) {
@@ -93,6 +95,14 @@ export default function HostScreen(props: HostScreenProps) {
             <div className="text-3xl font-black text-purple-400">{props.playedTrackIds.size} <span className="text-gray-600 text-xl">/ {props.shuffledTracks.length}</span></div>
             <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Сыграно</div>
           </div>
+          {props.prewarm && (
+            <div className="flex items-center gap-2 mr-3 px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/30" title="Обновляем ссылки на треки, чтобы во время игры не было пауз">
+              <Loader2 size={16} className="animate-spin text-blue-400" />
+              <span className="text-xs font-bold text-blue-300">
+                Готовим треки {props.prewarm.done}/{props.prewarm.total}
+              </span>
+            </div>
+          )}
           <div className="h-10 w-px bg-gray-800 mr-2" />
           <button onClick={() => props.setIsProjectorMode(true)} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition shadow-lg"><MonitorPlay size={20} /> Проектор</button>
           <button onClick={() => { setVerifyCardId(''); setVerifyResult(null); setIsBingoVerifyModalOpen(true); }} className="bg-green-600 hover:bg-green-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition shadow-lg"><CheckCircle2 size={20} /> БИНГО!</button>
