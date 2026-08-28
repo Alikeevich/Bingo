@@ -7,7 +7,7 @@ import { ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, 
 import { Track, Playlist, Game, Round, Template, BingoCard, Tag } from './types';
 import { migrateTemplate } from './lib/migrateTemplate';
 import { loadHostSession, saveHostSession, clearHostSession } from './lib/hostSessionStorage';
-import { playlistArtistSet, sharesArtist, songKey } from './utils';
+import { playlistArtistSet, sharesArtist, buildPlayQueue } from './utils';
 import AudioTrimmer from './components/AudioTrimmer';
 
 // Вкладки
@@ -82,7 +82,9 @@ export default function App() {
   // Чтобы не показывать «нет места в хранилище» на каждое изменение состояния
   const storageWarnedRef = useRef(false);
   const [shuffledTracks, setShuffledTracks] = useState<Track[]>([]);
-  const [playedTrackIds, setPlayedTrackIds] = useState<Set<string | number>>(new Set());
+  // id храним СТРОКАМИ: снапшот в плейлисте и запись в базе могут отдавать один и
+  // тот же трек как число и как строку, и тогда Set.has() молча не находил совпадения
+  const [playedTrackIds, setPlayedTrackIds] = useState<Set<string>>(new Set());
   const [currentHostTrackIndex, setCurrentHostTrackIndex] = useState<number>(0);
   const [hideTrackInfo, setHideTrackInfo] = useState(true);
   const [isProjectorMode, setIsProjectorMode] = useState(false);
@@ -122,7 +124,7 @@ export default function App() {
     if (saved) {
       setHostSession(saved.hostSession);
       setShuffledTracks(saved.shuffledTracks);
-      setPlayedTrackIds(new Set(saved.playedTrackIds));
+      setPlayedTrackIds(new Set(saved.playedTrackIds.map(String)));
       setCurrentHostTrackIndex(saved.currentHostTrackIndex);
       setHideTrackInfo(saved.hideTrackInfo);
       needsRehydrateRef.current = true;
@@ -197,7 +199,7 @@ export default function App() {
     const condition = hostSession.round.winCondition;
     const linesIndices = [[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24],[0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24],[0,6,12,18,24],[4,8,12,16,20]];
     const winners = hostSession.round.cards.filter(card => {
-      const matches = card.cells.map(cell => 'isFreeSpace' in cell ? true : playedTrackIds.has(cell.id));
+      const matches = card.cells.map(cell => 'isFreeSpace' in cell ? true : playedTrackIds.has(String(cell.id)));
       let linesCount = 0;
       linesIndices.forEach(line => { if (line.every(idx => matches[idx])) linesCount++; });
       if (condition === '1_line' && linesCount >= 1) return true;
@@ -537,34 +539,10 @@ export default function App() {
   const startHostSession = (game: Game, round: Round) => {
     const playlist = playlists.find(p => p.id === round.playlistId);
     if (!playlist) return showToast('Плейлист не найден!');
-    // Берём треки в том порядке, который задан в плейлисте — пользователь может
-    // отдельно «перемешать» в Плейлистах, если хочет. Авто-шафл на старте убрали
-    // чтобы случайные комбинации не давали бинго на рандомных карточках.
-    // Уникализируем дважды: по id И по «ключу песни» (название без скобок/feat-хвостов +
-    // главный артист) — чтобы одна и та же песня, попавшая в плейлист под разными id или
-    // с разными хвостами в названии (Peaches / Peaches (feat. …) / … - Radio Edit),
-    // не звучала в туре дважды.
-    // Плейлист хранит СНАПШОТ трека (JSONB) на момент добавления. Если трек потом
-    // редактировали в Моей Базе (залили полный MP3, задали обрезку, обновили preview) —
-    // в снапшоте этих полей нет. Поэтому подмешиваем свежую запись из базы по id.
-    const freshById = new Map(dbTracks.map(t => [String(t.id), t]));
-
-    const seenIds = new Set<string>();
-    const seenSongs = new Set<string>();
-    const uniqueQueue: Track[] = [];
-    for (const raw of playlist.tracks) {
-      const id = String(raw.id);
-      if (seenIds.has(id)) continue;
-      const fresh = freshById.get(id);
-      // свежие поля из базы перекрывают устаревший снапшот
-      const t: Track = fresh ? { ...raw, ...fresh } : raw;
-      const key = songKey(t.title, t.artist);
-      if (seenSongs.has(key)) continue;
-      seenIds.add(id);
-      seenSongs.add(key);
-      uniqueQueue.push(t);
-    }
-    setShuffledTracks(uniqueQueue);
+    // Очередь строит общий с генератором карточек код (см. buildPlayQueue):
+    // карточки обязаны собираться ровно из этих треков, иначе клетка с треком,
+    // которого в очереди нет, не закроется никогда.
+    const uniqueQueue = buildPlayQueue(playlist.tracks, dbTracks);
     void prewarmQueue(uniqueQueue);   // фоном, старт игры не блокируем
     setPlayedTrackIds(new Set());
     setCurrentHostTrackIndex(0);
@@ -578,7 +556,7 @@ export default function App() {
     if (index < 0 || index >= shuffledTracks.length) return;
     setCurrentHostTrackIndex(index);
     const track = shuffledTracks[index];
-    setPlayedTrackIds(prev => new Set(prev).add(track.id));
+    setPlayedTrackIds(prev => new Set(prev).add(String(track.id)));
     togglePlay(track);
     // Пре-кешим следующие треки ВСЕГДА, а не только при авто-ходе: ведущий чаще
     // переключает вручную, и раньше каждый такой трек качался с нуля.
@@ -926,7 +904,7 @@ export default function App() {
       <main className="flex-1 overflow-hidden p-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-gray-900 via-gray-950 to-gray-950">
         <Routes>
           <Route index element={<Navigate to="games" replace />} />
-          <Route path="games" element={<GamesTab games={games} setGames={setGames} playlists={playlists} templates={templates} showToast={showToast} startHostSession={startHostSession} setPrintViewCards={setPrintViewCards} />} />
+          <Route path="games" element={<GamesTab games={games} setGames={setGames} playlists={playlists} templates={templates} dbTracks={dbTracks} showToast={showToast} startHostSession={startHostSession} setPrintViewCards={setPrintViewCards} />} />
           <Route path="mydatabase" element={<MyDatabaseTab
             dbTracks={dbTracks} dbTags={dbTags} playingTrackId={playingTrackId} isPaused={isPaused} togglePlay={togglePlay}
             setTrackToAdd={setTrackToAdd} deleteTrackFromDb={deleteTrackFromDb}

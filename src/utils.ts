@@ -1,3 +1,5 @@
+import type { Track } from './types';
+
 export const chunkArray = (arr: any[], size: number) =>
   arr.reduce((acc: any[], _, i) => (i % size ? acc : [...acc, arr.slice(i, i + size)]),[]);
 
@@ -63,4 +65,37 @@ export const songKey = (title: string, artist: string): string => {
   const baseTitle = stripped || full;
   const primary = splitArtists(artist)[0] || (artist || '').trim().toLowerCase();
   return baseTitle + '|' + primary;
+};
+// ────────────────────────────────────────────────────────────────────────
+// ОЧЕРЕДЬ ВОСПРОИЗВЕДЕНИЯ ТУРА
+// ────────────────────────────────────────────────────────────────────────
+// Один и тот же список используют И генератор карточек, И сам тур.
+// Иначе в клетку попадает трек, которого в очереди нет, и карточка не
+// закроется НИКОГДА (для условия «вся карточка» хватает одного такого трека,
+// чтобы убить треть карточек).
+//
+// Порядок = порядок плейлиста (шафл на старте убран специально).
+// Уникализируем дважды: по id И по «ключу песни» — одна и та же песня,
+// попавшая в плейлист под разными id или с разными хвостами в названии
+// (Peaches / Peaches (feat. …) / … - Radio Edit), не должна звучать дважды.
+// Плейлист хранит СНАПШОТ трека на момент добавления, поэтому подмешиваем
+// свежую запись из базы по id (там мог появиться полный MP3, обрезка,
+// исправленное название).
+export const buildPlayQueue = (playlistTracks: Track[], dbTracks: Track[] = []): Track[] => {
+  const freshById = new Map(dbTracks.map((t) => [String(t.id), t]));
+  const seenIds = new Set<string>();
+  const seenSongs = new Set<string>();
+  const queue: Track[] = [];
+  for (const raw of playlistTracks || []) {
+    const id = String(raw.id);
+    if (seenIds.has(id)) continue;
+    const fresh = freshById.get(id);
+    const t: Track = fresh ? { ...raw, ...fresh } : raw;
+    const key = songKey(t.title, t.artist);
+    if (seenSongs.has(key)) continue;
+    seenIds.add(id);
+    seenSongs.add(key);
+    queue.push(t);
+  }
+  return queue;
 };

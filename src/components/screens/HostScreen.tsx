@@ -9,7 +9,7 @@ import { formatTime } from '../../utils';
 interface HostScreenProps {
   hostSession: { game: Game; round: Round; playlist: Playlist };
   shuffledTracks: Track[];
-  playedTrackIds: Set<string | number>;
+  playedTrackIds: Set<string>;
   currentHostTrackIndex: number;
   hideTrackInfo: boolean;
   autoWinners: string[];
@@ -66,7 +66,7 @@ export default function HostScreen(props: HostScreenProps) {
     const card = props.hostSession.round.cards.find(c => c.id === verifyCardId.trim());
     if (!card) return alert(`Карточка #${verifyCardId} не найдена!`);
     
-    const matches = card.cells.map(cell => 'isFreeSpace' in cell ? true : props.playedTrackIds.has(cell.id));
+    const matches = card.cells.map(cell => 'isFreeSpace' in cell ? true : props.playedTrackIds.has(String(cell.id)));
     const linesIndices = [
       [0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24],
       [0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24],
@@ -247,7 +247,7 @@ export default function HostScreen(props: HostScreenProps) {
           </div>
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-2">
             {props.shuffledTracks.map((track, index) => {
-              const isPlayed = props.playedTrackIds.has(track.id);
+              const isPlayed = props.playedTrackIds.has(String(track.id));
               const isCurrent = props.currentHostTrackIndex === index;
               return (
                 <button key={track.id} onClick={() => { props.playHostTrack(index); props.setHideTrackInfo(true); }} className={`w-full text-left p-3 rounded-xl flex items-center gap-4 transition border ${isCurrent ? 'bg-purple-900/30 border-purple-500 shadow-lg' : isPlayed ? 'bg-gray-900 border-gray-800 opacity-50 grayscale' : 'bg-gray-800 border-gray-700 hover:bg-gray-700'}`}>

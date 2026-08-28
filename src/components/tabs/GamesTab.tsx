@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../../supabase';
 import { Game, Round, Playlist, Template, BingoCard, Track } from '../../types';
+import { buildPlayQueue } from '../../utils';
 import { ChevronLeft, Calendar, Trash2, PlusCircle, ListMusic, LayoutTemplate, Play, Printer, PartyPopper } from 'lucide-react';
 
 // Все 12 выигрышных линий в сетке 5×5 (строки, столбцы, 2 диагонали)
@@ -34,13 +35,14 @@ interface GamesTabProps {
   games: Game[];
   setGames: (val: Game[]) => void;
   playlists: Playlist[];
+  dbTracks: Track[];
   templates: Template[];
   showToast: (msg: string) => void;
   startHostSession: (game: Game, round: Round) => void;
   setPrintViewCards: (val: { cards: BingoCard[]; template: Template }) => void;
 }
 
-export default function GamesTab({ games, setGames, playlists, templates, showToast, startHostSession, setPrintViewCards }: GamesTabProps) {
+export default function GamesTab({ games, setGames, playlists, dbTracks, templates, showToast, startHostSession, setPrintViewCards }: GamesTabProps) {
   const[viewingGame, setViewingGame] = useState<Game | null>(null);
   const[isCreateGameModalOpen, setIsCreateGameModalOpen] = useState(false);
   const [newGameName, setNewGameName] = useState('');
@@ -104,16 +106,17 @@ export default function GamesTab({ games, setGames, playlists, templates, showTo
     const template = templates.find(t => t.id === selectedTemplateId);
     if (!template) return;
     
-    // Порядок воспроизведения = порядок треков в плейлисте (шафл на старте тура убран).
-    // Зная его заранее, раздаём карточки так, чтобы они «выстреливали» на РАЗНЫХ треках —
-    // тогда не будет 2-3 бинго одновременно.
-    // Уникализируем по id — один и тот же трек, попавший в плейлист дважды, мог оказаться
-    // в карточке дважды (визуальный дубль) и ломал бинго. Очередь воспроизведения
-    // дедуплицируется так же, поэтому play-индексы считаем по уникальным трекам.
-    const uniqueTracks = Array.from(
-      new Map(playlist.tracks.map(t => [String(t.id), t])).values()
-    );
+    // Карточки собираем РОВНО из той очереди, которая прозвучит в туре
+    // (buildPlayQueue — тот же код, что и в старте тура). Раньше здесь треки
+    // уникализировались только по id, а очередь выбрасывала ещё и дубли по
+    // названию — и трек, попавший в клетку, но не в очередь, не закрывался
+    // никогда. Для условия «вся карточка» одного такого трека хватало, чтобы
+    // убить треть карточек, а нескольких — чтобы не было ни одного бинго.
+    // Порядок известен заранее, поэтому карточки раздаём так, чтобы они
+    // «выстреливали» на РАЗНЫХ треках — тогда не будет 2-3 бинго одновременно.
+    const uniqueTracks = buildPlayQueue(playlist.tracks, dbTracks);
     if (uniqueTracks.length < 24) return showToast(`Ошибка: нужно минимум 24 уникальных трека (сейчас ${uniqueTracks.length})!`);
+    const dropped = playlist.tracks.length - uniqueTracks.length;
 
     const playIndexOf = new Map<string, number>();
     uniqueTracks.forEach((t, idx) => playIndexOf.set(String(t.id), idx));
@@ -142,6 +145,7 @@ export default function GamesTab({ games, setGames, playlists, templates, showTo
     // перетасовки массива, быстро даже на сотне карточек).
     const MAX_TRIES = 300;
     let collisions = 0;
+    const winIndices: number[] = [];
     for (let i = 0; i < cardsCount; i++) {
       let cells = buildCells();
       let winIdx = winIndexForCard(cells, playIndexOf, round.winCondition);
@@ -154,15 +158,26 @@ export default function GamesTab({ games, setGames, playlists, templates, showTo
       }
       if (usedWinIndices.has(winIdx)) collisions++;
       usedWinIndices.add(winIdx);
+      winIndices.push(winIdx);
       newCards.push({ id: String(startId + i), cells });
     }
+
+    // Очередь известна заранее, поэтому можно честно сказать, КОГДА будет бинго.
+    // «Вся карточка» на большом плейлисте закрывается только под самый конец —
+    // без этой подсказки тур выглядит как «бинго не случилось».
+    const first = Math.min(...winIndices) + 1;
+    const last  = Math.max(...winIndices) + 1;
+    const when = `Первое бинго — на ${first}-й песне из ${uniqueTracks.length}, последняя карточка закроется на ${last}-й.`;
+    const droppedHint = dropped > 0
+      ? ` Из плейлиста выброшено ${dropped} повторов (тот же трек или та же песня) — в туре прозвучит ${uniqueTracks.length} песен.`
+      : '';
     if (collisions > 0) {
       const lineHint = round.winCondition === '1_line'
         ? ' Совет: 1 линия закрывается рано и кучно — выбери 2–3 линии и/или добавь треков в плейлист.'
         : ` Совет: добавь больше треков в плейлист (сейчас ${uniqueTracks.length}) — тогда «моментов победы» хватит на все карточки.`;
-      showToast(`Готово. ${collisions} из ${cardsCount} карточек могут выстрелить одновременно (мало уникальных «моментов победы»).${lineHint}`);
+      showToast(`Готово. ${when}${droppedHint} ${collisions} из ${cardsCount} карточек могут выстрелить одновременно.${lineHint}`);
     } else {
-      showToast(`Готово. Все ${cardsCount} карточек выстрелят в разные моменты — толпы не будет.`);
+      showToast(`Готово. ${when}${droppedHint} Все ${cardsCount} карточек выстрелят в разные моменты — толпы не будет.`);
     }
     
     const updatedRounds = game.rounds.map(r => r.id === round.id ? { ...r, cards:[...(r.cards || []), ...newCards] } : r);
