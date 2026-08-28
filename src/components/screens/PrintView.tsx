@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { BlobProvider } from '@react-pdf/renderer';
+import { pdf } from '@react-pdf/renderer';
 import { ChevronLeft, Printer, Download, Loader2, AlertTriangle } from 'lucide-react';
 import { BingoCard, Template } from '../../types';
-import { CardsDocument, preloadPdfFonts } from '../../lib/CardPdf';
+import { CardsDocument, refreshPdfFonts } from '../../lib/CardPdf';
 import { qrDataUrl, buildQrPayload } from '../../lib/qr';
 
 interface PrintViewProps {
@@ -13,20 +13,15 @@ interface PrintViewProps {
 export default function PrintView({ printViewCards, setPrintViewCards }: PrintViewProps) {
   const [qrs, setQrs] = useState<(string | null)[] | null>(null);
   const [qrError, setQrError] = useState<string | null>(null);
-  // Шрифты качаются асинхронно. Пока не докачались — рендер PDF не начинаем,
-  // иначе часть глифов не попадёт в subset и пропадут первые буквы слов.
-  const [fontsReady, setFontsReady] = useState(false);
   // Фон шаблона — картинка ~1.5 МБ. Если начать рендер до её загрузки,
   // @react-pdf МОЛЧА пропускает изображение и печатается пустой лист без макета.
-  // Поэтому ждём картинку так же, как шрифты, и честно сообщаем, если не удалось.
+  // Поэтому ждём картинку и честно сообщаем, если не удалось.
   const [bgReady, setBgReady] = useState(false);
   const [bgError, setBgError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    preloadPdfFonts().finally(() => { if (!cancelled) setFontsReady(true); });
-    return () => { cancelled = true; };
-  }, []);
+  // Готовый PDF: один на всё — превью, «Скачать» и «Печать»
+  const [doc, setDoc] = useState<{ url: string; blob: Blob } | null>(null);
+  const [docError, setDocError] = useState<string | null>(null);
+  const [stage, setStage] = useState<'fonts' | 'pdf'>('fonts');
 
   const bgUrl = printViewCards?.template.config.backgroundImageUrl || '';
   useEffect(() => {
@@ -66,6 +61,41 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
     return () => { cancelled = true; };
   }, [printViewCards]);
 
+  // ─── СБОРКА PDF ────────────────────────────────────────────────────────
+  // Один рендер на весь экран. Раньше здесь стояли ДВА <BlobProvider> с одним и
+  // тем же документом (для кнопок и для превью) — они собирали PDF ПАРАЛЛЕЛЬНО,
+  // вдвое дольше и вдвое больше памяти, но главное: оба рендера работают с одним
+  // общим кешем глифов шрифта, и пока один дописывал файл (и портил кеш), второй
+  // ещё считал раскладку — отсюда буквы, пропадавшие на части карточек.
+  useEffect(() => {
+    if (!printViewCards || !qrs || !bgReady) return;
+    const { cards, template } = printViewCards;
+    let cancelled = false;
+    let url: string | null = null;
+    setDoc(null);
+    setDocError(null);
+    setStage('fonts');
+    (async () => {
+      try {
+        await refreshPdfFonts();          // чистые шрифты на каждую печать
+        if (cancelled) return;
+        setStage('pdf');
+        const blob = await pdf(
+          <CardsDocument cards={cards} template={template} qrPngDataUrls={qrs} />
+        ).toBlob();
+        if (cancelled) return;
+        url = URL.createObjectURL(blob);
+        setDoc({ url, blob });
+      } catch (e: unknown) {
+        if (!cancelled) setDocError(e instanceof Error ? e.message : String(e));
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [printViewCards, qrs, bgReady]);
+
   if (!printViewCards) return null;
   const { cards, template } = printViewCards;
 
@@ -85,39 +115,32 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
           </div>
         </div>
 
-        {qrs && fontsReady && bgReady && !qrError && !bgError ? (
-          <BlobProvider document={<CardsDocument cards={cards} template={template} qrPngDataUrls={qrs} />}>
-            {({ url, blob, loading, error }) => (
-              <div className="flex items-center gap-3">
-                {error && (
-                  <span className="text-red-400 text-sm flex items-center gap-2"><AlertTriangle size={16} />Ошибка PDF</span>
-                )}
-                <button
-                  disabled={!url || loading}
-                  onClick={() => {
-                    if (!url) return;
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `${sanitize(template.name)}_${cards.length}cards.pdf`;
-                    a.click();
-                  }}
-                  className="bg-gray-800 hover:bg-gray-700 disabled:opacity-50 px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition border border-gray-700">
-                  {loading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-                  Скачать PDF
-                </button>
-                <button
-                  disabled={!blob || loading}
-                  onClick={() => { if (blob) printBlob(blob); }}
-                  className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white px-8 py-2.5 rounded-xl font-black flex items-center gap-2 transition shadow-lg shadow-purple-500/20">
-                  {loading ? <Loader2 size={18} className="animate-spin" /> : <Printer size={20} />}
-                  ПЕЧАТЬ
-                </button>
-              </div>
-            )}
-          </BlobProvider>
-        ) : (
+        {qrError || bgError || docError ? (
           <div className="text-gray-400 text-sm flex items-center gap-2">
-            {qrError ? <><AlertTriangle size={16} className="text-red-400" /> {qrError}</> : <><Loader2 size={16} className="animate-spin" /> Генерация QR-кодов…</>}
+            <AlertTriangle size={16} className="text-red-400" /> {qrError || bgError || docError}
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <button
+              disabled={!doc}
+              onClick={() => {
+                if (!doc) return;
+                const a = document.createElement('a');
+                a.href = doc.url;
+                a.download = `${sanitize(template.name)}_${cards.length}cards.pdf`;
+                a.click();
+              }}
+              className="bg-gray-800 hover:bg-gray-700 disabled:opacity-50 px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition border border-gray-700">
+              {doc ? <Download size={18} /> : <Loader2 size={18} className="animate-spin" />}
+              Скачать PDF
+            </button>
+            <button
+              disabled={!doc}
+              onClick={() => { if (doc) printBlob(doc.blob); }}
+              className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white px-8 py-2.5 rounded-xl font-black flex items-center gap-2 transition shadow-lg shadow-purple-500/20">
+              {doc ? <Printer size={20} /> : <Loader2 size={18} className="animate-spin" />}
+              ПЕЧАТЬ
+            </button>
           </div>
         )}
       </div>
@@ -126,25 +149,23 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
       <div className="flex-1 bg-gray-800/50 relative overflow-hidden">
         {bgError ? (
           <CenterError text={bgError} />
-        ) : !qrs || !fontsReady || !bgReady ? (
-          <CenterLoader text={!fontsReady ? 'Загружаем шрифты…' : !bgReady ? 'Загружаем фон шаблона…' : 'Готовим карточки…'} />
         ) : qrError ? (
           <CenterError text={qrError} />
+        ) : docError ? (
+          <CenterError text={docError} />
+        ) : !qrs ? (
+          <CenterLoader text="Генерация QR-кодов…" />
+        ) : !bgReady ? (
+          <CenterLoader text="Загружаем фон шаблона…" />
+        ) : !doc ? (
+          <CenterLoader text={stage === 'fonts' ? 'Загружаем шрифты…' : 'Собираем PDF…'} />
         ) : (
-          <BlobProvider document={<CardsDocument cards={cards} template={template} qrPngDataUrls={qrs} />}>
-            {({ url, loading, error }) => {
-              if (error)  return <CenterError text={String(error)} />;
-              if (loading || !url) return <CenterLoader text="Собираем PDF…" />;
-              return (
-                <iframe
-                  key={url}
-                  title="cards-pdf"
-                  src={url}
-                  className="w-full h-full border-0 bg-gray-900"
-                />
-              );
-            }}
-          </BlobProvider>
+          <iframe
+            key={doc.url}
+            title="cards-pdf"
+            src={doc.url}
+            className="w-full h-full border-0 bg-gray-900"
+          />
         )}
       </div>
     </div>

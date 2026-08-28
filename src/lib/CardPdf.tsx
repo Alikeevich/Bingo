@@ -46,26 +46,58 @@ if (typeof window !== 'undefined' && !window[FONTS_REGISTERED_KEY]) {
 }
 
 /**
- * Дожидается, пока ВСЕ начертания шрифтов реально скачаются.
+ * Гарантирует, что все начертания реально скачаны и разобраны.
  *
- * Зачем: Font.register() только запоминает URL, качается шрифт асинхронно.
- * Если начать рендер PDF раньше — часть глифов не попадает в subset шрифта,
- * и в готовом файле пропадает первая буква слова («Orda» → «rda», «HI-FI» → «I-FI»).
- * Баг плавающий: при повторной печати шрифт уже в кеше и всё выглядит нормально —
- * именно поэтому «если ещё раз распечатать, то норм».
+ * ВАЖНО: вес указываем ЧИСЛОМ. Font.load({fontWeight:'bold'}) в @react-pdf
+ * НЕ находит жирное начертание (сравнение идёт с числом 700, строка 'bold'
+ * не подходит) и молча грузит Regular — то есть прежний прогрев вообще не
+ * прогревал Bold/BoldItalic, а именно ими набрана главная строка в клетке.
  */
 export async function preloadPdfFonts(): Promise<void> {
-  const variants: { fontFamily: string; fontWeight?: string; fontStyle?: string }[] = [
-    { fontFamily: 'Roboto' },
-    { fontFamily: 'Roboto', fontWeight: 'bold' },
-    { fontFamily: 'Roboto', fontStyle: 'italic' },
-    { fontFamily: 'Roboto', fontWeight: 'bold', fontStyle: 'italic' },
-    { fontFamily: 'RobotoMono' },
-    { fontFamily: 'RobotoMono', fontWeight: 'bold' },
+  const variants: { fontFamily: string; fontWeight: number; fontStyle?: 'italic' }[] = [
+    { fontFamily: 'Roboto',     fontWeight: 400 },
+    { fontFamily: 'Roboto',     fontWeight: 700 },
+    { fontFamily: 'Roboto',     fontWeight: 400, fontStyle: 'italic' },
+    { fontFamily: 'Roboto',     fontWeight: 700, fontStyle: 'italic' },
+    { fontFamily: 'RobotoMono', fontWeight: 400 },
+    { fontFamily: 'RobotoMono', fontWeight: 700 },
   ];
   await Promise.all(
-    variants.map((v) => (Font.load as any)(v).catch(() => { /* начертание не критично */ }))
+    variants.map((v) => Font.load(v).catch(() => { /* начертание не критично */ }))
   );
+}
+
+/**
+ * Заново разбирает наши шрифты ПЕРЕД каждой сборкой PDF.
+ *
+ * Зачем. fontkit хранит разобранные глифы в кеше внутри объекта шрифта, а этот
+ * объект живёт до перезагрузки вкладки. Когда готовый PDF «вшивает» шрифт, он
+ * складывает в файл только нужные глифы (subset) — и при этом кладёт в тот же
+ * кеш глифы БЕЗ codePoints, то есть без привязки к буквам. Достаточно одной
+ * песни с диакритикой («Sigur Rós», «Måneskin», «Beyoncé»): составная Ó
+ * состоит из O + акцент, и в кеш попадает «пустая» O.
+ *
+ * Проверено: после сборки PDF со словом «Ólafur» в кеше жирного Roboto глиф
+ * 51 ('O') лежит с пустым codePoints. Дальше по этому кешу считаются
+ * соответствия «буква ↔ глиф» для следующих PDF — отсюда и пропадающие буквы,
+ * которые «через несколько перегенераций проходят».
+ *
+ * Лечится просто: перед каждой печатью выбрасываем разобранный шрифт и читаем
+ * TTF заново (файл лежит в кеше браузера, это миллисекунды).
+ */
+export async function refreshPdfFonts(): Promise<void> {
+  try {
+    for (const family of Object.values(Font.getRegisteredFonts())) {
+      for (const source of family?.sources || []) {
+        // только наши TTF: у встроенных Helvetica/Courier/Times в src имя, а не путь
+        if (typeof source.src === 'string' && source.src.includes('/fonts/')) {
+          source.data = null;
+          source.loadResultPromise = null;
+        }
+      }
+    }
+  } catch { /* если внутренности @react-pdf изменятся — просто печатаем как есть */ }
+  await preloadPdfFonts();
 }
 
 export const ALLOWED_FONTS = ['Roboto', 'RobotoMono'] as const;
