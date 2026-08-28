@@ -6,6 +6,7 @@ import Logo from './components/Logo';
 import { ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, Loader2, X, Scissors, LogOut, HardDriveDownload } from 'lucide-react';
 import { Track, Playlist, Game, Round, Template, BingoCard, Tag } from './types';
 import { migrateTemplate } from './lib/migrateTemplate';
+import { loadHostSession, saveHostSession, clearHostSession } from './lib/hostSessionStorage';
 import { playlistArtistSet, sharesArtist, songKey } from './utils';
 import AudioTrimmer from './components/AudioTrimmer';
 
@@ -76,6 +77,10 @@ export default function App() {
   const [isAutoPlay, setIsAutoPlay] = useState(false);
 
   const [hostSession, setHostSession] = useState<{ game: Game; round: Round; playlist: Playlist } | null>(null);
+  // Восстановленный из localStorage тур ждёт полных данных из базы
+  const needsRehydrateRef = useRef(false);
+  // Чтобы не показывать «нет места в хранилище» на каждое изменение состояния
+  const storageWarnedRef = useRef(false);
   const [shuffledTracks, setShuffledTracks] = useState<Track[]>([]);
   const [playedTrackIds, setPlayedTrackIds] = useState<Set<string | number>>(new Set());
   const [currentHostTrackIndex, setCurrentHostTrackIndex] = useState<number>(0);
@@ -113,21 +118,33 @@ export default function App() {
     fetchTemplates();
     fetchDatabase();
 
-    const savedSessionStr = localStorage.getItem('muzbingo_host_session');
-    if (savedSessionStr) {
-      try {
-        const parsed = JSON.parse(savedSessionStr);
-        if (parsed?.hostSession) {
-          setHostSession(parsed.hostSession);
-          setShuffledTracks(parsed.shuffledTracks || []);
-          setPlayedTrackIds(new Set(parsed.playedTrackIds || []));
-          setCurrentHostTrackIndex(parsed.currentHostTrackIndex || 0);
-          setHideTrackInfo(parsed.hideTrackInfo ?? true);
-          showToast('Игра восстановлена после обновления страницы!');
-        }
-      } catch (e) { localStorage.removeItem('muzbingo_host_session'); }
+    const saved = loadHostSession();
+    if (saved) {
+      setHostSession(saved.hostSession);
+      setShuffledTracks(saved.shuffledTracks);
+      setPlayedTrackIds(new Set(saved.playedTrackIds));
+      setCurrentHostTrackIndex(saved.currentHostTrackIndex);
+      setHideTrackInfo(saved.hideTrackInfo);
+      needsRehydrateRef.current = true;
+      showToast('Игра восстановлена после обновления страницы!');
     }
   }, []);
+
+  // В localStorage лежит только слепок тура (id + названия) — полные игру,
+  // тур с карточками и плейлист подставляем из базы, как только она загрузится.
+  useEffect(() => {
+    if (!needsRehydrateRef.current || !hostSession) return;
+    const dbGame = games.find(g => g.id === hostSession.game.id);
+    const dbPlaylist = playlists.find(p => p.id === hostSession.playlist.id);
+    if (!dbGame && !dbPlaylist) return;   // база ещё не приехала
+    const dbRound = dbGame?.rounds.find(r => r.id === hostSession.round.id);
+    needsRehydrateRef.current = false;
+    setHostSession({
+      game:     dbGame     || hostSession.game,
+      round:    dbRound    || hostSession.round,
+      playlist: dbPlaylist || hostSession.playlist,
+    });
+  }, [games, playlists, hostSession]);
 
   useEffect(() => {
     if (trackToAddToDb) {
@@ -157,12 +174,14 @@ export default function App() {
   }, [customFile]);
 
   useEffect(() => {
-    if (hostSession) {
-      localStorage.setItem('muzbingo_host_session', JSON.stringify({
-        hostSession, shuffledTracks, playedTrackIds: Array.from(playedTrackIds), currentHostTrackIndex, hideTrackInfo,
-      }));
-    } else {
-      localStorage.removeItem('muzbingo_host_session');
+    if (!hostSession) { clearHostSession(); return; }
+    const result = saveHostSession({
+      hostSession, shuffledTracks, playedTrackIds: Array.from(playedTrackIds), currentHostTrackIndex, hideTrackInfo,
+    });
+    // Предупреждаем один раз за тур: игра идёт как обычно, но F5 её не переживёт
+    if (result === 'failed' && !storageWarnedRef.current) {
+      storageWarnedRef.current = true;
+      showToast('Браузер не даёт сохранить игру (нет места в хранилище). Играть можно, но не перезагружай страницу.');
     }
   }, [hostSession, shuffledTracks, playedTrackIds, currentHostTrackIndex, hideTrackInfo]);
 
@@ -551,6 +570,7 @@ export default function App() {
     setCurrentHostTrackIndex(0);
     setHideTrackInfo(true);
     setAutoWinners([]);
+    storageWarnedRef.current = false;
     setHostSession({ game, round, playlist });
   };
 
