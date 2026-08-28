@@ -543,6 +543,23 @@ export default function App() {
     // карточки обязаны собираться ровно из этих треков, иначе клетка с треком,
     // которого в очереди нет, не закроется никогда.
     const uniqueQueue = buildPlayQueue(playlist.tracks, dbTracks);
+    setShuffledTracks(uniqueQueue);
+
+    // Проверяем карточки ПЕРЕД игрой: если в клетке есть трек, которого нет в
+    // очереди (карточки сгенерированы до правки плейлиста), эта карточка не
+    // закроется никогда — лучше сказать об этом сейчас, чем в конце тура.
+    const queueIds = new Set(uniqueQueue.map(t => String(t.id)));
+    const cards = round.cards || [];
+    const brokenCards = cards.filter(c =>
+      c.cells.some(cell => !('isFreeSpace' in cell) && !queueIds.has(String(cell.id)))
+    ).length;
+    if (brokenCards > 0) {
+      showToast(
+        `Внимание: ${brokenCards} из ${cards.length} карточек содержат песни, которых нет в очереди тура — ` +
+        `они не закроются. Плейлист изменился после генерации: перегенерируй карточки.`
+      );
+    }
+
     void prewarmQueue(uniqueQueue);   // фоном, старт игры не блокируем
     setPlayedTrackIds(new Set());
     setCurrentHostTrackIndex(0);
