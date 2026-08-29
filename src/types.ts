@@ -32,6 +32,10 @@ export interface Playlist {
 export interface BingoCard {
   id: string;
   cells: (Track | { isFreeSpace: true })[];
+  // На какой песне очереди карточка закроется (индекс с 0). Считается при
+  // генерации: очередь тура известна заранее. Информационное поле — если
+  // плейлист потом правили, значение устаревает.
+  winAt?: number;
 }
 
 export interface Round {

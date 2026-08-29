@@ -95,6 +95,19 @@ export default function HostScreen(props: HostScreenProps) {
             <div className="text-3xl font-black text-purple-400">{props.playedTrackIds.size} <span className="text-gray-600 text-xl">/ {props.shuffledTracks.length}</span></div>
             <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Сыграно</div>
           </div>
+          {/* Расписание побед: карточки знают, на какой песне закроются (winAt) */}
+          {(() => {
+            const next = (props.hostSession.round.cards || [])
+              .filter(c => typeof c.winAt === 'number' && c.winAt >= props.currentHostTrackIndex)
+              .sort((a, b) => (a.winAt as number) - (b.winAt as number))[0];
+            if (!next) return null;
+            return (
+              <div className="text-center mr-4 px-3 py-2 rounded-xl bg-gray-800/60 border border-gray-700" title="Расчёт по сгенерированным карточкам и порядку очереди">
+                <div className="text-sm font-black text-white">#{next.id} <span className="text-gray-500">на {(next.winAt as number) + 1}-й</span></div>
+                <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Ближайшее бинго</div>
+              </div>
+            );
+          })()}
           {props.prewarm && (
             <div className="flex items-center gap-2 mr-3 px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/30" title="Обновляем ссылки на треки, чтобы во время игры не было пауз">
               <Loader2 size={16} className="animate-spin text-blue-400" />

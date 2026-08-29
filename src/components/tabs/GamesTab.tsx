@@ -2,35 +2,10 @@ import { useState } from 'react';
 import { supabase } from '../../supabase';
 import { Game, Round, Playlist, Template, BingoCard, Track } from '../../types';
 import { buildPlayQueue } from '../../utils';
+import { winIndexForCard, buildCardForWinIndex, buildRandomCells, minWinIndex, maxWinIndex } from '../../lib/cardBuilder';
 import { ChevronLeft, Calendar, Trash2, PlusCircle, ListMusic, LayoutTemplate, Play, Printer, PartyPopper } from 'lucide-react';
 
 // Все 12 выигрышных линий в сетке 5×5 (строки, столбцы, 2 диагонали)
-const WIN_LINES = [
-  [0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24],
-  [0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24],
-  [0,6,12,18,24],[4,8,12,16,20],
-];
-
-// На каком ИНДЕКСЕ воспроизведения карточка впервые выполнит условие победы.
-// playIndexOf: id трека → его позиция в очереди. Свободная клетка считается «отмеченной» всегда.
-function winIndexForCard(
-  cells: (Track | { isFreeSpace: true })[],
-  playIndexOf: Map<string, number>,
-  condition: Round['winCondition']
-): number {
-  const cellPlay = cells.map(c =>
-    'isFreeSpace' in c ? -1 : (playIndexOf.get(String((c as Track).id)) ?? Infinity)
-  );
-  // Линия «закрывается» на максимальном play-индексе среди её 5 клеток
-  const lineDoneAt = WIN_LINES.map(line => Math.max(...line.map(i => cellPlay[i])));
-  const sorted = [...lineDoneAt].sort((a, b) => a - b);
-  if (condition === '1_line') return sorted[0];        // первая закрытая линия
-  if (condition === '2_lines') return sorted[1];       // вторая
-  if (condition === '3_lines') return sorted[2];       // третья
-  // full — все 24 клетки отмечены = максимальный play-индекс
-  return Math.max(...cellPlay);
-}
-
 interface GamesTabProps {
   games: Game[];
   setGames: (val: Game[]) => void;
@@ -51,6 +26,10 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
 
   const [cardGeneratorSetup, setCardGeneratorSetup] = useState<{ game: Game; round: Round } | null>(null);
   const [cardsCount, setCardsCount] = useState<number>(20);
+  // Моменты победы: авто (как раньше — просто разные) или заданные вручную
+  const [winMode, setWinMode] = useState<'auto' | 'manual'>('auto');
+  const [firstWinSong, setFirstWinSong] = useState<number>(25);   // номер песни (с 1)
+  const [winStep, setWinStep] = useState<number>(3);              // через сколько песен следующая
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
 
   const createGame = async () => {
@@ -121,45 +100,51 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
     const playIndexOf = new Map<string, number>();
     uniqueTracks.forEach((t, idx) => playIndexOf.set(String(t.id), idx));
 
-    const fisherYates = (arr: Track[]) => {
-      const a = [...arr];
-      for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [a[i], a[j]] = [a[j], a[i]];
-      }
-      return a;
-    };
-
-    const buildCells = (): (Track | { isFreeSpace: true })[] => {
-      const cardTracks = fisherYates(uniqueTracks).slice(0, 24);
-      return [...cardTracks.slice(0, 12), { isFreeSpace: true }, ...cardTracks.slice(12, 24)];
-    };
-
     const newCards: BingoCard[] = [];
     const startId = 1000 + (round.cards?.length || 0) + 1;
-    // Учитываем точки победы уже существующих карточек этого раунда, чтобы новые не совпадали с ними
-    const usedWinIndices = new Set<number>();
-    (round.cards || []).forEach(c => usedWinIndices.add(winIndexForCard(c.cells, playIndexOf, round.winCondition)));
-
-    // Больше попыток = плотнее заполняем доступные «моменты победы» (это просто
-    // перетасовки массива, быстро даже на сотне карточек).
-    const MAX_TRIES = 300;
-    let collisions = 0;
     const winIndices: number[] = [];
-    for (let i = 0; i < cardsCount; i++) {
-      let cells = buildCells();
-      let winIdx = winIndexForCard(cells, playIndexOf, round.winCondition);
-      // Пытаемся подобрать раскладку с уникальной точкой победы
-      let tries = 0;
-      while (usedWinIndices.has(winIdx) && tries < MAX_TRIES) {
-        cells = buildCells();
-        winIdx = winIndexForCard(cells, playIndexOf, round.winCondition);
-        tries++;
+    let collisions = 0;
+    let missedTargets = 0;
+
+    if (winMode === 'manual') {
+      // ── РУЧНЫЕ МОМЕНТЫ ПОБЕДЫ ──────────────────────────────────────────
+      // Ведущий сам говорит, на какой песне закроется первая карточка и через
+      // сколько песен следующая. Карточка собирается ПОД эту песню: победная
+      // линия из треков «до» неё + сама она, остальные клетки — в основном
+      // из треков «после», чтобы раньше времени ничего не закрылось.
+      const lo = minWinIndex(round.winCondition);
+      const hi = maxWinIndex(round.winCondition, uniqueTracks.length);
+      for (let i = 0; i < cardsCount; i++) {
+        const target = (firstWinSong - 1) + i * Math.max(1, winStep);
+        let cells = target >= lo && target <= hi
+          ? buildCardForWinIndex(uniqueTracks, round.winCondition, target, playIndexOf)
+          : null;
+        if (!cells) { missedTargets++; cells = buildRandomCells(uniqueTracks); }
+        const winIdx = winIndexForCard(cells, playIndexOf, round.winCondition);
+        winIndices.push(winIdx);
+        newCards.push({ id: String(startId + i), cells, winAt: winIdx });
       }
-      if (usedWinIndices.has(winIdx)) collisions++;
-      usedWinIndices.add(winIdx);
-      winIndices.push(winIdx);
-      newCards.push({ id: String(startId + i), cells });
+    } else {
+      // ── АВТОМАТИЧЕСКИ ──────────────────────────────────────────────────
+      // Случайные карточки, но с разными «моментами победы», чтобы не было
+      // двух-трёх бинго одновременно.
+      const usedWinIndices = new Set<number>();
+      (round.cards || []).forEach(c => usedWinIndices.add(winIndexForCard(c.cells, playIndexOf, round.winCondition)));
+      const MAX_TRIES = 300;
+      for (let i = 0; i < cardsCount; i++) {
+        let cells = buildRandomCells(uniqueTracks);
+        let winIdx = winIndexForCard(cells, playIndexOf, round.winCondition);
+        let tries = 0;
+        while (usedWinIndices.has(winIdx) && tries < MAX_TRIES) {
+          cells = buildRandomCells(uniqueTracks);
+          winIdx = winIndexForCard(cells, playIndexOf, round.winCondition);
+          tries++;
+        }
+        if (usedWinIndices.has(winIdx)) collisions++;
+        usedWinIndices.add(winIdx);
+        winIndices.push(winIdx);
+        newCards.push({ id: String(startId + i), cells, winAt: winIdx });
+      }
     }
 
     // Очередь известна заранее, поэтому можно честно сказать, КОГДА будет бинго.
@@ -171,7 +156,12 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
     const droppedHint = dropped > 0
       ? ` Из плейлиста выброшено ${dropped} повторов (тот же трек или та же песня) — в туре прозвучит ${uniqueTracks.length} песен.`
       : '';
-    if (collisions > 0) {
+    if (winMode === 'manual') {
+      const missHint = missedTargets > 0
+        ? ` ${missedTargets} карточкам заданная песня не подошла (вышли за пределы ${minWinIndex(round.winCondition) + 1}–${maxWinIndex(round.winCondition, uniqueTracks.length) + 1}) — они собраны случайно.`
+        : '';
+      showToast(`Готово. ${when}${missHint}${droppedHint}`);
+    } else if (collisions > 0) {
       const lineHint = round.winCondition === '1_line'
         ? ' Совет: 1 линия закрывается рано и кучно — выбери 2–3 линии и/или добавь треков в плейлист.'
         : ` Совет: добавь больше треков в плейлист (сейчас ${uniqueTracks.length}) — тогда «моментов победы» хватит на все карточки.`;
@@ -179,7 +169,7 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
     } else {
       showToast(`Готово. ${when}${droppedHint} Все ${cardsCount} карточек выстрелят в разные моменты — толпы не будет.`);
     }
-    
+
     const updatedRounds = game.rounds.map(r => r.id === round.id ? { ...r, cards:[...(r.cards || []), ...newCards] } : r);
     const updatedGame = { ...game, rounds: updatedRounds };
     setGames(games.map(g => g.id === game.id ? updatedGame : g));
@@ -266,9 +256,64 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
                 <label className="block text-sm text-gray-400 mb-2">Количество</label>
                 <input type="number" value={cardsCount} onChange={e => setCardsCount(Number(e.target.value) || 1)} className="w-full bg-gray-950 border border-gray-800 py-3 text-center rounded-xl font-bold" />
               </div>
-              <div className="mb-6">
+              <div className="mb-4">
                 <label className="block text-sm text-gray-400 mb-2">Шаблон</label>
                 <select value={selectedTemplateId} onChange={e => setSelectedTemplateId(e.target.value)} className="w-full bg-gray-950 border border-gray-800 rounded-xl py-3 px-4 text-white">{templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+              </div>
+
+              {/* Моменты победы: авто или заданные вручную */}
+              <div className="mb-6">
+                <label className="block text-sm text-gray-400 mb-2">Когда карточки выигрывают</label>
+                <div className="flex gap-2 mb-3">
+                  <button onClick={() => setWinMode('auto')}
+                    className={`flex-1 py-3 rounded-xl font-bold text-sm transition ${winMode === 'auto' ? 'bg-purple-600 text-white' : 'bg-gray-950 border border-gray-800 text-gray-400'}`}>
+                    Автоматически
+                  </button>
+                  <button onClick={() => setWinMode('manual')}
+                    className={`flex-1 py-3 rounded-xl font-bold text-sm transition ${winMode === 'manual' ? 'bg-purple-600 text-white' : 'bg-gray-950 border border-gray-800 text-gray-400'}`}>
+                    Задать самому
+                  </button>
+                </div>
+
+                {winMode === 'manual' ? (() => {
+                  const queue = buildPlayQueue(
+                    playlists.find(p => p.id === cardGeneratorSetup.round.playlistId)?.tracks || [],
+                    dbTracks
+                  );
+                  const cond = cardGeneratorSetup.round.winCondition;
+                  const lo = minWinIndex(cond) + 1;
+                  const hi = maxWinIndex(cond, queue.length) + 1;
+                  const step = Math.max(1, winStep);
+                  const lastSong = firstWinSong + (cardsCount - 1) * step;
+                  const bad = firstWinSong < lo || lastSong > hi;
+                  return (
+                    <>
+                      <div className="flex gap-3">
+                        <div className="flex-1">
+                          <span className="block text-xs text-gray-500 mb-1">Первое бинго на песне №</span>
+                          <input type="number" value={firstWinSong} min={lo} max={hi}
+                            onChange={e => setFirstWinSong(Math.max(1, Number(e.target.value) || 1))}
+                            className="w-full bg-gray-950 border border-gray-800 py-3 text-center rounded-xl font-bold" />
+                        </div>
+                        <div className="flex-1">
+                          <span className="block text-xs text-gray-500 mb-1">Следующее через (песен)</span>
+                          <input type="number" value={winStep} min={1}
+                            onChange={e => setWinStep(Math.max(1, Number(e.target.value) || 1))}
+                            className="w-full bg-gray-950 border border-gray-800 py-3 text-center rounded-xl font-bold" />
+                        </div>
+                      </div>
+                      <p className={`text-xs mt-2 ${bad ? 'text-orange-400' : 'text-gray-500'}`}>
+                        {queue.length < 24
+                          ? 'В плейлисте меньше 24 песен.'
+                          : bad
+                            ? `Для этого условия победа возможна только с ${lo}-й по ${hi}-ю песню (в туре ${queue.length}). Сейчас нужны песни ${firstWinSong}–${lastSong}: часть карточек соберётся случайно.`
+                            : `Карточки закроются на песнях ${firstWinSong}, ${firstWinSong + step}, ${firstWinSong + 2 * step}… последняя на ${lastSong}-й из ${queue.length}.`}
+                      </p>
+                    </>
+                  );
+                })() : (
+                  <p className="text-xs text-gray-500">Приложение само разведёт карточки по разным песням, чтобы не было двух бинго подряд.</p>
+                )}
               </div>
               <div className="flex gap-4">
                 <button onClick={() => setCardGeneratorSetup(null)} className="flex-1 py-4 bg-gray-800 rounded-xl font-bold">Отмена</button>
