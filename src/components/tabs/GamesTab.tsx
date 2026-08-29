@@ -146,13 +146,22 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
         if (!cells) { missedTargets++; cells = buildRandomCells(uniqueTracks); }
         built.push({ cells, winAt: winIndexForCard(cells, playIndexOf, round.winCondition) });
       }
-      // Нумеруем карточки ПО ПОРЯДКУ побед: #1001 закроется первой, #1002 второй.
-      // Иначе ведущий видит «ближайшее бинго #1009» и не понимает, что происходит.
-      built.sort((a, b) => a.winAt - b.winAt);
+      // Номера раздаём В СЛУЧАЙНОМ порядке. Если бы #1001 выигрывал первым,
+      // #1002 вторым и так далее, зал бы за пару туров понял, что победители
+      // расписаны заранее. Ведущий порядок всё равно видит — в экране игры
+      // показывается ближайшая победа (#номер и песня).
+      const ids = built.map((_, i) => startId + i);
+      for (let i = ids.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [ids[i], ids[j]] = [ids[j], ids[i]];
+      }
       built.forEach((b, i) => {
         winIndices.push(b.winAt);
-        newCards.push({ id: String(startId + i), cells: b.cells, winAt: b.winAt });
+        newCards.push({ id: String(ids[i]), cells: b.cells, winAt: b.winAt });
       });
+      // В печать и в базу — по возрастанию номера, чтобы пачка карточек была
+      // по порядку и по ней ничего нельзя было понять.
+      newCards.sort((a, b) => Number(a.id) - Number(b.id));
     } else {
       // ── АВТОМАТИЧЕСКИ ──────────────────────────────────────────────────
       // Случайные карточки, но с разными «моментами победы», чтобы не было
@@ -320,7 +329,6 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
                     ? Math.round(from + ((to - from) * i) / (cardsCount - 1))
                     : from;
                   const sameSong = cardsCount > 1 && (to - from) < cardsCount - 1;
-                  const firstId = 1000 + (replaceCards ? 0 : (cardGeneratorSetup.round.cards?.length || 0)) + 1;
                   return (
                     <>
                       <div className="flex gap-3">
@@ -341,8 +349,8 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
                         <p className="text-xs mt-2 text-orange-400">В плейлисте меньше 24 песен.</p>
                       ) : (
                         <p className="text-xs mt-2 text-gray-500">
-                          Победы: {at(0)}, {at(1)}, {at(2)}… последняя на {at(cardsCount - 1)}-й песне из {queue.length}.
-                          {' '}Карточки нумеруются по порядку побед — первой закроется #{firstId}.
+                          Победы на песнях: {at(0)}, {at(1)}, {at(2)}… последняя на {at(cardsCount - 1)}-й из {queue.length}.
+                          {' '}Номера карточек раздаются вразнобой, чтобы зал не понял, что победители расписаны — тебе порядок виден в экране игры.
                         </p>
                       )}
                       {clamped && queue.length >= 24 && (
