@@ -80,6 +80,20 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
     }
   };
 
+  // Открываем генератор с осмысленными числами: победы по умолчанию идут
+  // ближе к концу тура, но внутри разрешённого для этого условия окна.
+  const openGenerator = (game: Game, round: Round) => {
+    const queue = buildPlayQueue(playlists.find(p => p.id === round.playlistId)?.tracks || [], dbTracks);
+    const lo = minWinIndex(round.winCondition) + 1;
+    const hi = maxWinIndex(round.winCondition, queue.length) + 1;
+    if (hi >= lo) {
+      setLastWinSong(hi);
+      setFirstWinSong(Math.max(lo, hi - Math.round((hi - lo) * 0.7)));
+    }
+    setReplaceCards(true);
+    setCardGeneratorSetup({ game, round });
+  };
+
   const generateCards = async () => {
     if (!cardGeneratorSetup || !selectedTemplateId) return;
     const { game, round } = cardGeneratorSetup;
@@ -230,7 +244,7 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
                     <p className="text-gray-500 text-sm mb-6 flex items-center gap-2"><LayoutTemplate size={16} /> {cardsCountLabel}</p>
                     <div className="mt-auto flex gap-3">
                       <button onClick={() => startHostSession(currentGame, round)} disabled={!playlist} className="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition disabled:opacity-50"><Play size={20} fill="currentColor" /> Играть</button>
-                      <button onClick={() => { if (templates.length > 0 && !selectedTemplateId) setSelectedTemplateId(templates[0].id); setCardGeneratorSetup({ game: currentGame, round }); }} disabled={!playlist || playlist.tracks.length < 24} className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition disabled:opacity-50"><Printer size={20} /> Карточки</button>
+                      <button onClick={() => { if (templates.length > 0 && !selectedTemplateId) setSelectedTemplateId(templates[0].id); openGenerator(currentGame, round); }} disabled={!playlist || playlist.tracks.length < 24} className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition disabled:opacity-50"><Printer size={20} /> Карточки</button>
                     </div>
                   </div>
                 );
@@ -333,7 +347,9 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
                       )}
                       {clamped && queue.length >= 24 && (
                         <p className="text-xs mt-1 text-orange-400">
-                          Для условия «{condName}» победа возможна только с {lo}-й по {hi}-ю песню — цифры подогнаны под этот диапазон.
+                          Для условия «{condName}» победа возможна с {lo}-й по {hi}-ю песню — цифры подогнаны под диапазон.
+                          {' '}Раньше {lo}-й не закрыть {cond === 'full' ? '24 клетки' : `${minWinIndex(cond) + 1} клеток`};
+                          {cond !== 'full' && ` последние ${queue.length - hi} песен нужны как запас — иначе остальные линии закроются раньше и карточка выиграет не тогда, когда задумано.`}
                         </p>
                       )}
                       {sameSong && queue.length >= 24 && (
