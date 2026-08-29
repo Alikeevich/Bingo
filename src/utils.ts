@@ -99,3 +99,26 @@ export const buildPlayQueue = (playlistTracks: Track[], dbTracks: Track[] = []):
   }
   return queue;
 };
+
+// ────────────────────────────────────────────────────────────────────────
+// ОТМЕЧЕНА ЛИ КЛЕТКА КАРТОЧКИ
+// ────────────────────────────────────────────────────────────────────────
+// Сравниваем не только по id, но и по «ключу песни». Одна и та же песня легко
+// оказывается в базе под разными id: трек перезалили, добавили второй раз,
+// добавили версию «(Remastered)». В карточку попал один id, в туре прозвучал
+// другой — ведущий песню сыграл, гость честно закрыл клетку, а система считала
+// её незакрытой, и человек «не выигрывал» при живом бинго.
+export const buildCellMatcher = (
+  queue: Track[],
+  playedIds: Set<string>
+): ((cell: Track | { isFreeSpace: true }) => boolean) => {
+  const playedSongs = new Set<string>();
+  for (const t of queue) {
+    if (playedIds.has(String(t.id))) playedSongs.add(songKey(t.title, t.artist));
+  }
+  return (cell) => {
+    if ('isFreeSpace' in cell) return true;
+    if (playedIds.has(String(cell.id))) return true;
+    return playedSongs.has(songKey(cell.title, cell.artist));
+  };
+};

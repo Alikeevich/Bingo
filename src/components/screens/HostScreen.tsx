@@ -4,7 +4,7 @@ import {
   SkipBack, SkipForward, PauseCircle, Play, ListChecks, Loader2, Trophy, SearchCheck, Plus
 } from 'lucide-react';
 import { Track, Game, Round, Playlist, BingoCard } from '../../types';
-import { formatTime } from '../../utils';
+import { formatTime, buildCellMatcher } from '../../utils';
 
 interface HostScreenProps {
   hostSession: { game: Game; round: Round; playlist: Playlist };
@@ -66,7 +66,7 @@ export default function HostScreen(props: HostScreenProps) {
     const card = props.hostSession.round.cards.find(c => c.id === verifyCardId.trim());
     if (!card) return alert(`Карточка #${verifyCardId} не найдена!`);
     
-    const matches = card.cells.map(cell => 'isFreeSpace' in cell ? true : props.playedTrackIds.has(String(cell.id)));
+    const matches = card.cells.map(buildCellMatcher(props.shuffledTracks, props.playedTrackIds));
     const linesIndices = [
       [0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24],
       [0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24],

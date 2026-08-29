@@ -7,7 +7,7 @@ import { ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, 
 import { Track, Playlist, Game, Round, Template, BingoCard, Tag } from './types';
 import { migrateTemplate } from './lib/migrateTemplate';
 import { loadHostSession, saveHostSession, clearHostSession } from './lib/hostSessionStorage';
-import { playlistArtistSet, sharesArtist, buildPlayQueue } from './utils';
+import { playlistArtistSet, sharesArtist, buildPlayQueue, buildCellMatcher } from './utils';
 import AudioTrimmer from './components/AudioTrimmer';
 
 // Вкладки
@@ -198,8 +198,9 @@ export default function App() {
     if (!hostSession?.round.cards || playedTrackIds.size === 0) return setAutoWinners([]);
     const condition = hostSession.round.winCondition;
     const linesIndices = [[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24],[0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24],[0,6,12,18,24],[4,8,12,16,20]];
+    const isMarked = buildCellMatcher(shuffledTracks, playedTrackIds);
     const winners = hostSession.round.cards.filter(card => {
-      const matches = card.cells.map(cell => 'isFreeSpace' in cell ? true : playedTrackIds.has(String(cell.id)));
+      const matches = card.cells.map(isMarked);
       let linesCount = 0;
       linesIndices.forEach(line => { if (line.every(idx => matches[idx])) linesCount++; });
       if (condition === '1_line' && linesCount >= 1) return true;
@@ -209,7 +210,7 @@ export default function App() {
       return false;
     });
     setAutoWinners(winners.map(w => w.id));
-  }, [playedTrackIds, hostSession]);
+  }, [playedTrackIds, hostSession, shuffledTracks]);
 
   const fetchPlaylists = async () => {
     const { data } = await supabase.from('playlists').select('*').order('created_at', { ascending: false });

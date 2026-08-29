@@ -46,9 +46,51 @@ self.addEventListener('fetch', (event) => {
   event.respondWith((async () => {
     const cache = await caches.open(AUDIO_CACHE);
 
-    // Запросы с Range (перемотка аудио) не кэшируем — отдаём сети, иначе
-    // браузер получит кусок вместо полного файла и звук поедет.
+    // ── Запросы с Range ──────────────────────────────────────────────────
+    // Safari (и все браузеры на маке/айфоне) НИКОГДА не просит аудио целиком —
+    // тег <audio> сразу шлёт «Range: bytes=0-». Раньше такие запросы уходили
+    // мимо кэша прямо в сеть, поэтому офлайн-кэш работал в Chrome на винде и
+    // не работал на маке вообще.
+    // Теперь берём из кэша ЦЕЛЫЙ файл и сами нарезаем нужный кусок (206).
     if (req.headers.has('range')) {
+      const m = /bytes=(\d*)-(\d*)/i.exec(req.headers.get('range') || '');
+      // полный файл лежит в кэше под чистым URL (его кладёт «Офлайн Кэш»)
+      let full = await cache.match(req.url, { ignoreVary: true });
+      if (!full) {
+        // качаем целиком (без Range) — заодно попадёт в кэш для следующего раза
+        try {
+          const res = await fetch(req.url, { mode: 'cors' });
+          if (res && res.ok) { cache.put(req.url, res.clone()).catch(() => {}); full = res; }
+        } catch (e) { /* сети нет — ниже отдадим что есть */ }
+      }
+
+      if (full && full.status === 200 && full.type !== 'opaque') {
+        try {
+          const buf = await full.clone().arrayBuffer();
+          const size = buf.byteLength;
+          if (size > 0) {
+            const start = m && m[1] ? parseInt(m[1], 10) : 0;
+            const end = Math.min(m && m[2] ? parseInt(m[2], 10) : size - 1, size - 1);
+            if (start <= end) {
+              return new Response(buf.slice(start, end + 1), {
+                status: 206,
+                statusText: 'Partial Content',
+                headers: {
+                  'Content-Type': full.headers.get('Content-Type') || 'audio/mpeg',
+                  'Content-Range': `bytes ${start}-${end}/${size}`,
+                  'Content-Length': String(end - start + 1),
+                  'Accept-Ranges': 'bytes',
+                },
+              });
+            }
+          }
+        } catch (e) { /* не смогли нарезать — уходим в сеть */ }
+      }
+
+      // Непрозрачный (no-cors) ответ нарезать нельзя — отдаём как есть:
+      // перемотка будет хуже, но офлайн работает.
+      if (full && full.type === 'opaque') return full;
+
       try { return await fetch(req); } catch (e) {
         const cached = await cache.match(req, { ignoreVary: true });
         if (cached) return cached;
