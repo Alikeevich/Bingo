@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { cityOf, type EventItem } from './EventsSection';
+import { cityOf, formatPrice, type EventItem } from './EventsSection';
 
 const TZ = 'Asia/Almaty';
 
@@ -135,6 +135,9 @@ export default function SignupModal({
                 {dateLabel}
               </h3>
               <p className="text-cream/60 mt-1 text-sm">{cityOf(event)}{event.venue ? ` · ${event.venue}` : ''}</p>
+              {formatPrice(event.price) && (
+                <p className="text-lime mt-1 text-sm font-semibold">{formatPrice(event.price)} с человека</p>
+              )}
               <p className="text-cream/55 mt-3 text-sm">
                 Оставь контакты — придержим за тобой места.
               </p>

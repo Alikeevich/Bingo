@@ -68,10 +68,10 @@ export default async function handler(req: any, res: any) {
   // Проверяем, что игра существует и ещё не прошла
   let { data: ev, error: evErr } = await supabase
     .from('events')
-    .select('id, starts_at, venue, city')
+    .select('id, starts_at, venue, city, price')
     .eq('id', eventId)
     .maybeSingle();
-  if (evErr && /city/i.test(evErr.message)) {
+  if (evErr && /city|price/i.test(evErr.message)) {
     ({ data: ev, error: evErr } = await supabase
       .from('events')
       .select('id, starts_at, venue')
@@ -105,6 +105,9 @@ export default async function handler(req: any, res: any) {
       `Имя: ${name}`,
       `Телефон: ${phone}`,
       `Гостей: ${people}`,
+      ...(typeof (ev as any).price === "number" && (ev as any).price > 0
+        ? [`Сумма: ${((ev as any).price * people).toLocaleString("ru-RU")} ₸ (${people} × ${(ev as any).price.toLocaleString("ru-RU")} ₸)`]
+        : []),
       `Город: ${(ev as any).city || 'Астана'}`,
       `Игра: ${fmtDate(ev.starts_at)}${ev.venue ? ' · ' + ev.venue : ''}`,
       '',

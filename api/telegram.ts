@@ -7,6 +7,19 @@ const TZ = 'Asia/Almaty'; // весь Казахстан теперь UTC+5 — 
 const DEFAULT_CITY = 'Астана';
 
 // Приводим город к единому виду, чтобы «экибастуз» и «Экибастуз » на сайте были одной вкладкой
+// «5000», «5 000», «5000 тг», «5000₸» → 5000. «нет», «0», «-» → null. Иначе undefined (не цена).
+function parsePrice(raw: string): number | null | undefined {
+  const t = (raw || '').trim().toLowerCase();
+  if (!t) return undefined;
+  if (['нет', '-', '0', 'бесплатно'].includes(t)) return null;
+  const m = t.replace(/\s/g, '').match(/^(\d+)(тг|тенге|₸|kzt)?$/);
+  return m ? Number(m[1]) : undefined;
+}
+
+function priceLabel(price: number | null | undefined): string {
+  return typeof price === 'number' && price > 0 ? ` · ${price.toLocaleString('ru-RU')} ₸` : '';
+}
+
 function normCity(raw: string): string {
   const c = raw.trim().replace(/\s+/g, ' ');
   return c ? c.charAt(0).toUpperCase() + c.slice(1).toLowerCase() : '';
@@ -14,9 +27,11 @@ function normCity(raw: string): string {
 
 const HELP_TEXT = `Команды:
 /games — список будущих игр
-/addgame YYYY-MM-DD HH:MM Город | Место — добавить игру
-   пример: /addgame 2026-10-21 20:00 Экибастуз | Harat's Pub
+/addgame YYYY-MM-DD HH:MM Город | Место | Цена — добавить игру
+   пример: /addgame 2026-10-21 20:00 Экибастуз | Harat's Pub | 5000
+   цена — в тенге за человека, можно не указывать
    без «Город |» игра попадёт в Астану
+/setprice <id> <цена> — поменять цену игры (0 или «нет» — убрать)
 /delgame <id> — удалить игру (вместе с её записями)
 /signups — все будущие игры и записи под ними
 /delsignup <id> — удалить запись (если человек отказался)`;
@@ -67,18 +82,27 @@ async function runCommand(
       await send(
         token,
         chatId,
-        'Формат: /addgame 2026-10-21 20:00 Экибастуз | Harat’s Pub'
+        'Формат: /addgame 2026-10-21 20:00 Экибастуз | Harat’s Pub | 5000'
       );
       return;
     }
     const [, date, time, rest] = m;
-    // «Город | Место». Без разделителя — старый формат, город по умолчанию Астана.
+    // «Город | Место | Цена». Без разделителя — старый формат, город по умолчанию Астана.
     let city = DEFAULT_CITY;
     let venue: string | undefined = rest?.trim() || undefined;
+    let price: number | null = null;
     if (rest && rest.includes('|')) {
-      const [c, ...v] = rest.split('|');
-      city = normCity(c) || DEFAULT_CITY;
-      venue = v.join('|').trim() || undefined;
+      const parts = rest.split('|').map((x) => x.trim());
+      city = normCity(parts[0]) || DEFAULT_CITY;
+      // Последний кусок — цена, если он целиком число («5000», «5 000», «5000 тг»)
+      if (parts.length >= 3) {
+        const parsed = parsePrice(parts[parts.length - 1]);
+        if (parsed !== undefined) {
+          price = parsed;
+          parts.pop();
+        }
+      }
+      venue = parts.slice(1).join(' | ').trim() || undefined;
     }
     const [hh, mm] = time.split(':');
     const iso = `${date}T${hh.padStart(2, '0')}:${mm.padStart(2, '0')}:00+05:00`;
@@ -89,7 +113,7 @@ async function runCommand(
     }
     const { data, error } = await supabase
       .from('events')
-      .insert({ starts_at: d.toISOString(), venue: venue || null, city })
+      .insert({ starts_at: d.toISOString(), venue: venue || null, city, price })
       .select('id')
       .single();
     if (error || !data) {
@@ -99,15 +123,31 @@ async function runCommand(
     await send(
       token,
       chatId,
-      `Добавил игру #${data.id} — ${city}, ${fmt(d.toISOString())}${venue ? ' · ' + venue : ''}`
+      `Добавил игру #${data.id} — ${city}, ${fmt(d.toISOString())}${venue ? ' · ' + venue : ''}${priceLabel(price)}`
     );
+    return;
+  }
+
+  if (cmd === '/setprice') {
+    const m = args.match(/^(\d+)\s+(.+)$/);
+    const price = m ? parsePrice(m[2]) : undefined;
+    if (!m || price === undefined) {
+      await send(token, chatId, 'Формат: /setprice 12 5000  (0 или «нет» — убрать цену)');
+      return;
+    }
+    const { error } = await supabase.from('events').update({ price }).eq('id', Number(m[1]));
+    if (error) {
+      await send(token, chatId, 'Ошибка: ' + error.message);
+      return;
+    }
+    await send(token, chatId, price ? `Цена игры #${m[1]}: ${price.toLocaleString('ru-RU')} ₸` : `Цену у игры #${m[1]} убрал.`);
     return;
   }
 
   if (cmd === '/games') {
     const { data, error } = await supabase
       .from('events')
-      .select('id, starts_at, venue, city')
+      .select('id, starts_at, venue, city, price')
       .gte('starts_at', new Date().toISOString())
       .order('starts_at', { ascending: true });
     if (error) {
@@ -119,7 +159,7 @@ async function runCommand(
       return;
     }
     const lines = data.map(
-      (e) => `#${e.id} — ${e.city || DEFAULT_CITY}, ${fmt(e.starts_at)}${e.venue ? ' · ' + e.venue : ''}`
+      (e) => `#${e.id} — ${e.city || DEFAULT_CITY}, ${fmt(e.starts_at)}${e.venue ? ' · ' + e.venue : ''}${priceLabel(e.price)}`
     );
     await send(token, chatId, 'Будущие игры:\n' + lines.join('\n'));
     return;
@@ -143,7 +183,7 @@ async function runCommand(
   if (cmd === '/signups') {
     const { data, error } = await supabase
       .from('events')
-      .select('id, starts_at, venue, city, signups(id, name, phone, people_count)')
+      .select('id, starts_at, venue, city, price, signups(id, name, phone, people_count)')
       .gte('starts_at', new Date().toISOString())
       .order('starts_at', { ascending: true });
     if (error) {
@@ -155,6 +195,7 @@ async function runCommand(
       starts_at: string;
       venue: string | null;
       city: string | null;
+      price: number | null;
       signups: Array<{ id: number; name: string; phone: string; people_count: number }>;
     }>;
     if (events.length === 0) {
@@ -163,7 +204,7 @@ async function runCommand(
     }
     const parts: string[] = [];
     for (const e of events) {
-      const head = `Игра #${e.id} — ${e.city || DEFAULT_CITY}, ${fmt(e.starts_at)}${e.venue ? ' · ' + e.venue : ''}`;
+      const head = `Игра #${e.id} — ${e.city || DEFAULT_CITY}, ${fmt(e.starts_at)}${e.venue ? ' · ' + e.venue : ''}${priceLabel(e.price)}`;
       parts.push(head);
       const sUps = e.signups ?? [];
       if (sUps.length === 0) {

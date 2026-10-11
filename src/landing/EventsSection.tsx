@@ -8,7 +8,12 @@ export type EventItem = {
   starts_at: string;
   venue: string | null;
   city?: string | null;
+  price?: number | null;
 };
+
+// 5000 → «5 000 ₸». Пусто, если цена не задана.
+export const formatPrice = (p?: number | null) =>
+  typeof p === 'number' && p > 0 ? `${p.toLocaleString('ru-RU')} ₸` : '';
 
 export const DEFAULT_CITY = 'Астана';
 export const cityOf = (e: EventItem) => (e.city || DEFAULT_CITY).trim();
@@ -154,6 +159,12 @@ function EventCard({
         <span className="font-mono text-lime font-semibold">{p.time}</span>
         {event.venue && <span className="text-cream/55">· {event.venue}</span>}
       </div>
+      {formatPrice(event.price) && (
+        <p className="mt-3 font-display font-extrabold text-2xl text-cream">
+          {formatPrice(event.price)}
+          <span className="ml-1.5 text-sm font-semibold text-cream/50">с человека</span>
+        </p>
+      )}
       <button
         onClick={onPick}
         className="mt-6 rounded-full bg-lime px-6 py-3 font-display font-extrabold text-ink hover:scale-[1.03] active:scale-95 transition self-start"

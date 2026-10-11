@@ -19,10 +19,10 @@ export default async function handler(req: any, res: any) {
   const supabase = createClient(url, anon);
   let { data, error } = await supabase
     .from('events')
-    .select('id, starts_at, venue, city')
+    .select('id, starts_at, venue, city, price')
     .order('starts_at', { ascending: true });
   // Колонки city ещё нет (SQL не применён) — отдаём без неё, сайт не должен падать
-  if (error && /city/i.test(error.message)) {
+  if (error && /city|price/i.test(error.message)) {
     ({ data, error } = await supabase
       .from('events')
       .select('id, starts_at, venue')
