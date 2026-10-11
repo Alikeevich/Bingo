@@ -66,11 +66,18 @@ export default async function handler(req: any, res: any) {
   });
 
   // Проверяем, что игра существует и ещё не прошла
-  const { data: ev, error: evErr } = await supabase
+  let { data: ev, error: evErr } = await supabase
     .from('events')
-    .select('id, starts_at, venue')
+    .select('id, starts_at, venue, city')
     .eq('id', eventId)
     .maybeSingle();
+  if (evErr && /city/i.test(evErr.message)) {
+    ({ data: ev, error: evErr } = await supabase
+      .from('events')
+      .select('id, starts_at, venue')
+      .eq('id', eventId)
+      .maybeSingle() as any);
+  }
   if (evErr || !ev) {
     res.status(404).json({ error: 'Event not found' });
     return;
@@ -98,6 +105,7 @@ export default async function handler(req: any, res: any) {
       `Имя: ${name}`,
       `Телефон: ${phone}`,
       `Гостей: ${people}`,
+      `Город: ${(ev as any).city || 'Астана'}`,
       `Игра: ${fmtDate(ev.starts_at)}${ev.venue ? ' · ' + ev.venue : ''}`,
       '',
       `Удалить запись: /delsignup ${signup.id}`,

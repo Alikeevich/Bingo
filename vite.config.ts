@@ -91,7 +91,7 @@ export default defineConfig(({ mode }) => {
             const supabase = createClient(url, anon)
             const { data, error } = await supabase
               .from('events')
-              .select('id, starts_at, venue')
+              .select('id, starts_at, venue, city')
               .order('starts_at', { ascending: true })
             if (error) return jsonRes(res, 500, { error: error.message })
             jsonRes(res, 200, { events: data ?? [] })

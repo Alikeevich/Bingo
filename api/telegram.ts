@@ -3,11 +3,20 @@
 // Использует service_role-ключ Supabase, чтобы обходить RLS (полный доступ к events/signups).
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const TZ = 'Asia/Almaty'; // UTC+5, без перехода на летнее время
+const TZ = 'Asia/Almaty'; // весь Казахстан теперь UTC+5 — подходит и Астане, и Экибастузу
+const DEFAULT_CITY = 'Астана';
+
+// Приводим город к единому виду, чтобы «экибастуз» и «Экибастуз » на сайте были одной вкладкой
+function normCity(raw: string): string {
+  const c = raw.trim().replace(/\s+/g, ' ');
+  return c ? c.charAt(0).toUpperCase() + c.slice(1).toLowerCase() : '';
+}
 
 const HELP_TEXT = `Команды:
 /games — список будущих игр
-/addgame YYYY-MM-DD HH:MM Место — добавить игру (время Астаны)
+/addgame YYYY-MM-DD HH:MM Город | Место — добавить игру
+   пример: /addgame 2026-10-21 20:00 Экибастуз | Harat's Pub
+   без «Город |» игра попадёт в Астану
 /delgame <id> — удалить игру (вместе с её записями)
 /signups — все будущие игры и записи под ними
 /delsignup <id> — удалить запись (если человек отказался)`;
@@ -58,11 +67,19 @@ async function runCommand(
       await send(
         token,
         chatId,
-        'Формат: /addgame 2026-06-15 20:00 Harat’s Pub'
+        'Формат: /addgame 2026-10-21 20:00 Экибастуз | Harat’s Pub'
       );
       return;
     }
-    const [, date, time, venue] = m;
+    const [, date, time, rest] = m;
+    // «Город | Место». Без разделителя — старый формат, город по умолчанию Астана.
+    let city = DEFAULT_CITY;
+    let venue: string | undefined = rest?.trim() || undefined;
+    if (rest && rest.includes('|')) {
+      const [c, ...v] = rest.split('|');
+      city = normCity(c) || DEFAULT_CITY;
+      venue = v.join('|').trim() || undefined;
+    }
     const [hh, mm] = time.split(':');
     const iso = `${date}T${hh.padStart(2, '0')}:${mm.padStart(2, '0')}:00+05:00`;
     const d = new Date(iso);
@@ -72,7 +89,7 @@ async function runCommand(
     }
     const { data, error } = await supabase
       .from('events')
-      .insert({ starts_at: d.toISOString(), venue: venue?.trim() || null })
+      .insert({ starts_at: d.toISOString(), venue: venue || null, city })
       .select('id')
       .single();
     if (error || !data) {
@@ -82,7 +99,7 @@ async function runCommand(
     await send(
       token,
       chatId,
-      `Добавил игру #${data.id} — ${fmt(d.toISOString())}${venue ? ' · ' + venue.trim() : ''}`
+      `Добавил игру #${data.id} — ${city}, ${fmt(d.toISOString())}${venue ? ' · ' + venue : ''}`
     );
     return;
   }
@@ -90,7 +107,7 @@ async function runCommand(
   if (cmd === '/games') {
     const { data, error } = await supabase
       .from('events')
-      .select('id, starts_at, venue')
+      .select('id, starts_at, venue, city')
       .gte('starts_at', new Date().toISOString())
       .order('starts_at', { ascending: true });
     if (error) {
@@ -102,7 +119,7 @@ async function runCommand(
       return;
     }
     const lines = data.map(
-      (e) => `#${e.id} — ${fmt(e.starts_at)}${e.venue ? ' · ' + e.venue : ''}`
+      (e) => `#${e.id} — ${e.city || DEFAULT_CITY}, ${fmt(e.starts_at)}${e.venue ? ' · ' + e.venue : ''}`
     );
     await send(token, chatId, 'Будущие игры:\n' + lines.join('\n'));
     return;
@@ -126,7 +143,7 @@ async function runCommand(
   if (cmd === '/signups') {
     const { data, error } = await supabase
       .from('events')
-      .select('id, starts_at, venue, signups(id, name, phone, people_count)')
+      .select('id, starts_at, venue, city, signups(id, name, phone, people_count)')
       .gte('starts_at', new Date().toISOString())
       .order('starts_at', { ascending: true });
     if (error) {
@@ -137,6 +154,7 @@ async function runCommand(
       id: number;
       starts_at: string;
       venue: string | null;
+      city: string | null;
       signups: Array<{ id: number; name: string; phone: string; people_count: number }>;
     }>;
     if (events.length === 0) {
@@ -145,7 +163,7 @@ async function runCommand(
     }
     const parts: string[] = [];
     for (const e of events) {
-      const head = `Игра #${e.id} — ${fmt(e.starts_at)}${e.venue ? ' · ' + e.venue : ''}`;
+      const head = `Игра #${e.id} — ${e.city || DEFAULT_CITY}, ${fmt(e.starts_at)}${e.venue ? ' · ' + e.venue : ''}`;
       parts.push(head);
       const sUps = e.signups ?? [];
       if (sUps.length === 0) {

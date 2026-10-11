@@ -11,7 +11,7 @@ export const OWNER_TELEGRAM = 'kazheke_12';
 export const CONTACTS = {
   phone: '+7 (775) 000-30-07',
   instagram: 'muzbingo_astana',
-  city: 'Астана, Казахстан',
+  city: 'Астана · Экибастуз, Казахстан',
 };
 
 // Фотографии с реальных игр (лежат в public/, отдаются по /1.jpg .. /8.jpg)

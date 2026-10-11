@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CONTACTS } from './config';
 
 const TZ = 'Asia/Almaty';
@@ -7,7 +7,12 @@ export type EventItem = {
   id: number;
   starts_at: string;
   venue: string | null;
+  city?: string | null;
 };
+
+export const DEFAULT_CITY = 'Астана';
+export const cityOf = (e: EventItem) => (e.city || DEFAULT_CITY).trim();
+const CITY_KEY = 'muzbingo_city';
 
 function partsOf(iso: string) {
   const d = new Date(iso);
@@ -24,6 +29,14 @@ const ACCENTS = ['bg-magenta', 'bg-lime', 'bg-grape'];
 export default function EventsSection({ onPick }: { onPick: (e: EventItem) => void }) {
   const [events, setEvents] = useState<EventItem[] | null>(null);
   const [error, setError] = useState(false);
+  // Выбранный город запоминаем — гость из Экибастуза не должен каждый раз переключать
+  const [city, setCity] = useState<string>(() => {
+    try { return localStorage.getItem(CITY_KEY) || 'all'; } catch { return 'all'; }
+  });
+  const pickCity = (c: string) => {
+    setCity(c);
+    try { localStorage.setItem(CITY_KEY, c); } catch { /* приватный режим */ }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -39,6 +52,16 @@ export default function EventsSection({ onPick }: { onPick: (e: EventItem) => vo
     };
   }, []);
 
+  // Города берём из самих игр — новый город появится на сайте, как только его добавят в боте
+  const cities = useMemo(() => {
+    const set = new Set((events || []).map(cityOf));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'ru'));
+  }, [events]);
+  const multiCity = cities.length > 1;
+  // Если сохранённого города больше нет в расписании — показываем все
+  const activeCity = city !== 'all' && cities.includes(city) ? city : 'all';
+  const shown = (events || []).filter((e) => activeCity === 'all' || cityOf(e) === activeCity);
+
   return (
     <section id="events" className="mx-auto max-w-6xl px-5 py-16 sm:py-24 scroll-mt-20">
       <div className="text-center">
@@ -52,6 +75,22 @@ export default function EventsSection({ onPick }: { onPick: (e: EventItem) => vo
           Выбери дату — мы запишем тебя и придержим места.
         </p>
       </div>
+
+      {multiCity && (
+        <div className="mt-8 flex flex-wrap justify-center gap-2">
+          {['all', ...cities].map((c) => (
+            <button
+              key={c}
+              onClick={() => pickCity(c)}
+              className={`rounded-full px-5 py-2.5 font-display font-bold text-sm transition ${
+                activeCity === c ? 'bg-lime text-ink' : 'bg-white/5 text-cream/70 hover:bg-white/10'
+              }`}
+            >
+              {c === 'all' ? 'Все города' : c}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="mt-10">
         {events === null && !error && (
@@ -68,10 +107,11 @@ export default function EventsSection({ onPick }: { onPick: (e: EventItem) => vo
 
         {events && events.length > 0 && (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {events.map((ev, i) => (
+            {shown.map((ev, i) => (
               <EventCard
                 key={ev.id}
                 event={ev}
+                showCity={multiCity}
                 accent={ACCENTS[i % ACCENTS.length]}
                 onPick={() => onPick(ev)}
               />
@@ -86,16 +126,25 @@ export default function EventsSection({ onPick }: { onPick: (e: EventItem) => vo
 function EventCard({
   event,
   accent,
+  showCity,
   onPick,
 }: {
   event: EventItem;
   accent: string;
+  showCity: boolean;
   onPick: () => void;
 }) {
   const p = partsOf(event.starts_at);
   return (
     <div className="group relative overflow-hidden rounded-3xl bg-ink-card border border-white/10 p-6 hover:border-magenta/50 hover:-translate-y-1 transition flex flex-col">
-      <span className={`block h-1.5 w-10 rounded-full ${accent} mb-5`} />
+      <div className="flex items-center justify-between mb-5">
+        <span className={`block h-1.5 w-10 rounded-full ${accent}`} />
+        {showCity && (
+          <span className="rounded-full bg-white/5 px-3 py-1 text-xs font-bold uppercase tracking-wider text-cream/70">
+            {cityOf(event)}
+          </span>
+        )}
+      </div>
       <div className="flex items-baseline gap-3">
         <span className="font-display font-black text-6xl leading-none">{p.day}</span>
         <span className="font-display font-bold text-xl text-cream/70 lowercase">{p.month}</span>

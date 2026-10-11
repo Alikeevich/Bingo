@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { EventItem } from './EventsSection';
+import { cityOf, type EventItem } from './EventsSection';
 
 const TZ = 'Asia/Almaty';
 
@@ -116,7 +116,7 @@ export default function SignupModal({
             </h3>
             <p className="text-cream/70 leading-relaxed mb-7 max-w-sm mx-auto">
               Записали тебя на <span className="text-lime font-semibold">{dateLabel}</span>
-              {event.venue ? <> · {event.venue}</> : null}. Если что-то изменится — позвоним.
+              {' · '}{cityOf(event)}{event.venue ? <> · {event.venue}</> : null}. Если что-то изменится — позвоним.
             </p>
             <button
               onClick={onClose}
@@ -134,9 +134,7 @@ export default function SignupModal({
               <h3 className="font-display text-2xl sm:text-3xl font-extrabold text-cream leading-tight">
                 {dateLabel}
               </h3>
-              {event.venue && (
-                <p className="text-cream/60 mt-1 text-sm">{event.venue}</p>
-              )}
+              <p className="text-cream/60 mt-1 text-sm">{cityOf(event)}{event.venue ? ` · ${event.venue}` : ''}</p>
               <p className="text-cream/55 mt-3 text-sm">
                 Оставь контакты — придержим за тобой места.
               </p>
