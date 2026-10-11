@@ -53,6 +53,17 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
     }
   };
 
+  // Формат вечера: 1 тур — 2 линии, 2 тур — 3 линии, 3 тур и дальше — вся карточка.
+  // Условие подставляется само по номеру тура, но его можно поменять в списке.
+  const defaultConditionFor = (roundsSoFar: number): Round['winCondition'] =>
+    roundsSoFar === 0 ? '2_lines' : roundsSoFar === 1 ? '3_lines' : 'full';
+
+  const openAddRound = () => {
+    const n = viewingGame?.rounds.length ?? 0;
+    setNewRound({ name: `Тур ${n + 1}`, winCondition: defaultConditionFor(n) });
+    setIsAddRoundModalOpen(true);
+  };
+
   const addRoundToGame = async () => {
     if (!viewingGame || !newRound.name || !newRound.playlistId) return;
     const roundToAdd: Round = {
@@ -63,7 +74,6 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
     setGames(games.map(g => g.id === viewingGame.id ? updatedGame : g));
     setViewingGame(updatedGame);
     setIsAddRoundModalOpen(false);
-    setNewRound({ winCondition: '1_line' });
     await supabase.from('games').update({ rounds: updatedGame.rounds }).eq('id', viewingGame.id);
     showToast('Тур добавлен!');
   };
@@ -232,7 +242,7 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
         <div className="flex-1 overflow-y-auto pr-2 pb-10 custom-scrollbar">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold">Туры</h2>
-            <button onClick={() => setIsAddRoundModalOpen(true)} className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition flex items-center gap-2"><PlusCircle size={18} /> Добавить тур</button>
+            <button onClick={openAddRound} className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition flex items-center gap-2"><PlusCircle size={18} /> Добавить тур</button>
           </div>
           {currentGame.rounds.length === 0 ? (
             <div className="text-center py-20 text-gray-500 bg-gray-900/50 rounded-2xl border border-dashed border-gray-800">В этой игре пока нет туров.</div>
