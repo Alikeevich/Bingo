@@ -408,12 +408,18 @@ function VibeGallery() {
               className="shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-ink-card shadow-xl shadow-black/40"
               style={{ transform: `rotate(${i % 2 === 0 ? -1.5 : 1.5}deg)` }}
             >
-              <img
-                src={src}
-                alt="Атмосфера MuzBingo"
-                className="h-56 sm:h-80 w-auto object-cover block"
-                loading="lazy"
-              />
+              <picture>
+                <source srcSet={src.replace(/\.jpg$/, '.webp')} type="image/webp" />
+                <img
+                  src={src}
+                  alt="Атмосфера MuzBingo"
+                  className="h-56 sm:h-80 w-auto object-cover block"
+                  width={480}
+                  height={640}
+                  loading="lazy"
+                  decoding="async"
+                />
+              </picture>
             </div>
           ))}
         </div>
@@ -482,7 +488,10 @@ function InstagramPreview() {
           <div className="relative shrink-0">
             <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-full p-[3px] bg-gradient-to-tr from-magenta via-lime to-grape">
               <div className="h-full w-full rounded-full bg-ink-card grid place-items-center overflow-hidden">
-                <img src="/logo.png" alt="MuzBingo" className="h-10 sm:h-12 w-auto" />
+                <picture>
+                  <source srcSet="/logo.webp" type="image/webp" />
+                  <img src="/logo.png" alt="MuzBingo" className="h-10 sm:h-12 w-auto" loading="lazy" decoding="async" />
+                </picture>
               </div>
             </div>
           </div>
