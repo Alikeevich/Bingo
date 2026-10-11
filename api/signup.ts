@@ -110,15 +110,15 @@ export default async function handler(req: any, res: any) {
       '',
       `Удалить запись: /delsignup ${signup.id}`,
     ].join('\n');
-    try {
-      await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    // Записи получают все админы из вайтлиста (id через запятую)
+    const targets = String(chatId).split(',').map((x) => x.trim()).filter(Boolean);
+    await Promise.all(targets.map((id) =>
+      fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, text }),
-      });
-    } catch {
-      /* пусть запись уже создана — уведомление не критично */
-    }
+        body: JSON.stringify({ chat_id: id, text }),
+      }).catch(() => { /* запись уже создана — уведомление не критично */ })
+    ));
   }
 
   res.status(200).json({ ok: true, signup_id: signup.id });

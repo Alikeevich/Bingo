@@ -1,5 +1,5 @@
 // POST /api/telegram — вебхук Telegram. Реагирует на команды владельца.
-// Проверяет X-Telegram-Bot-Api-Secret-Token и сравнивает chat_id с TELEGRAM_CHAT_ID.
+// Проверяет X-Telegram-Bot-Api-Secret-Token и пускает только chat_id из TELEGRAM_CHAT_ID (список через запятую).
 // Использует service_role-ключ Supabase, чтобы обходить RLS (полный доступ к events/signups).
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
@@ -207,7 +207,11 @@ export default async function handler(req: any, res: any) {
 
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const ownerChatId = String(process.env.TELEGRAM_CHAT_ID || '');
+  // Вайтлист админов: несколько chat_id через запятую. Первый — главный владелец,
+  // ему же приходят сообщения о том, что боту пишет кто-то посторонний.
+  const admins = String(process.env.TELEGRAM_CHAT_ID || '')
+    .split(',').map((x) => x.trim()).filter(Boolean);
+  const ownerChatId = admins[0] || '';
   const supaUrl = process.env.VITE_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -235,8 +239,28 @@ export default async function handler(req: any, res: any) {
   const chatId = String(msg?.chat?.id || '');
   let text: string = typeof msg?.text === 'string' ? msg.text.trim() : '';
 
-  // Чужие чаты игнорируем молча
-  if (!chatId || chatId !== ownerChatId) {
+  if (!chatId) {
+    res.status(200).json({ ok: true });
+    return;
+  }
+
+  // Не из вайтлиста: команды не выполняем, но на /start говорим человеку его id
+  // и сообщаем владельцу, кто пишет. Иначе узнать id нового ведущего нельзя —
+  // Telegram не отдаёт id по @username.
+  if (!admins.includes(chatId)) {
+    if (/^\/start/.test(text)) {
+      const u = msg?.from || {};
+      const who = [u.first_name, u.last_name].filter(Boolean).join(' ') || 'без имени';
+      const handle = u.username ? '@' + u.username : 'без username';
+      await send(token, chatId, `Бот только для команды MuzBingo. Твой id: ${chatId} — передай его владельцу.`);
+      await send(
+        token,
+        ownerChatId,
+        `Боту написал посторонний: ${who} (${handle}), id ${chatId}.
+` +
+        `Чтобы дать доступ — добавь ${chatId} через запятую в TELEGRAM_CHAT_ID в Vercel.`
+      );
+    }
     res.status(200).json({ ok: true });
     return;
   }
