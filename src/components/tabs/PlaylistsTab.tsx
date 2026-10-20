@@ -344,7 +344,7 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
   }
 
   return (
-    <div className="animate-in fade-in duration-300">
+    <div className="animate-in fade-in duration-300 h-full overflow-y-auto custom-scrollbar pr-2 pb-10">
       <h1 className="text-3xl font-bold mb-2">Плейлисты</h1>
       <p className="text-gray-400 mb-8">Создавайте папки с музыкой (по 60–80 треков).</p>
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">

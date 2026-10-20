@@ -394,7 +394,7 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
   }
 
   return (
-    <div className="animate-in fade-in duration-300">
+    <div className="animate-in fade-in duration-300 h-full overflow-y-auto custom-scrollbar pr-2 pb-10">
       <h1 className="text-3xl font-bold mb-2">Мероприятия</h1>
       <p className="text-gray-400 mb-8">Создавайте игры, добавляйте в них туры и генерируйте карточки.</p>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
