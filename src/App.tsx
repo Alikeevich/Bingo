@@ -931,7 +931,7 @@ export default function App() {
       <main className="flex-1 overflow-hidden p-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-gray-900 via-gray-950 to-gray-950">
         <Routes>
           <Route index element={<Navigate to="games" replace />} />
-          <Route path="games" element={<GamesTab games={games} setGames={setGames} playlists={playlists} templates={templates} dbTracks={dbTracks} showToast={showToast} startHostSession={startHostSession} setPrintViewCards={setPrintViewCards} />} />
+          <Route path="games" element={<GamesTab games={games} setGames={setGames} playlists={playlists} templates={templates} dbTracks={dbTracks} showToast={showToast} startHostSession={startHostSession} setPrintViewCards={setPrintViewCards} resolveTrackUrl={resolveTrackUrl} />} />
           <Route path="mydatabase" element={<MyDatabaseTab
             dbTracks={dbTracks} dbTags={dbTags} playingTrackId={playingTrackId} isPaused={isPaused} togglePlay={togglePlay}
             setTrackToAdd={setTrackToAdd} deleteTrackFromDb={deleteTrackFromDb}

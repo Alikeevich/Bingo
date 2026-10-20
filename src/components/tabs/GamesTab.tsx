@@ -3,7 +3,8 @@ import { supabase } from '../../supabase';
 import { Game, Round, Playlist, Template, BingoCard, Track } from '../../types';
 import { buildPlayQueue } from '../../utils';
 import { winIndexForCard, buildCardForWinIndex, buildRandomCells, minWinIndex, maxWinIndex, Cells } from '../../lib/cardBuilder';
-import { ChevronLeft, Calendar, Trash2, PlusCircle, ListMusic, LayoutTemplate, Play, Printer, PartyPopper } from 'lucide-react';
+import { ChevronLeft, Calendar, Trash2, PlusCircle, ListMusic, LayoutTemplate, Play, Printer, PartyPopper, HardDriveDownload, Loader2 } from 'lucide-react';
+import { cacheTracks, isOfflineCacheReady } from '../../lib/offlineCache';
 
 // Все 12 выигрышных линий в сетке 5×5 (строки, столбцы, 2 диагонали)
 interface GamesTabProps {
@@ -15,9 +16,58 @@ interface GamesTabProps {
   showToast: (msg: string) => void;
   startHostSession: (game: Game, round: Round) => void;
   setPrintViewCards: (val: { cards: BingoCard[]; template: Template }) => void;
+  /** Ссылка, которую реально играет плеер (свой MP3 / R2 / свежий Deezer) */
+  resolveTrackUrl: (track: Track) => Promise<string | null>;
 }
 
-export default function GamesTab({ games, setGames, playlists, dbTracks, templates, showToast, startHostSession, setPrintViewCards }: GamesTabProps) {
+export default function GamesTab({ games, setGames, playlists, dbTracks, templates, showToast, startHostSession, setPrintViewCards, resolveTrackUrl }: GamesTabProps) {
+  // Скачивание всей игры в офлайн-кэш: { этап, сделано, всего } или null
+  const [gameOffline, setGameOffline] = useState<{ phase: string; done: number; total: number } | null>(null);
+
+  // Одна кнопка вместо «Офлайн Кэш» в каждом плейлисте: берём очереди ВСЕХ туров
+  // игры (тот же код, что играет тур), получаем реальные ссылки и отдаём их
+  // Service Worker. Делать заранее, на хорошем интернете, а не в заведении.
+  const cacheGameOffline = async (game: Game) => {
+    if (!isOfflineCacheReady()) {
+      showToast('Офлайн-режим ещё готовится. Обнови страницу (Ctrl+Shift+R) и нажми снова.');
+      return;
+    }
+    const seen = new Set<string>();
+    const tracks: Track[] = [];
+    for (const r of game.rounds) {
+      const pl = playlists.find(p => p.id === r.playlistId);
+      for (const t of buildPlayQueue(pl?.tracks || [], dbTracks)) {
+        if (seen.has(String(t.id))) continue;
+        seen.add(String(t.id));
+        tracks.push(t);
+      }
+    }
+    if (tracks.length === 0) { showToast('В турах нет треков'); return; }
+
+    try {
+      // 1) свежие ссылки — по 4 параллельно, бережно к Deezer
+      setGameOffline({ phase: 'Получаем ссылки', done: 0, total: tracks.length });
+      const urls: string[] = [];
+      let resolved = 0, missing = 0;
+      for (let i = 0; i < tracks.length; i += 4) {
+        const part = await Promise.all(tracks.slice(i, i + 4).map(t => resolveTrackUrl(t).catch(() => null)));
+        part.forEach(u => (u ? urls.push(u) : missing++));
+        resolved += part.length;
+        setGameOffline({ phase: 'Получаем ссылки', done: resolved, total: tracks.length });
+      }
+      // 2) скачивание в кэш
+      setGameOffline({ phase: 'Скачиваем', done: 0, total: urls.length });
+      await cacheTracks(urls, (done, total) => setGameOffline({ phase: 'Скачиваем', done, total }));
+      showToast(missing
+        ? `Готово: ${urls.length} треков офлайн. Не удалось получить: ${missing}`
+        : `Готово: все ${urls.length} треков игры доступны офлайн`);
+    } catch {
+      showToast('Не удалось скачать игру офлайн. Проверь интернет и попробуй ещё раз.');
+    } finally {
+      setGameOffline(null);
+    }
+  };
+
   const[viewingGame, setViewingGame] = useState<Game | null>(null);
   const[isCreateGameModalOpen, setIsCreateGameModalOpen] = useState(false);
   const [newGameName, setNewGameName] = useState('');
@@ -232,7 +282,18 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
         <div className="flex-1 overflow-y-auto pr-2 pb-10 custom-scrollbar">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold">Туры</h2>
-            <button onClick={() => setIsAddRoundModalOpen(true)} className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition flex items-center gap-2"><PlusCircle size={18} /> Добавить тур</button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => cacheGameOffline(viewingGame)}
+                disabled={!!gameOffline || viewingGame.rounds.length === 0}
+                title="Скачать треки всех туров этой игры, чтобы они играли даже без интернета. Делай дома, заранее."
+                className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition flex items-center gap-2 disabled:opacity-50"
+              >
+                {gameOffline ? <Loader2 size={18} className="animate-spin" /> : <HardDriveDownload size={18} />}
+                {gameOffline ? `${gameOffline.phase}: ${gameOffline.done}/${gameOffline.total}` : 'Скачать игру офлайн'}
+              </button>
+              <button onClick={() => setIsAddRoundModalOpen(true)} className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition flex items-center gap-2"><PlusCircle size={18} /> Добавить тур</button>
+            </div>
           </div>
           {currentGame.rounds.length === 0 ? (
             <div className="text-center py-20 text-gray-500 bg-gray-900/50 rounded-2xl border border-dashed border-gray-800">В этой игре пока нет туров.</div>
