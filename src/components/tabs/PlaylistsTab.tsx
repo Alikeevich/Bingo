@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../../supabase';
-import { Playlist, Track } from '../../types';
-import { ChevronLeft, CheckCircle2, UploadCloud, HardDriveDownload, Loader2, Music, Timer, PauseCircle, PlayCircle, Trash2, FolderPlus, Shuffle, Search, X, SearchCheck } from 'lucide-react';
+import { Game, Playlist, Track } from '../../types';
+import { ChevronLeft, CheckCircle2, UploadCloud, HardDriveDownload, Loader2, Music, Timer, PauseCircle, PlayCircle, Trash2, FolderPlus, Shuffle, Search, X, SearchCheck, GripVertical, AlertTriangle } from 'lucide-react';
 import { splitArtists } from '../../utils';
 import { cacheTracks, isOfflineCacheReady } from '../../lib/offlineCache';
 
@@ -14,9 +14,11 @@ interface PlaylistsTabProps {
   showToast: (msg: string) => void;
   /** Даёт ссылку, которую реально играет плеер (свой MP3 / R2 / свежий Deezer) */
   resolveTrackUrl: (track: Track) => Promise<string | null>;
+  /** Нужны, чтобы предупредить: смена порядка ломает уже собранные карточки туров */
+  games: Game[];
 }
 
-export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, isPaused, togglePlay, showToast, resolveTrackUrl }: PlaylistsTabProps) {
+export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, isPaused, togglePlay, showToast, resolveTrackUrl, games }: PlaylistsTabProps) {
   const[viewingPlaylist, setViewingPlaylist] = useState<Playlist | null>(null);
   const[isCreatePlaylistModalOpen, setIsCreatePlaylistModalOpen] = useState(false);
   const[newPlaylistName, setNewPlaylistName] = useState('');
@@ -24,6 +26,9 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
   const [offlineProgress, setOfflineProgress] = useState<{ current: number; total: number } | null>(null);
   const [trackSearch, setTrackSearch] = useState('');
   const [dupesOnly, setDupesOnly] = useState(false);
+  // Перетаскивание: какую строку тащим и над какой сейчас курсор
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
 
   const createPlaylist = async () => {
     if (!newPlaylistName.trim()) return;
@@ -55,7 +60,37 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
     setPlaylists(playlists.map(p => p.id === playlistId ? { ...p, tracks: shuffled } : p));
     if (viewingPlaylist?.id === playlistId) setViewingPlaylist({ ...viewingPlaylist, tracks: shuffled });
     await supabase.from('playlists').update({ tracks: shuffled }).eq('id', playlistId);
-    showToast('Плейлист перемешан');
+    warnIfCardsBuilt(playlistId, 'Плейлист перемешан');
+  };
+
+  // Туры, у которых по этому плейлисту уже собраны карточки. Порядок плейлиста —
+  // это порядок, в котором треки звучат в туре, и по нему же рассчитано, на какой
+  // песне выиграет каждая карточка. Поменял порядок — напечатанные бланки начнут
+  // выигрывать не тогда, когда задумано.
+  const roundsWithCards = (playlistId: string) =>
+    games.flatMap(g => g.rounds
+      .filter(r => r.playlistId === playlistId && (r.cards?.length || 0) > 0)
+      .map(r => `${g.name} / ${r.name}`));
+
+  const warnIfCardsBuilt = (playlistId: string, okText: string) => {
+    const affected = roundsWithCards(playlistId);
+    showToast(affected.length
+      ? `${okText}. Перегенерируй карточки: ${affected.join(', ')}`
+      : okText);
+  };
+
+  // Переставляет трек с позиции from на позицию to и сохраняет порядок
+  const moveTrack = async (playlistId: string, from: number, to: number) => {
+    const playlist = playlists.find(p => p.id === playlistId);
+    if (!playlist || from === to || from < 0 || to < 0) return;
+    const next = [...playlist.tracks];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setPlaylists(playlists.map(p => p.id === playlistId ? { ...p, tracks: next } : p));
+    if (viewingPlaylist?.id === playlistId) setViewingPlaylist({ ...viewingPlaylist, tracks: next });
+    const { error } = await supabase.from('playlists').update({ tracks: next }).eq('id', playlistId);
+    if (error) { showToast('Не удалось сохранить порядок: ' + error.message); return; }
+    warnIfCardsBuilt(playlistId, 'Порядок сохранён');
   };
 
   const removeTrackFromPlaylist = async (playlistId: string, trackId: string | number) => {
@@ -161,6 +196,8 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
       list = list.filter(isDupTrack).slice().sort((a, b) => sharedOf(a).localeCompare(sharedOf(b)));
     }
     const filteredTracks = list;
+    const canReorder = !q && !dupesOnly && currentPlaylist.tracks.length > 1;
+    const builtRounds = roundsWithCards(currentPlaylist.id);
     return (
       <div className="animate-in slide-in-from-right-8 duration-300 flex flex-col h-full">
         <button onClick={() => { setTrackSearch(''); setDupesOnly(false); setViewingPlaylist(null); }} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition w-fit"><ChevronLeft size={20} /> Назад к списку</button>
@@ -238,11 +275,56 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              <div className="text-sm text-gray-500 mb-2 font-medium bg-gray-900 p-3 rounded-lg border border-gray-800"><Timer size={16} className="inline mr-2 -mt-1" /> {dupesOnly ? 'Это треки, у которых исполнитель (или фит) повторяется. Удали лишние, чтобы не было повторов в игре.' : 'Подсказка: алгоритм берёт случайные 24 трека из всего плейлиста. Загрузите 60–80 треков для разнообразия.'}</div>
+              <div className="text-sm text-gray-500 mb-2 font-medium bg-gray-900 p-3 rounded-lg border border-gray-800"><Timer size={16} className="inline mr-2 -mt-1" /> {dupesOnly
+                ? 'Это треки, у которых исполнитель (или фит) повторяется. Удали лишние, чтобы не было повторов в игре.'
+                : canReorder
+                  ? 'Перетаскивай треки мышкой за значок слева — в этом порядке они зазвучат в туре.'
+                  : 'Чтобы менять порядок, сбрось поиск — перетаскивать можно только полный список.'}</div>
+              {canReorder && builtRounds.length > 0 && (
+                <div className="text-sm text-yellow-300 mb-2 bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/30 flex gap-2">
+                  <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
+                  <span>
+                    По этому плейлисту уже собраны карточки: {builtRounds.join(', ')}. Если поменяешь порядок —
+                    перегенерируй их, иначе бланки будут выигрывать не на тех песнях.
+                  </span>
+                </div>
+              )}
               {filteredTracks.map((track, index) => {
                 const isPlaying = playingTrackId === track.id && !isPaused;
                 return (
-                  <div key={track.id} className={`flex items-center gap-4 p-3 rounded-xl border transition group ${isPlaying ? 'bg-gray-800 border-purple-500' : 'bg-gray-900 border-gray-800 hover:bg-gray-800'}`}>
+                  <div
+                    key={track.id}
+                    draggable={canReorder}
+                    onDragStart={e => {
+                      setDragIndex(index);
+                      e.dataTransfer.effectAllowed = 'move';
+                      e.dataTransfer.setData('text/plain', String(index)); // Firefox без этого не начинает перетаскивание
+                    }}
+                    onDragOver={e => {
+                      if (dragIndex === null) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      if (overIndex !== index) setOverIndex(index);
+                    }}
+                    onDrop={e => {
+                      e.preventDefault();
+                      if (dragIndex !== null) moveTrack(currentPlaylist.id, dragIndex, index);
+                      setDragIndex(null); setOverIndex(null);
+                    }}
+                    onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
+                    className={`flex items-center gap-4 p-3 rounded-xl border transition group ${
+                      dragIndex === index ? 'opacity-40' : ''
+                    } ${
+                      overIndex === index && dragIndex !== null && dragIndex !== index
+                        ? (dragIndex < index ? 'border-b-purple-400 border-b-2' : 'border-t-purple-400 border-t-2')
+                        : ''
+                    } ${isPlaying ? 'bg-gray-800 border-purple-500' : 'bg-gray-900 border-gray-800 hover:bg-gray-800'}`}
+                  >
+                    {canReorder && (
+                      <div className="text-gray-600 group-hover:text-gray-300 cursor-grab active:cursor-grabbing -mr-2" title="Перетащи, чтобы поменять порядок">
+                        <GripVertical size={18} />
+                      </div>
+                    )}
                     <div className="w-8 text-center text-gray-500 font-medium">{index + 1}</div>
                     <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => togglePlay(track)}>
                       <img src={track.cover} alt="cover" className="w-full h-full object-cover" />
