@@ -8,7 +8,16 @@
  *
  * Стратегия для аудио: сначала кэш, при промахе — сеть, и ответ кладём в кэш.
  */
-const AUDIO_CACHE = 'muzbingo-audio-v1';
+// v2: ключ кэша — ссылка БЕЗ query. Старый v1 удалится сам при активации.
+const AUDIO_CACHE = 'muzbingo-audio-v2';
+
+// Ссылки Deezer содержат токен (?hdnea=exp=…), который меняется каждые 15 минут,
+// а сам файл по пути остаётся тем же. Если хранить по полной ссылке, кэш никогда
+// не находит трек повторно и копит дубли. Поэтому храним и ищем по пути без query.
+// У R2 / Supabase / Apple query в ссылках на аудио не используется — им это не мешает.
+const cacheKey = (url) => {
+  try { const u = new URL(url); return u.origin + u.pathname; } catch (e) { return url; }
+};
 
 // Хосты, откуда приходит музыка и обложки
 const AUDIO_HOSTS = [
@@ -55,12 +64,12 @@ self.addEventListener('fetch', (event) => {
     if (req.headers.has('range')) {
       const m = /bytes=(\d*)-(\d*)/i.exec(req.headers.get('range') || '');
       // полный файл лежит в кэше под чистым URL (его кладёт «Офлайн Кэш»)
-      let full = await cache.match(req.url, { ignoreVary: true });
+      let full = await cache.match(cacheKey(req.url), { ignoreVary: true });
       if (!full) {
         // качаем целиком (без Range) — заодно попадёт в кэш для следующего раза
         try {
           const res = await fetch(req.url, { mode: 'cors' });
-          if (res && res.ok) { cache.put(req.url, res.clone()).catch(() => {}); full = res; }
+          if (res && res.ok) { cache.put(cacheKey(req.url), res.clone()).catch(() => {}); full = res; }
         } catch (e) { /* сети нет — ниже отдадим что есть */ }
       }
 
@@ -92,24 +101,24 @@ self.addEventListener('fetch', (event) => {
       if (full && full.type === 'opaque') return full;
 
       try { return await fetch(req); } catch (e) {
-        const cached = await cache.match(req, { ignoreVary: true });
+        const cached = await cache.match(cacheKey(req.url), { ignoreVary: true });
         if (cached) return cached;
         throw e;
       }
     }
 
-    const cached = await cache.match(req, { ignoreVary: true });
+    const cached = await cache.match(cacheKey(req.url), { ignoreVary: true });
     if (cached) return cached;
 
     try {
       const res = await fetch(req);
       // Кэшируем только удачные ответы; opaque (no-cors) тоже кладём — лучше, чем ничего
       if (res && (res.ok || res.type === 'opaque')) {
-        cache.put(req, res.clone()).catch(() => {});
+        cache.put(cacheKey(req.url), res.clone()).catch(() => {});
       }
       return res;
     } catch (e) {
-      const fallback = await cache.match(req, { ignoreVary: true });
+      const fallback = await cache.match(cacheKey(req.url), { ignoreVary: true });
       if (fallback) return fallback;
       throw e;
     }
@@ -126,10 +135,10 @@ self.addEventListener('message', (event) => {
     let done = 0;
     for (const url of urls) {
       try {
-        const hit = await cache.match(url, { ignoreVary: true });
+        const hit = await cache.match(cacheKey(url), { ignoreVary: true });
         if (!hit) {
           const res = await fetch(url, { mode: 'cors' });
-          if (res.ok) await cache.put(url, res.clone());
+          if (res.ok) await cache.put(cacheKey(url), res.clone());
         }
       } catch { /* пропускаем недоступный трек */ }
       done++;

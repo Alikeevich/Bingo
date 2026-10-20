@@ -335,6 +335,15 @@ export default function App() {
         return null; // Deezer убрал превью — трек больше не играбелен
       } catch (e) {
         console.warn('refreshDeezerUrl failed for', track.id, e);
+        // Нет сети (или Deezer не ответил). Если файл уже лежит в офлайн-кэше —
+        // играем старую ссылку: Service Worker отдаст трек с диска по пути без токена.
+        // Если в кэше нет — ведём себя как раньше (трек пропускается).
+        try {
+          if ('caches' in window) {
+            const u = new URL(url);
+            if (await caches.match(u.origin + u.pathname)) return url;
+          }
+        } catch { /* нет доступа к кэшу — как раньше */ }
         return null;
       } finally {
         // через секунду удаляем из кеша (на случай если опять протухнет через время)
