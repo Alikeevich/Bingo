@@ -13,7 +13,7 @@ interface GamesTabProps {
   playlists: Playlist[];
   dbTracks: Track[];
   templates: Template[];
-  showToast: (msg: string) => void;
+  showToast: (msg: string, opts?: { sticky?: boolean }) => void;
   startHostSession: (game: Game, round: Round) => void;
   setPrintViewCards: (val: { cards: BingoCard[]; template: Template }) => void;
   /** Ссылка, которую реально играет плеер (свой MP3 / R2 / свежий Deezer) */
@@ -76,10 +76,27 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
 
   const [cardGeneratorSetup, setCardGeneratorSetup] = useState<{ game: Game; round: Round } | null>(null);
   const [cardsCount, setCardsCount] = useState<number>(20);
+  // Тексты в числовых полях. Храним отдельно от чисел: раньше поле сразу
+  // превращало пустоту в «1», и стереть цифру, чтобы вписать 80, было нельзя.
+  const [cardsDraft, setCardsDraft] = useState('20');
   // Моменты победы: авто (как раньше — просто разные) или заданные вручную
   const [winMode, setWinMode] = useState<'auto' | 'manual'>('auto');
   const [firstWinSong, setFirstWinSong] = useState<number>(25);   // номер песни (с 1)
   const [lastWinSong, setLastWinSong] = useState<number>(50);     // номер песни последней победы
+  const [firstDraft, setFirstDraft] = useState('25');
+  const [lastDraft, setLastDraft] = useState('50');
+  // Ввод в числовое поле: текст храним как есть, число обновляем только когда оно валидно
+  const numInput = (setDraft: (v: string) => void, setNum: (n: number) => void) =>
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const v = e.target.value.replace(/[^\d]/g, '');
+      setDraft(v);
+      const n = parseInt(v, 10);
+      if (n > 0) setNum(n);
+    };
+  // Ушёл из поля с пустотой — возвращаем последнее нормальное значение
+  const numBlur = (draft: string, setDraft: (v: string) => void, current: number) => () => {
+    if (!(parseInt(draft, 10) > 0)) setDraft(String(current));
+  };
   // Старые карточки тура. По умолчанию заменяем: если оставить, они выиграют
   // вразнобой и собьют расписание побед у новых.
   const [replaceCards, setReplaceCards] = useState<boolean>(true);
@@ -248,14 +265,14 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
       const missHint = missedTargets > 0
         ? ` ${missedTargets} карточкам не удалось попасть в заданную песню — они собраны случайно.`
         : '';
-      showToast(`Готово. ${when}${missHint}${droppedHint}`);
+      showToast(`Готово. ${when}${missHint}${droppedHint}`, { sticky: true });
     } else if (collisions > 0) {
       const lineHint = round.winCondition === '1_line'
         ? ' Совет: 1 линия закрывается рано и кучно — выбери 2–3 линии и/или добавь треков в плейлист.'
         : ` Совет: добавь больше треков в плейлист (сейчас ${uniqueTracks.length}) — тогда «моментов победы» хватит на все карточки.`;
-      showToast(`Готово. ${when}${droppedHint} ${collisions} из ${cardsCount} карточек могут выстрелить одновременно.${lineHint}`);
+      showToast(`Готово. ${when}${droppedHint} ${collisions} из ${cardsCount} карточек могут выстрелить одновременно.${lineHint}`, { sticky: true });
     } else {
-      showToast(`Готово. ${when}${droppedHint} Все ${cardsCount} карточек выстрелят в разные моменты — толпы не будет.`);
+      showToast(`Готово. ${when}${droppedHint} Все ${cardsCount} карточек выстрелят в разные моменты — толпы не будет.`, { sticky: true });
     }
 
     const updatedRounds = game.rounds.map(r => r.id === round.id ? { ...r, cards: [...keptCards, ...newCards] } : r);
@@ -353,7 +370,11 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
               <h3 className="text-xl font-bold mb-6">Генератор карточек</h3>
               <div className="mb-4">
                 <label className="block text-sm text-gray-400 mb-2">Количество</label>
-                <input type="number" value={cardsCount} onChange={e => setCardsCount(Number(e.target.value) || 1)} className="w-full bg-gray-950 border border-gray-800 py-3 text-center rounded-xl font-bold" />
+                <input type="text" inputMode="numeric" value={cardsDraft}
+                  onChange={numInput(setCardsDraft, setCardsCount)}
+                  onBlur={numBlur(cardsDraft, setCardsDraft, cardsCount)}
+                  onFocus={e => e.target.select()}
+                  className="w-full bg-gray-950 border border-gray-800 py-3 text-center rounded-xl font-bold" />
               </div>
               <div className="mb-4">
                 <label className="block text-sm text-gray-400 mb-2">Шаблон</label>
@@ -395,14 +416,18 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
                       <div className="flex gap-3">
                         <div className="flex-1">
                           <span className="block text-xs text-gray-500 mb-1">Первое бинго на песне №</span>
-                          <input type="number" value={firstWinSong} min={lo} max={hi}
-                            onChange={e => setFirstWinSong(Math.max(1, Number(e.target.value) || 1))}
+                          <input type="text" inputMode="numeric" value={firstDraft}
+                            onChange={numInput(setFirstDraft, setFirstWinSong)}
+                            onBlur={numBlur(firstDraft, setFirstDraft, firstWinSong)}
+                            onFocus={e => e.target.select()}
                             className="w-full bg-gray-950 border border-gray-800 py-3 text-center rounded-xl font-bold" />
                         </div>
                         <div className="flex-1">
                           <span className="block text-xs text-gray-500 mb-1">Последнее бинго на песне №</span>
-                          <input type="number" value={lastWinSong} min={lo} max={hi}
-                            onChange={e => setLastWinSong(Math.max(1, Number(e.target.value) || 1))}
+                          <input type="text" inputMode="numeric" value={lastDraft}
+                            onChange={numInput(setLastDraft, setLastWinSong)}
+                            onBlur={numBlur(lastDraft, setLastDraft, lastWinSong)}
+                            onFocus={e => e.target.select()}
                             className="w-full bg-gray-950 border border-gray-800 py-3 text-center rounded-xl font-bold" />
                         </div>
                       </div>

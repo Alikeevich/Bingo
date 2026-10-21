@@ -94,7 +94,10 @@ export default function App() {
 
   const [printViewCards, setPrintViewCards] = useState<{ cards: BingoCard[]; template: Template } | null>(null);
   const [trackToAdd, setTrackToAdd] = useState<Track | null>(null); 
-  const [toast, setToast] = useState<string | null>(null);
+  // sticky — не исчезает сам, только по крестику (для длинных итогов, например
+  // расписания побед после генерации карточек — его не успевали прочитать)
+  const [toast, setToast] = useState<{ text: string; sticky: boolean } | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Стейты модалки сохранения/редактирования
   const [trackToAddToDb, setTrackToAddToDb] = useState<Track | null>(null);
@@ -242,7 +245,13 @@ export default function App() {
     if (tagsData) setDbTags(tagsData);
   };
 
-  const showToast = (message: string) => { setToast(message); setTimeout(() => setToast(null), 3000); };
+  const showToast = (message: string, opts?: { sticky?: boolean }) => {
+    // Сбрасываем таймер прошлого тоста — иначе он закрывал новый раньше времени
+    if (toastTimerRef.current) { clearTimeout(toastTimerRef.current); toastTimerRef.current = null; }
+    const sticky = !!opts?.sticky;
+    setToast({ text: message, sticky });
+    if (!sticky) toastTimerRef.current = setTimeout(() => setToast(null), 3000);
+  };
 
   // ─── ПЛЕЕР: помощники для плавных переходов ───────────────────────────
 
@@ -903,8 +912,16 @@ export default function App() {
       <audio ref={preloadAudioRef} preload="auto" crossOrigin="anonymous" muted aria-hidden="true" style={{ display: 'none' }} />
 
       {toast && (
-        <div className="absolute top-6 right-6 bg-green-600 text-white px-6 py-4 rounded-xl shadow-2xl font-bold flex items-center gap-3 z-[300] animate-in slide-in-from-top-4">
-          <CheckCircle2 size={20} />{toast}
+        <div className="absolute top-6 right-6 max-w-md bg-green-600 text-white pl-6 pr-3 py-4 rounded-xl shadow-2xl font-bold flex items-start gap-3 z-[300] animate-in slide-in-from-top-4">
+          <CheckCircle2 size={20} className="flex-shrink-0 mt-0.5" />
+          <span className="flex-1 leading-snug">{toast.text}</span>
+          <button
+            onClick={() => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); setToast(null); }}
+            className="flex-shrink-0 p-1 -mt-1 rounded-lg hover:bg-white/20 transition"
+            title="Закрыть"
+          >
+            <X size={18} />
+          </button>
         </div>
       )}
 
