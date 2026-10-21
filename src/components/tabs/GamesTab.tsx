@@ -3,7 +3,7 @@ import { supabase } from '../../supabase';
 import { Game, Round, Playlist, Template, BingoCard, Track } from '../../types';
 import { buildPlayQueue } from '../../utils';
 import { winIndexForCard, buildCardForWinIndex, buildRandomCells, minWinIndex, maxWinIndex, Cells } from '../../lib/cardBuilder';
-import { ChevronLeft, Calendar, Trash2, PlusCircle, ListMusic, LayoutTemplate, Play, Printer, PartyPopper, HardDriveDownload, Loader2 } from 'lucide-react';
+import { ChevronLeft, Calendar, Trash2, PlusCircle, ListMusic, LayoutTemplate, Play, Printer, PartyPopper, HardDriveDownload, Loader2, Download } from 'lucide-react';
 import { cacheTracks, isOfflineCacheReady } from '../../lib/offlineCache';
 
 // Все 12 выигрышных линий в сетке 5×5 (строки, столбцы, 2 диагонали)
@@ -75,6 +75,30 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
   const[newRound, setNewRound] = useState<Partial<Round>>({ winCondition: '1_line' });
 
   const [cardGeneratorSetup, setCardGeneratorSetup] = useState<{ game: Game; round: Round } | null>(null);
+  // Повторное скачивание уже созданных карточек (без новой генерации)
+  const [reprint, setReprint] = useState<{ round: Round; index: number } | null>(null);
+  const [reprintTemplateId, setReprintTemplateId] = useState<string>('');
+
+  // Какой шаблон предложить: тот, которым печатали; иначе «Тур N» по номеру тура; иначе первый
+  const guessTemplate = (round: Round, index: number): string => {
+    if (round.templateId && templates.some(t => t.id === round.templateId)) return round.templateId;
+    const byName = templates.find(t => t.name.replace(/\s+/g, ' ').trim().toLowerCase() === `тур ${index + 1}`);
+    return (byName || templates[0])?.id || '';
+  };
+
+  const openReprint = (round: Round, index: number) => {
+    if (!round.cards?.length) return;
+    if (templates.length === 0) { showToast('Нет шаблонов карточек — создай шаблон во вкладке «Шаблоны»'); return; }
+    const guessed = guessTemplate(round, index);
+    // Один шаблон или шаблон уже запомнен — открываем сразу, без лишнего окна
+    if (templates.length === 1 || (round.templateId && guessed === round.templateId)) {
+      const template = templates.find(t => t.id === guessed)!;
+      setPrintViewCards({ cards: round.cards, template });
+      return;
+    }
+    setReprintTemplateId(guessed);
+    setReprint({ round, index });
+  };
   const [cardsCount, setCardsCount] = useState<number>(20);
   // Тексты в числовых полях. Храним отдельно от чисел: раньше поле сразу
   // превращало пустоту в «1», и стереть цифру, чтобы вписать 80, было нельзя.
@@ -275,7 +299,7 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
       showToast(`Готово. ${when}${droppedHint} Все ${cardsCount} карточек выстрелят в разные моменты — толпы не будет.`, { sticky: true });
     }
 
-    const updatedRounds = game.rounds.map(r => r.id === round.id ? { ...r, cards: [...keptCards, ...newCards] } : r);
+    const updatedRounds = game.rounds.map(r => r.id === round.id ? { ...r, cards: [...keptCards, ...newCards], templateId: template.id } : r);
     const updatedGame = { ...game, rounds: updatedRounds };
     setGames(games.map(g => g.id === game.id ? updatedGame : g));
     if (viewingGame?.id === game.id) setViewingGame(updatedGame);
@@ -329,6 +353,15 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
                     <h3 className="text-2xl font-black mb-2 truncate">{round.name}</h3>
                     <p className="text-gray-400 text-sm mb-2 flex items-center gap-2"><ListMusic size={16} /> {playlist ? `${playlist.name} (${playlist.tracks.length} треков)` : 'Плейлист удалён'}</p>
                     <p className="text-gray-500 text-sm mb-6 flex items-center gap-2"><LayoutTemplate size={16} /> {cardsCountLabel}</p>
+                    {!!round.cards?.length && (
+                      <button
+                        onClick={() => openReprint(round, index)}
+                        title="Открыть уже созданные карточки ещё раз — скачать или распечатать. Новые не создаются."
+                        className="mb-3 w-full bg-gray-950 border border-gray-800 hover:border-gray-600 text-gray-300 hover:text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition"
+                      >
+                        <Download size={16} /> Скачать готовые ({round.cards.length})
+                      </button>
+                    )}
                     <div className="mt-auto flex gap-3">
                       <button onClick={() => startHostSession(currentGame, round)} disabled={!playlist} className="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition disabled:opacity-50"><Play size={20} fill="currentColor" /> Играть</button>
                       <button onClick={() => { if (templates.length > 0 && !selectedTemplateId) setSelectedTemplateId(templates[0].id); openGenerator(currentGame, round); }} disabled={!playlist || playlist.tracks.length < 24} className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition disabled:opacity-50"><Printer size={20} /> Карточки</button>
@@ -339,6 +372,38 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
             </div>
           )}
         </div>
+
+        {/* Повторное скачивание готовых карточек */}
+        {reprint && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setReprint(null)}>
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+              <h3 className="text-xl font-bold mb-1">Скачать готовые карточки</h3>
+              <p className="text-gray-400 text-sm mb-5">
+                {reprint.round.name}: {reprint.round.cards?.length} карточек. Это те же карточки, что уже созданы, —
+                новые не генерируются, расписание побед не меняется.
+              </p>
+              <label className="block text-xs text-gray-500 mb-1">Шаблон оформления</label>
+              <select value={reprintTemplateId} onChange={e => setReprintTemplateId(e.target.value)}
+                className="w-full bg-gray-950 border border-gray-800 rounded-xl py-3 px-4 text-white focus:border-purple-500 mb-6">
+                {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              <div className="flex gap-3">
+                <button onClick={() => setReprint(null)} className="flex-1 py-3 bg-gray-800 rounded-xl font-bold">Отмена</button>
+                <button
+                  onClick={() => {
+                    const template = templates.find(t => t.id === reprintTemplateId);
+                    if (!template || !reprint.round.cards?.length) return;
+                    setPrintViewCards({ cards: reprint.round.cards, template });
+                    setReprint(null);
+                  }}
+                  className="flex-1 py-3 bg-purple-600 hover:bg-purple-500 rounded-xl font-bold flex items-center justify-center gap-2"
+                >
+                  <Download size={18} /> Открыть
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Модалки туров и генерации здесь же */}
         {isAddRoundModalOpen && (

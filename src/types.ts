@@ -44,6 +44,8 @@ export interface Round {
   playlistId: string;
   winCondition: '1_line' | '2_lines' | '3_lines' | 'full';
   cards?: BingoCard[];
+  /** Шаблон, которым печатали карточки — чтобы скачать их ещё раз тем же оформлением */
+  templateId?: string;
 }
 
 export interface Game {
