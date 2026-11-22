@@ -7,6 +7,8 @@ import { ListMusic, LayoutTemplate, PartyPopper, CheckCircle2, Globe, Database, 
 import { Track, Playlist, Game, Round, Template, BingoCard, Tag } from './types';
 import { migrateTemplate } from './lib/migrateTemplate';
 import { loadHostSession, saveHostSession, clearHostSession } from './lib/hostSessionStorage';
+import { evaluateCard } from './lib/cardBuilder';
+import { loadFadeSettings, saveFadeSettings, fadeInMs, fadeOutLeadSec, FadeSettings } from './lib/fade';
 import { playlistArtistSet, sharesArtist, buildPlayQueue, buildCellMatcher } from './utils';
 import AudioTrimmer from './components/AudioTrimmer';
 
@@ -61,7 +63,10 @@ export default function App() {
   // Активный фрагмент (preview_start / preview_end в секундах) текущего проигрываемого трека.
   // Хранится в ref чтобы onTimeUpdate (статичный хендлер) знал актуальные границы без re-attach.
   const currentSegmentRef = useRef<{ start?: number; end?: number; finished?: boolean }>({});
-  // Интервал плавного изменения громкости ( / fade-out)
+  // Плавность звука в игре (появление / затухание, 0–5 с) — ведущий меняет прямо в пульте
+  const [fade, setFadeState] = useState<FadeSettings>(() => loadFadeSettings(typeof window !== 'undefined' ? window.localStorage : undefined));
+  const setFade = (next: FadeSettings) => { setFadeState(next); saveFadeSettings(window.localStorage, next); };
+  // Интервал плавного изменения громкости (fade-in / fade-out)
   const fadeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Защита от двойного авто-перехода: onTimeUpdate (preview_end) и onEnded могут
   // оба вызвать handleTrackFinished для одного трека → трек проскакивал/перезапускался.
@@ -206,18 +211,8 @@ export default function App() {
   useEffect(() => {
     if (!hostSession?.round.cards || playedTrackIds.size === 0) return setAutoWinners([]);
     const condition = hostSession.round.winCondition;
-    const linesIndices = [[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24],[0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24],[0,6,12,18,24],[4,8,12,16,20]];
     const isMarked = buildCellMatcher(shuffledTracks, playedTrackIds);
-    const winners = hostSession.round.cards.filter(card => {
-      const matches = card.cells.map(isMarked);
-      let linesCount = 0;
-      linesIndices.forEach(line => { if (line.every(idx => matches[idx])) linesCount++; });
-      if (condition === '1_line' && linesCount >= 1) return true;
-      if (condition === '2_lines' && linesCount >= 2) return true;
-      if (condition === '3_lines' && linesCount >= 3) return true;
-      if (condition === 'full' && matches.every(m => m)) return true;
-      return false;
-    });
+    const winners = hostSession.round.cards.filter(card => evaluateCard(card.cells.map(isMarked), condition).isWinner);
     setAutoWinners(winners.map(w => w.id));
   }, [playedTrackIds, hostSession, shuffledTracks]);
 
@@ -264,8 +259,8 @@ export default function App() {
   // Плавно меняет громкость аудио-элемента от `from` к `to` за `durationMs`
   const fadeVolume = (audio: HTMLAudioElement, from: number, to: number, durationMs: number) => {
     if (fadeIntervalRef.current) { clearInterval(fadeIntervalRef.current); fadeIntervalRef.current = null; }
-    const steps = 12;
-    const stepMs = Math.max(8, durationMs / steps);
+    // Шаг не длиннее 50 мс: на долгом (до 5 с) затухании громкость меняется без ступенек
+    const stepMs = Math.max(8, Math.min(50, durationMs / 12));
     const totalSteps = Math.max(1, Math.round(durationMs / stepMs));
     let i = 0;
     audio.volume = Math.max(0, Math.min(1, from));
@@ -415,6 +410,7 @@ export default function App() {
         // RESUME — продолжаем с текущей секунды, НЕ перезагружаем трек
         if (fadeIntervalRef.current) { clearInterval(fadeIntervalRef.current); fadeIntervalRef.current = null; }
         audioEl.volume = 1;
+        fadeOutStartedRef.current = false; // пауза пришлась на затухание — оно перезапустится на остатке
         setIsPaused(false);
         audioEl.play().catch(console.error);
       } else {
@@ -463,9 +459,10 @@ export default function App() {
         audioEl.removeEventListener('loadedmetadata', onMeta);
       };
       audioEl.addEventListener('loadedmetadata', onMeta);
-      // Короткий (60мс) — звук не прыгает с тишины во весь объём
+      // Появление звука: настройка ведущего, иначе 60 мс — чтобы не было щелчка
+      const segLen = segEnd !== undefined ? segEnd - (segStart ?? 0) : 0;
       audioEl.volume = 0;
-      audioEl.play().then(() => fadeVolume(audioEl, 0, 1, 60)).catch(err => { console.error(err); setPlayingTrackId(null); });
+      audioEl.play().then(() => fadeVolume(audioEl, 0, 1, fadeInMs(fade, segLen))).catch(err => { console.error(err); setPlayingTrackId(null); });
     } catch (err) { console.error(err); setPlayingTrackId(null); }
   };
 
@@ -658,16 +655,16 @@ export default function App() {
         return;
       }
 
-      // За 180мс до конца (если впереди ещё есть треки в hostSession+autoPlay) запускаем fade-out
-      if (
-        !fadeOutStartedRef.current &&
-        effectiveEnd > 0 &&
-        effectiveEnd - t < 0.18 &&
-        isAutoPlay && hostSession &&
-        currentHostTrackIndex < shuffledTracks.length - 1
-      ) {
-        fadeOutStartedRef.current = true;
-        fadeVolume(el, el.volume, 0, 150);
+      // Затухание перед концом фрагмента: настройка ведущего, иначе 180 мс
+      // перед авто-переходом. Длительность — сколько реально осталось до конца.
+      if (!fadeOutStartedRef.current && effectiveEnd > 0 && !el.paused) {
+        const autoAdvance = !!(isAutoPlay && hostSession && currentHostTrackIndex < shuffledTracks.length - 1);
+        const lead = fadeOutLeadSec(fade, effectiveEnd - (seg.start ?? 0), autoAdvance);
+        const left = effectiveEnd - t;
+        if (lead !== null && left < lead) {
+          fadeOutStartedRef.current = true;
+          fadeVolume(el, el.volume, 0, Math.max(50, left * 1000));
+        }
       }
     },
     onLoadedMetadata: (e: React.SyntheticEvent<HTMLAudioElement>) => setDuration(e.currentTarget.duration),
@@ -909,7 +906,7 @@ export default function App() {
         <audio ref={audioRef} preload="auto" crossOrigin="anonymous" {...audioHandlers} />
         <audio ref={preloadAudioRef} preload="auto" crossOrigin="anonymous" muted aria-hidden="true" style={{ display: 'none' }} />
         <HostScreen
-          hostSession={hostSession} shuffledTracks={shuffledTracks} playedTrackIds={playedTrackIds} currentHostTrackIndex={currentHostTrackIndex} hideTrackInfo={hideTrackInfo} autoWinners={autoWinners} playingTrackId={playingTrackId} isPaused={isPaused} currentTime={currentTime} duration={duration} isAutoPlay={isAutoPlay} setIsAutoPlay={setIsAutoPlay} setHideTrackInfo={setHideTrackInfo} setIsProjectorMode={setIsProjectorMode} playHostTrack={playHostTrack} endHostSession={endHostSession} setAutoWinners={setAutoWinners} togglePlay={togglePlay} audioRef={audioRef} extendCurrentTrack={extendCurrentTrack} playFullVersion={playFullVersion} segment={segment} isFullMode={isFullMode} prewarm={prewarm}
+          hostSession={hostSession} shuffledTracks={shuffledTracks} playedTrackIds={playedTrackIds} currentHostTrackIndex={currentHostTrackIndex} hideTrackInfo={hideTrackInfo} autoWinners={autoWinners} playingTrackId={playingTrackId} isPaused={isPaused} currentTime={currentTime} duration={duration} isAutoPlay={isAutoPlay} setIsAutoPlay={setIsAutoPlay} setHideTrackInfo={setHideTrackInfo} setIsProjectorMode={setIsProjectorMode} playHostTrack={playHostTrack} endHostSession={endHostSession} setAutoWinners={setAutoWinners} togglePlay={togglePlay} audioRef={audioRef} fade={fade} setFade={setFade} extendCurrentTrack={extendCurrentTrack} playFullVersion={playFullVersion} segment={segment} isFullMode={isFullMode} prewarm={prewarm}
         />
       </>
     );

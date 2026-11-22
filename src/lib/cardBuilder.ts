@@ -29,6 +29,34 @@ export function winIndexForCard(
   return Math.max(...cellPlay);   // full — когда отмечены все 24
 }
 
+/**
+ * Выиграла ли карточка прямо сейчас. Единственное место с правилом победы:
+ * им пользуются и авто-подсветка бинго, и ручная проверка карточки ведущим.
+ * matches — отмечена ли каждая из 25 клеток (свободная клетка — true).
+ */
+export function evaluateCard(
+  matches: boolean[],
+  condition: Round['winCondition']
+): { linesCount: number; isWinner: boolean } {
+  const linesCount = WIN_LINES.filter(line => line.every(i => matches[i])).length;
+  const need = linesNeeded(condition);
+  const isWinner = condition === 'full'
+    ? matches.length === 25 && matches.every(Boolean)
+    : need > 0 && linesCount >= need;
+  return { linesCount, isWinner };
+}
+
+/**
+ * Карточка по номеру, который ведущий набрал с бланка: «7», «#7», «№ 7», «007».
+ * Номера карточек — целые числа, поэтому сравниваем как числа, а не как строки.
+ */
+export function findCardByNumber<C extends { id: string }>(cards: C[], input: string): C | undefined {
+  const digits = input.replace(/[\s#№]/g, '');
+  if (!/^\d+$/.test(digits)) return undefined;
+  const n = Number(digits);
+  return cards.find(c => c.id.trim() === digits || Number(c.id) === n);
+}
+
 // Сколько линий должно закрыться к моменту победы
 const linesNeeded = (condition: Round['winCondition']): number =>
   condition === '1_line' ? 1 : condition === '2_lines' ? 2 : condition === '3_lines' ? 3 : 0;

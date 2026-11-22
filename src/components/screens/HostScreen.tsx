@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { 
   PartyPopper, MonitorPlay, CheckCircle2, Power, Music, EyeOff, Eye,
-  SkipBack, SkipForward, PauseCircle, Play, ListChecks, Loader2, Trophy, SearchCheck, Plus, X
+  SkipBack, SkipForward, PauseCircle, Play, ListChecks, Loader2, Trophy, SearchCheck, Plus, X, AudioLines
 } from 'lucide-react';
+import { FadeSettings, FADE_MAX_SEC, FADE_STEP_SEC } from '../../lib/fade';
 import { Track, Game, Round, Playlist, BingoCard } from '../../types';
 import { formatTime, buildCellMatcher } from '../../utils';
+import { evaluateCard, findCardByNumber } from '../../lib/cardBuilder';
 
 interface HostScreenProps {
   hostSession: { game: Game; round: Round; playlist: Playlist };
@@ -26,6 +28,9 @@ interface HostScreenProps {
   setAutoWinners: (val: string[]) => void;
   togglePlay: (track: Track) => void;
   audioRef: React.RefObject<HTMLAudioElement>;
+  /** Плавное появление / затухание звука, секунды 0–5 */
+  fade: FadeSettings;
+  setFade: (next: FadeSettings) => void;
   extendCurrentTrack: (seconds?: number) => void;
   playFullVersion: () => void;
   /** Границы играющего фрагмента в секундах. end === 0 — играем до конца файла. */
@@ -39,6 +44,7 @@ interface HostScreenProps {
 export default function HostScreen(props: HostScreenProps) {
   const[isBingoVerifyModalOpen, setIsBingoVerifyModalOpen] = useState(false);
   const[verifyCardId, setVerifyCardId] = useState('');
+  const [isFadeOpen, setIsFadeOpen] = useState(false);
   const [verifyResult, setVerifyResult] = useState<{ card: BingoCard; matches: boolean[]; linesCount: number; isWinner: boolean; } | null>(null);
 
   const currentTrack = props.shuffledTracks[props.currentHostTrackIndex];
@@ -63,20 +69,11 @@ export default function HostScreen(props: HostScreenProps) {
   const handleVerifyCard = () => {
     if (!verifyCardId.trim()) return;
     if (!props.hostSession?.round.cards?.length) return alert('В этом туре ещё не сгенерированы карточки');
-    const card = props.hostSession.round.cards.find(c => c.id === verifyCardId.trim());
+    const card = findCardByNumber(props.hostSession.round.cards, verifyCardId);
     if (!card) return alert(`Карточка #${verifyCardId} не найдена`);
     
     const matches = card.cells.map(buildCellMatcher(props.shuffledTracks, props.playedTrackIds));
-    const linesIndices = [
-      [0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24],
-      [0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24],
-      [0,6,12,18,24],[4,8,12,16,20]
-    ];
-    let linesCount = 0;
-    linesIndices.forEach(line => { if (line.every(idx => matches[idx])) linesCount++; });
-    
-    const cond = props.hostSession.round.winCondition;
-    const isWinner = (cond === '1_line' && linesCount >= 1) || (cond === '2_lines' && linesCount >= 2) || (cond === '3_lines' && linesCount >= 3) || (cond === 'full' && matches.every(m => m));
+    const { linesCount, isWinner } = evaluateCard(matches, props.hostSession.round.winCondition);
     setVerifyResult({ card, matches, linesCount, isWinner });
   };
 
@@ -185,6 +182,40 @@ export default function HostScreen(props: HostScreenProps) {
                     <input type="checkbox" checked={props.isAutoPlay} onChange={e => props.setIsAutoPlay(e.target.checked)} className="hidden" />
                     <span className={`text-sm transition-colors ${props.isAutoPlay ? 'text-pult-text' : 'text-pult-muted group-hover:text-pult-text2'}`}>Авто-ход</span>
                   </label>
+                  {/* Плавность звука: по клику всплывает панель с двумя ползунками */}
+                  <div className="relative mt-3">
+                    <button
+                      onClick={() => setIsFadeOpen(o => !o)}
+                      title="Плавное появление и затухание звука"
+                      className={`h-8 px-2.5 -ml-2.5 rounded-md text-sm inline-flex items-center gap-2 transition-colors ${isFadeOpen ? 'bg-pult-raised text-pult-text' : 'text-pult-text2 hover:text-pult-text hover:bg-white/[0.04]'}`}
+                    >
+                      <AudioLines size={16} className={props.fade.inSec > 0 || props.fade.outSec > 0 ? 'text-lime' : ''} />
+                      Плавность
+                      <span className="font-mono text-xs tabular-nums text-pult-muted">{props.fade.inSec}с / {props.fade.outSec}с</span>
+                    </button>
+                    {isFadeOpen && (
+                      <>
+                        <div className="fixed inset-0 z-[40]" onClick={() => setIsFadeOpen(false)} />
+                        <div className="absolute bottom-full left-0 mb-2 z-[41] w-72 rounded-xl bg-pult-raised border border-white/[0.08] p-4 shadow-[0_12px_32px_rgba(0,0,0,0.45)]">
+                          {([['inSec', 'Появление (fade in)'], ['outSec', 'Затухание (fade out)']] as const).map(([key, label]) => (
+                            <div key={key} className="mb-4 last:mb-0">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm text-pult-text">{label}</span>
+                                <span className="font-mono text-sm tabular-nums text-lime">{props.fade[key] === 0 ? 'выкл' : `${props.fade[key]} с`}</span>
+                              </div>
+                              <input
+                                type="range" min={0} max={FADE_MAX_SEC} step={FADE_STEP_SEC}
+                                value={props.fade[key]}
+                                onChange={e => props.setFade({ ...props.fade, [key]: Number(e.target.value) })}
+                                className="w-full accent-lime cursor-pointer"
+                              />
+                            </div>
+                          ))}
+                          <p className="text-xs text-pult-muted leading-snug">Затухание срабатывает сразу, появление — со следующего трека. Отсчёт от границ фрагмента.</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-6">
                   <button onClick={() => props.setHideTrackInfo(!props.hideTrackInfo)} title={props.hideTrackInfo ? 'Показать название' : 'Скрыть название'} className={`w-12 h-12 rounded-full flex items-center justify-center border transition-colors ${props.hideTrackInfo ? 'bg-pult-raised border-white/[0.06] text-pult-text2 hover:text-pult-text' : 'bg-pult-raised border-lime/50 text-lime'}`}>
