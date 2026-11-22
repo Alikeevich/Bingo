@@ -7,13 +7,7 @@ import {
   Trash2, Scissors,
 } from 'lucide-react';
 import AudioTrimmer from '../AudioTrimmer';
-
-// /api/r2-sign пускает только вошедшего ведущего — передаём его токен Supabase
-const authHeader = async (): Promise<Record<string, string>> => {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
+import { authHeader, uploadMp3ToR2 } from '../../lib/r2Upload';
 
 interface Props {
   dbTracks: Track[];
@@ -94,25 +88,7 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
       // можно было начинать не дожидаясь настройки R2.
       let stored = '';
       try {
-        const signRes = await fetch('/api/r2-sign', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
-          body: JSON.stringify({ trackId: id }),
-        });
-        if (!signRes.ok) throw new Error('r2 not configured');
-        const { signedUrl, publicUrl } = await signRes.json();
-        const put = await fetch(signedUrl, {
-          method: 'PUT',
-          body: res.blob,
-          // Cache-Control обязан совпадать с тем, что заложено в подпись,
-          // иначе R2 отклонит загрузку с ошибкой подписи.
-          headers: {
-            'Content-Type': 'audio/mpeg',
-            'Cache-Control': 'public, max-age=31536000, immutable',
-          },
-        });
-        if (!put.ok) throw new Error(`R2 отказал (${put.status})`);
-        stored = publicUrl; // в mp3_path ляжет полный https-URL
+        stored = await uploadMp3ToR2(res.blob, id); // в mp3_path ляжет полный https-URL
       } catch {
         const safeName = `full_${id}_${Date.now()}.mp3`;
         const { error: upErr } = await supabase.storage

@@ -8,6 +8,7 @@ import { Track, Playlist, Game, Round, Template, BingoCard, Tag } from './types'
 import { migrateTemplate } from './lib/migrateTemplate';
 import { loadHostSession, saveHostSession, clearHostSession } from './lib/hostSessionStorage';
 import { evaluateCard } from './lib/cardBuilder';
+import { uploadMp3ToR2, isMp3File } from './lib/r2Upload';
 import { loadFadeSettings, saveFadeSettings, fadeInMs, fadeOutLeadSec, FadeSettings } from './lib/fade';
 import { playlistArtistSet, sharesArtist, buildPlayQueue, buildCellMatcher } from './utils';
 import AudioTrimmer from './components/AudioTrimmer';
@@ -365,6 +366,13 @@ export default function App() {
     return promise;
   };
 
+  // Свой загруженный трек. Новые и перенесённые лежат в R2 — полная ссылка в preview.
+  // Старая схема: id трека = имя файла в Supabase Storage.
+  const customTrackUrl = (track: Track): string =>
+    track.preview && /^https?:\/\//i.test(track.preview)
+      ? track.preview
+      : supabase.storage.from('audio-tracks').getPublicUrl(String(track.id)).data.publicUrl;
+
   // Резолвит готовый-к-воспроизведению URL. Приоритет:
   //   1) mp3Path — своя полная версия (офлайн, точная позиция для «Продолжить»)
   //   2) isCustom — старая схема, где id трека = имя файла в Storage
@@ -375,9 +383,7 @@ export default function App() {
         ? track.mp3Path // внешнее хранилище (Cloudflare R2 / CDN)
         : supabase.storage.from('audio-tracks').getPublicUrl(track.mp3Path).data.publicUrl;
     }
-    if (track.isCustom) {
-      return supabase.storage.from('audio-tracks').getPublicUrl(String(track.id)).data.publicUrl;
-    }
+    if (track.isCustom) return customTrackUrl(track);
     return refreshDeezerUrl(track);
   };
 
@@ -797,20 +803,25 @@ export default function App() {
       setIsUploadingMp3(true);
       const ext = customFile.name.split('.').pop() || 'mp3';
       const safeName = `custom_${Date.now()}.${ext}`;
-      
-      const { data, error: uploadError } = await supabase.storage
-        .from('audio-tracks')
-        .upload(safeName, customFile, { upsert: true });
 
-      if (uploadError) {
-        console.error(uploadError);
-        showToast('Ошибка загрузки файла');
-        setIsUploadingMp3(false);
-        return;
+      // MP3 — в R2; Supabase Storage только запасной путь (там всего 1 ГБ на весь проект)
+      let uploadedUrl = '';
+      if (isMp3File(customFile)) {
+        try { uploadedUrl = await uploadMp3ToR2(customFile, safeName); } catch (e) { console.warn('R2 upload failed, fallback to Supabase', e); }
       }
-
-      const { data: urlData } = supabase.storage.from('audio-tracks').getPublicUrl(data.path);
-      previewUrl = urlData.publicUrl;
+      if (!uploadedUrl) {
+        const { data, error: uploadError } = await supabase.storage
+          .from('audio-tracks')
+          .upload(safeName, customFile, { upsert: true });
+        if (uploadError) {
+          console.error(uploadError);
+          showToast('Ошибка загрузки файла');
+          setIsUploadingMp3(false);
+          return;
+        }
+        uploadedUrl = supabase.storage.from('audio-tracks').getPublicUrl(data.path).data.publicUrl;
+      }
+      previewUrl = uploadedUrl;
       safeId = safeName;
       isCustomTrack = true;
     }
@@ -1002,9 +1013,7 @@ export default function App() {
         // Источник аудио для триммера: blob от нового MP3 или публичный URL из supabase при правке кастомного
         const trimmerSrc =
           customFileUrl ??
-          (trackToAddToDb.isCustom
-            ? supabase.storage.from('audio-tracks').getPublicUrl(String(trackToAddToDb.id)).data.publicUrl
-            : null);
+          (trackToAddToDb.isCustom ? customTrackUrl(trackToAddToDb) : null);
 
         return (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">

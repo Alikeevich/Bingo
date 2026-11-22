@@ -74,7 +74,8 @@ async function checkTrack(t) {
     const u = /^https?:/i.test(t.mp3Path) ? t.mp3Path : `${SUPA}/storage/v1/object/public/audio-tracks/${t.mp3Path}`;
     return (await head(u)) ? 'ok:MP3' : 'FAIL:MP3 недоступен';
   }
-  if (t.isCustom) return (await head(`${SUPA}/storage/v1/object/public/audio-tracks/${encodeURIComponent(String(t.id))}`)) ? 'ok:свой' : 'FAIL:свой файл недоступен';
+  // Свой трек: перенесённые и новые лежат в R2 (ссылка в preview), старые — в Supabase Storage по id
+  if (t.isCustom) return (await head(/^https?:/.test(t.preview || '') ? t.preview : `${SUPA}/storage/v1/object/public/audio-tracks/${encodeURIComponent(String(t.id))}`)) ? 'ok:свой' : 'FAIL:свой файл недоступен';
   const p = t.preview || '';
   if (!p) return 'FAIL:нет превью';
   if (!p.includes('exp=')) return (await head(p)) ? 'ok:превью' : 'FAIL:превью недоступно';

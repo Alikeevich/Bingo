@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../../supabase';
+import { uploadMp3ToR2, isMp3File } from '../../lib/r2Upload';
 import { Game, Playlist, Tag, Track } from '../../types';
 import { ChevronLeft, UploadCloud, HardDriveDownload, Loader2, PauseCircle, PlayCircle, Trash2, FolderPlus, Shuffle, Search, X, SearchCheck, GripVertical, Lock } from 'lucide-react';
 import { splitArtists } from '../../utils';
@@ -122,13 +123,20 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
       const ext = file.name.split('.').pop() || 'mp3';
       const safeName = `custom_${Date.now()}_${i}.${ext}`;
       try {
-        const { data, error } = await supabase.storage.from('audio-tracks').upload(safeName, file, { upsert: true });
-        if (error) throw error;
-        const { data: urlData } = supabase.storage.from('audio-tracks').getPublicUrl(data.path);
+        // MP3 — в R2; Supabase Storage только запасной путь (там всего 1 ГБ на весь проект)
+        let url = '';
+        if (isMp3File(file)) {
+          try { url = await uploadMp3ToR2(file, safeName); } catch (e) { console.warn('R2 upload failed, fallback to Supabase', e); }
+        }
+        if (!url) {
+          const { data, error } = await supabase.storage.from('audio-tracks').upload(safeName, file, { upsert: true });
+          if (error) throw error;
+          url = supabase.storage.from('audio-tracks').getPublicUrl(data.path).data.publicUrl;
+        }
         newTracks.push({
           id: safeName, title: file.name.replace(`.${ext}`, ''),
           artist: 'Свой трек', cover: 'https://placehold.co/400x400/8b5cf6/ffffff?text=MP3',
-          preview: urlData.publicUrl, isCustom: true,
+          preview: url, isCustom: true,
         });
       } catch (err: any) { showToast(`Ошибка загрузки ${file.name}: ${err.message}`); }
     }
