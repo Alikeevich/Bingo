@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, Loader2, PauseCircle, PlayCircle, ChevronLeft, Database, ListMusic } from 'lucide-react';
 import { Track } from '../../types';
+import { parseITunes, searchITunes as fetchITunes } from '../../lib/itunes';
 
 // Пресеты: чарт (RSS Apple) или поисковый запрос (iTunes Search)
 const FILTERS: { name: string; kind: 'chart' | 'search'; query?: string; genre?: string }[] = [
@@ -15,9 +16,7 @@ const FILTERS: { name: string; kind: 'chart' | 'search'; query?: string; genre?:
 ];
 
 const PAGE = 50;
-// Поиск — по стору US: там полный западный каталог И рус/каз артисты (в kz-сторе
-// западное урезано лицензиями). Чарт — по kz (локальный топ). lookup по id — глобально.
-const COUNTRY_SEARCH = 'us';
+// Чарт — по kz (локальный топ). Поиск — по стору US, см. lib/itunes.
 const COUNTRY_CHART = 'kz';
 
 interface GlobalSearchTabProps {
@@ -27,22 +26,6 @@ interface GlobalSearchTabProps {
   setTrackToAddToDb: (track: Track) => void;
   setTrackToAdd: (track: Track) => void;
 }
-
-// Обложку 100x100 апскейлим до 600x600
-const bigCover = (url: string) => (url || '').replace(/\/\d+x\d+bb\./, '/600x600bb.');
-
-// iTunes Search result → Track
-const parseITunes = (results: any[]): Track[] =>
-  results
-    .filter((t) => t.previewUrl && t.trackName)
-    .map((t) => ({
-      id: t.trackId,
-      title: t.trackName,
-      artist: t.artistName,
-      cover: bigCover(t.artworkUrl100 || t.artworkUrl60 || ''),
-      preview: t.previewUrl,
-      isCustom: false,
-    }));
 
 export default function GlobalSearchTab({ playingTrackId, isPaused, togglePlay, setTrackToAddToDb, setTrackToAdd }: GlobalSearchTabProps) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -81,9 +64,8 @@ export default function GlobalSearchTab({ playingTrackId, isPaused, togglePlay, 
     const rid = ++reqIdRef.current;
     setIsSearching(true); setActiveFilter(filterName); setPage(0);
     try {
-      const res = await fetch(`/api/itunes/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=200&country=${COUNTRY_SEARCH}`);
-      const data = await res.json();
-      if (rid === reqIdRef.current) setAllResults(parseITunes(data.results || []));
+      const tracks = await fetchITunes(query);
+      if (rid === reqIdRef.current) setAllResults(tracks);
     } catch (e) { console.error(e); if (rid === reqIdRef.current) setAllResults([]); }
     finally { if (rid === reqIdRef.current) setIsSearching(false); }
   };

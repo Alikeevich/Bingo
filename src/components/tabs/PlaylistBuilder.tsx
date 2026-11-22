@@ -1,12 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Game, Playlist, Tag, Track } from '../../types';
+import { searchITunes } from '../../lib/itunes';
 import { playlistArtistSet, sharesArtist, splitArtists, songKey } from '../../utils';
 import {
-  ArrowRight, ArrowLeft, Search, X, Shuffle, Download, Layers, Lock, Play, Pause, ChevronLeft, ChevronRight,
+  ArrowRight, ArrowLeft, Search, X, Shuffle, Download, Layers, Lock, Play, Pause, ChevronLeft, ChevronRight, Loader2,
 } from 'lucide-react';
 
 /**
- * Набор песен в плейлист: слева вся «Моя база», справа плейлист.
+ * Набор песен в плейлист: слева «Моя база» или общий каталог (iTunes), справа плейлист.
  * Галочками отмечаешь, кнопкой переносишь пачкой. Плюс три помощника:
  * случайное добавление, загрузка из другого тура и подсветка песен,
  * которые уже звучали на другой игре.
@@ -60,6 +61,29 @@ function shuffled<T>(arr: T[]): T[] {
 export default function PlaylistBuilder(p: Props) {
   const inPlaylist = useMemo(() => new Set(p.playlist.tracks.map(t => String(t.id))), [p.playlist.tracks]);
 
+  // ── источник левой панели: своя база или общий каталог ──
+  const [source, setSource] = useState<'db' | 'catalog'>('db');
+  const [catalogQuery, setCatalogQuery] = useState('');
+  const [catalog, setCatalog] = useState<Track[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogSearched, setCatalogSearched] = useState(false);
+  const reqRef = useRef(0);
+  const runCatalogSearch = async () => {
+    const q = catalogQuery.trim();
+    if (!q) return;
+    const rid = ++reqRef.current;
+    setCatalogLoading(true); setPage(0); setLeftSel(new Set());
+    try {
+      const found = await searchITunes(q);
+      if (rid === reqRef.current) { setCatalog(found); setCatalogSearched(true); }
+    } catch {
+      if (rid === reqRef.current) { setCatalog([]); setCatalogSearched(true); p.showToast('Каталог не ответил — проверь интернет и попробуй ещё раз'); }
+    } finally {
+      if (rid === reqRef.current) setCatalogLoading(false);
+    }
+  };
+  const switchSource = (next: 'db' | 'catalog') => { setSource(next); setPage(0); setLeftSel(new Set()); };
+
   // ── фильтры левой панели ──
   const [query, setQuery] = useState('');
   const [tag, setTag] = useState('');
@@ -94,6 +118,9 @@ export default function PlaylistBuilder(p: Props) {
   const isBlocked = (t: Track) => sharesArtist(t.artist, presentArtists);
 
   const left = useMemo(() => {
+    if (source === 'catalog') {
+      return catalog.filter(t => !inPlaylist.has(String(t.id)) && !(hideBlocked && isBlocked(t)));
+    }
     const q = query.trim().toLowerCase();
     return p.dbTracks.filter(t => {
       if (inPlaylist.has(String(t.id))) return false;
@@ -103,7 +130,7 @@ export default function PlaylistBuilder(p: Props) {
       return t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [p.dbTracks, inPlaylist, query, tag, hideBlocked, presentArtists]);
+  }, [source, catalog, p.dbTracks, inPlaylist, query, tag, hideBlocked, presentArtists]);
 
   const pages = Math.max(1, Math.ceil(left.length / PAGE));
   const curPage = Math.min(page, pages - 1);
@@ -247,10 +274,28 @@ export default function PlaylistBuilder(p: Props) {
         {/* ── ЛЕВО: вся база ── */}
         <section className="flex flex-col min-h-0 rounded-xl border border-white/[0.08] bg-pult-card">
           <header className="p-4 pb-3 flex flex-col gap-3 border-b border-white/[0.06]">
-            <div className="flex items-baseline justify-between">
-              <h3 className="text-base font-medium text-pult-text">Моя база</h3>
+            <div className="flex items-center justify-between">
+              <div className="inline-flex rounded-lg bg-pult-raised p-0.5 border border-white/[0.06]">
+                {([['db', 'Моя база'], ['catalog', 'Каталог']] as const).map(([k, label]) => (
+                  <button key={k} type="button" onClick={() => switchSource(k)}
+                    className={`h-8 px-3 rounded-md text-sm transition-colors ${source === k ? 'bg-pult-card text-pult-text' : 'text-pult-text2 hover:text-pult-text'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
               <span className="font-mono text-xs tabular-nums text-pult-muted">{left.length} песен</span>
             </div>
+            {source === 'catalog' ? (
+              <form onSubmit={e => { e.preventDefault(); runCatalogSearch(); }} className="grid grid-cols-[1fr_auto] gap-2">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-pult-muted" />
+                  <input value={catalogQuery} onChange={e => setCatalogQuery(e.target.value)} placeholder="Поиск по всему каталогу: исполнитель или песня" className={`${field} pl-8`} />
+                </div>
+                <button type="submit" disabled={catalogLoading || !catalogQuery.trim()} className={`${btn} bg-lime text-[#141415] hover:bg-[#d4ff63] min-w-[84px] justify-center`}>
+                  {catalogLoading ? <Loader2 size={16} className="animate-spin" /> : 'Найти'}
+                </button>
+              </form>
+            ) : (
             <div className="grid grid-cols-[1fr_160px] gap-2">
               <div className="relative">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-pult-muted" />
@@ -261,6 +306,7 @@ export default function PlaylistBuilder(p: Props) {
                 {p.dbTags.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
               </select>
             </div>
+            )}
             <div className="flex items-center justify-between text-sm">
               <label className="inline-flex items-center gap-2 text-pult-text2 cursor-pointer">
                 <input type="checkbox" checked={allLeftOnPage} disabled={p.locked} onChange={() => {
@@ -278,7 +324,13 @@ export default function PlaylistBuilder(p: Props) {
           </header>
           <div className="flex-1 overflow-y-auto custom-scrollbar p-2 flex flex-col gap-0.5">
             {leftPage.map(t => renderRow(t, 'l'))}
-            {leftPage.length === 0 && <p className="p-6 text-center text-sm text-pult-muted">Ничего не найдено</p>}
+            {leftPage.length === 0 && (
+              <p className="p-6 text-center text-sm text-pult-muted">
+                {source === 'catalog' && !catalogSearched
+                  ? 'Найди песни в общем каталоге — их можно добавить в плейлист сразу, без сохранения в базу'
+                  : 'Ничего не найдено'}
+              </p>
+            )}
           </div>
           <footer className="flex items-center justify-between px-4 h-12 border-t border-white/[0.06] text-sm text-pult-text2">
             <span className="font-mono tabular-nums">выбрано {leftSel.size}</span>
