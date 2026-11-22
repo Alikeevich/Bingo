@@ -425,7 +425,7 @@ function CanvasEditor({ config, activeSlot, setActiveSlot, patchSlot }: {
         {config.backgroundImageUrl ? (
           <img src={config.backgroundImageUrl} alt="" className="absolute inset-0 w-full h-full object-fill" draggable={false} />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-pult-text2 text-sm">Загрузите дизайнерский PNG</div>
+          <div className="absolute inset-0 flex items-center justify-center text-neutral-500 text-sm">Загрузите дизайнерский PNG</div>
         )}
 
         {/* СЛОТЫ */}

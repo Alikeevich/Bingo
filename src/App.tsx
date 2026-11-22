@@ -913,7 +913,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen bg-pult-bg text-[#141415] font-sans selection:bg-lime overflow-hidden relative">
+    <div className="flex h-screen bg-pult-bg text-pult-text font-sans selection:bg-lime selection:text-[#141415] overflow-hidden relative">
       <audio ref={audioRef} preload="auto" crossOrigin="anonymous" {...audioHandlers} />
       {/* Скрытый второй элемент — только для пре-кеша следующего трека (звук не воспроизводится) */}
       <audio ref={preloadAudioRef} preload="auto" crossOrigin="anonymous" muted aria-hidden="true" style={{ display: 'none' }} />
