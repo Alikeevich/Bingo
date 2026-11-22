@@ -975,7 +975,7 @@ export default function App() {
             playingTrackId={playingTrackId} isPaused={isPaused} togglePlay={togglePlay} setTrackToAdd={setTrackToAdd}
             setTrackToAddToDb={(t) => { setIsEditingTrack(false); setTrackToAddToDb(t); setSelectedTagsForNewTrack([]); setNewTagInput(''); }}
           />} />
-          <Route path="playlists" element={<PlaylistsTab playlists={playlists} setPlaylists={setPlaylists} playingTrackId={playingTrackId} isPaused={isPaused} togglePlay={togglePlay} showToast={showToast} resolveTrackUrl={resolveTrackUrl} games={games} />} />
+          <Route path="playlists" element={<PlaylistsTab playlists={playlists} setPlaylists={setPlaylists} playingTrackId={playingTrackId} isPaused={isPaused} togglePlay={togglePlay} showToast={showToast} resolveTrackUrl={resolveTrackUrl} games={games} dbTracks={dbTracks} dbTags={dbTags} />} />
           <Route path="migration" element={<Suspense fallback={<TabLoader />}><MigrationTab dbTracks={dbTracks} setDbTracks={setDbTracks} showToast={showToast} /></Suspense>} />
           <Route path="templates" element={<TemplatesTab templates={templates} setTemplates={setTemplates} showToast={showToast} />} />
           {/* неизвестный адрес внутри инструмента — возвращаем к мероприятиям */}

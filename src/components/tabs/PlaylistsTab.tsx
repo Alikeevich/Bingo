@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { supabase } from '../../supabase';
-import { Game, Playlist, Track } from '../../types';
-import { ChevronLeft, CheckCircle2, UploadCloud, HardDriveDownload, Loader2, Music, Timer, PauseCircle, PlayCircle, Trash2, FolderPlus, Shuffle, Search, X, SearchCheck, GripVertical, AlertTriangle } from 'lucide-react';
+import { Game, Playlist, Tag, Track } from '../../types';
+import { ChevronLeft, UploadCloud, HardDriveDownload, Loader2, PauseCircle, PlayCircle, Trash2, FolderPlus, Shuffle, Search, X, SearchCheck, GripVertical, Lock } from 'lucide-react';
 import { splitArtists } from '../../utils';
 import { cacheTracks, isOfflineCacheReady } from '../../lib/offlineCache';
+import PlaylistBuilder from './PlaylistBuilder';
 
 interface PlaylistsTabProps {
   playlists: Playlist[];
@@ -11,14 +12,17 @@ interface PlaylistsTabProps {
   playingTrackId: string | number | null;
   isPaused: boolean;
   togglePlay: (track: Track) => void;
-  showToast: (msg: string) => void;
+  showToast: (msg: string, opts?: { sticky?: boolean }) => void;
   /** Даёт ссылку, которую реально играет плеер (свой MP3 / R2 / свежий Deezer) */
   resolveTrackUrl: (track: Track) => Promise<string | null>;
   /** Нужны, чтобы предупредить: смена порядка ломает уже собранные карточки туров */
   games: Game[];
+  /** «Моя база» и теги — левая панель конструктора плейлиста */
+  dbTracks: Track[];
+  dbTags: Tag[];
 }
 
-export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, isPaused, togglePlay, showToast, resolveTrackUrl, games }: PlaylistsTabProps) {
+export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, isPaused, togglePlay, showToast, resolveTrackUrl, games, dbTracks, dbTags }: PlaylistsTabProps) {
   const[viewingPlaylist, setViewingPlaylist] = useState<Playlist | null>(null);
   const[isCreatePlaylistModalOpen, setIsCreatePlaylistModalOpen] = useState(false);
   const[newPlaylistName, setNewPlaylistName] = useState('');
@@ -29,12 +33,16 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
   // Перетаскивание: какую строку тащим и над какой сейчас курсор
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
+  const [detailTab, setDetailTab] = useState<'build' | 'order'>('build');
+  // Плейлисты, которые ведущий явно разблокировал для правки, несмотря на готовые бланки
+  const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set());
+  const [unlockAsk, setUnlockAsk] = useState<string | null>(null);
 
   const createPlaylist = async () => {
     if (!newPlaylistName.trim()) return;
     setIsCreatePlaylistModalOpen(false);
     const { data } = await supabase.from('playlists').insert([{ name: newPlaylistName, tracks: [] }]).select();
-    if (data?.[0]) { setPlaylists([data[0], ...playlists]); showToast('Плейлист создан!'); }
+    if (data?.[0]) { setPlaylists([data[0], ...playlists]); showToast('Плейлист создан'); }
     setNewPlaylistName('');
   };
 
@@ -128,13 +136,13 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
     if (viewingPlaylist?.id === playlistId) setViewingPlaylist({ ...viewingPlaylist, tracks: newTracks });
     await supabase.from('playlists').update({ tracks: newTracks }).eq('id', playlistId);
     setIsUploadingMp3(false);
-    showToast('Треки успешно добавлены!');
+    showToast('Песни добавлены');
     e.target.value = '';
   };
 
   const cachePlaylistForOffline = async (playlist: Playlist) => {
     if (!isOfflineCacheReady()) {
-      showToast('Офлайн-режим ещё готовится. Обнови страницу и попробуй снова.');
+      showToast('Офлайн-режим ещё готовится. Обнови страницу и попробуй снова');
       return;
     }
     try {
@@ -165,9 +173,17 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
       showToast(`Готово: ${urls.length} треков доступны офлайн`);
       setTimeout(() => setOfflineProgress(null), 2000);
     } catch (e) {
-      showToast('Ошибка кэширования.');
+      showToast('Не удалось сохранить для офлайна');
       setOfflineProgress(null);
     }
+  };
+
+  // Сохраняет новый состав/порядок плейлиста (общий путь для конструктора)
+  const savePlaylistTracks = async (playlistId: string, next: Track[]) => {
+    setPlaylists(playlists.map(p => p.id === playlistId ? { ...p, tracks: next } : p));
+    if (viewingPlaylist?.id === playlistId) setViewingPlaylist({ ...viewingPlaylist, tracks: next });
+    const { error } = await supabase.from('playlists').update({ tracks: next }).eq('id', playlistId);
+    if (error) showToast('Не удалось сохранить плейлист: ' + error.message, { sticky: true });
   };
 
   if (viewingPlaylist) {
@@ -196,174 +212,287 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
       list = list.filter(isDupTrack).slice().sort((a, b) => sharedOf(a).localeCompare(sharedOf(b)));
     }
     const filteredTracks = list;
-    const canReorder = !q && !dupesOnly && currentPlaylist.tracks.length > 1;
     const builtRounds = roundsWithCards(currentPlaylist.id);
+    // По плейлисту напечатаны бланки — менять песни и порядок нельзя, пока явно не разблокировать
+    const locked = builtRounds.length > 0 && !unlockedIds.has(currentPlaylist.id);
+    const canReorder = !locked && !q && !dupesOnly && currentPlaylist.tracks.length > 1;
+
+    const quietBtn = 'h-9 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-2 bg-pult-raised text-pult-text border border-white/[0.06] hover:bg-[#2b2b2e] transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
+
     return (
-      <div className="animate-in slide-in-from-right-8 duration-300 flex flex-col h-full">
-        <button onClick={() => { setTrackSearch(''); setDupesOnly(false); setViewingPlaylist(null); }} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition w-fit"><ChevronLeft size={20} /> Назад к списку</button>
-        <div className="flex items-end justify-between mb-8 border-b border-gray-800 pb-8">
+      <div className="flex flex-col h-full min-h-0 text-pult-text">
+        <button
+          onClick={() => { setTrackSearch(''); setDupesOnly(false); setViewingPlaylist(null); }}
+          className="inline-flex items-center gap-1 text-sm text-pult-text2 hover:text-pult-text transition-colors w-fit mb-4"
+        >
+          <ChevronLeft size={16} /> Плейлисты
+        </button>
+
+        <header className="flex items-end justify-between gap-6 mb-6">
           <div>
-            <h1 className="text-4xl font-black mb-2">{currentPlaylist.name}</h1>
-            <div className="flex items-center gap-4 flex-wrap">
-              <span className="text-gray-400">{currentPlaylist.tracks.length} треков</span>
-              {isReadyForGame ? <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium flex items-center gap-1"><CheckCircle2 size={16} /> Готов к генерации</span> : <span className="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-sm font-medium">Нужно минимум 24 трека</span>}
-              <div className="relative">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
-                <input
-                  type="text"
-                  value={trackSearch}
-                  onChange={(e) => setTrackSearch(e.target.value)}
-                  placeholder="Поиск: трек, исполнитель, тег…"
-                  className="bg-gray-900 border border-gray-800 rounded-full pl-8 pr-8 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 w-64"
-                />
-                {trackSearch && (
-                  <button onClick={() => setTrackSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white" title="Сбросить">
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-              <button
-                onClick={() => setDupesOnly(v => !v)}
-                disabled={dupCount === 0}
-                title="Показать треки, у которых исполнитель (или фит) повторяется в плейлисте"
-                className={`px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5 transition disabled:opacity-40 ${dupesOnly ? 'bg-yellow-500 text-gray-900' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
-              >
-                <SearchCheck size={14} /> {dupesOnly ? 'Показать все' : `Найти дубли${dupCount ? ` (${dupCount})` : ''}`}
-              </button>
-              {q && <span className="text-xs text-gray-500">найдено: {filteredTracks.length}</span>}
-              {dupesOnly && <span className="text-xs text-yellow-500/80">дублей-артистов: {dupCount} — удали лишние</span>}
-            </div>
+            <h1 className="text-2xl font-medium">{currentPlaylist.name}</h1>
+            <p className="mt-1 text-sm text-pult-text2">
+              <span className="font-mono tabular-nums">{currentPlaylist.tracks.length}</span> песен
+              <span className="mx-2 text-pult-muted">·</span>
+              {isReadyForGame
+                ? <span>готов к генерации бланков</span>
+                : <span className="text-amber-300">нужно минимум 24 песни</span>}
+              {builtRounds.length > 0 && (
+                <>
+                  <span className="mx-2 text-pult-muted">·</span>
+                  <span>бланки: {builtRounds.join(', ')}</span>
+                </>
+              )}
+            </p>
           </div>
-          <div className="flex gap-4">
-            <label className="bg-purple-600 hover:bg-purple-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 cursor-pointer transition shadow-lg">
-              {isUploadingMp3 ? <Loader2 size={20} className="animate-spin" /> : <UploadCloud size={20} />}
-              <span>Загрузить свои MP3</span>
-              <input type="file" multiple accept="audio/mpeg,audio/mp3,audio/wav" className="hidden" onChange={e => uploadCustomTracks(e, currentPlaylist.id)} disabled={isUploadingMp3} />
+          <div className="flex items-center gap-2">
+            <label className={`${quietBtn} cursor-pointer ${locked ? 'pointer-events-none opacity-40' : ''}`}>
+              {isUploadingMp3 ? <Loader2 size={16} className="animate-spin" /> : <UploadCloud size={16} />}
+              Свои MP3
+              <input type="file" multiple accept="audio/mpeg,audio/mp3,audio/wav" className="hidden" onChange={e => uploadCustomTracks(e, currentPlaylist.id)} disabled={isUploadingMp3 || locked} />
             </label>
-            <button
-              onClick={() => shufflePlaylist(currentPlaylist.id)}
-              disabled={currentPlaylist.tracks.length < 2}
-              title="Перемешать порядок треков в плейлисте"
-              className="bg-gray-800 hover:bg-gray-700 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition disabled:opacity-50">
-              <Shuffle size={20} /> Перемешать
+            <button onClick={() => shufflePlaylist(currentPlaylist.id)} disabled={locked || currentPlaylist.tracks.length < 2} title="Перемешать порядок песен" className={quietBtn}>
+              <Shuffle size={16} /> Перемешать
             </button>
-            <button onClick={() => cachePlaylistForOffline(currentPlaylist)} disabled={currentPlaylist.tracks.length === 0} className="bg-gray-800 hover:bg-gray-700 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition disabled:opacity-50"><HardDriveDownload size={20} /> Офлайн Кэш</button>
+            <button onClick={() => cachePlaylistForOffline(currentPlaylist)} disabled={currentPlaylist.tracks.length === 0} title="Скачать песни, чтобы играли без интернета" className={quietBtn}>
+              <HardDriveDownload size={16} /> Офлайн
+            </button>
           </div>
+        </header>
+
+        {/* вкладки */}
+        <div className="flex items-center gap-1 mb-4 border-b border-white/[0.06]">
+          {([['build', 'Набор песен'], ['order', 'Порядок и прослушка']] as const).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setDetailTab(k)}
+              className={`h-10 px-4 -mb-px text-sm transition-colors border-b-2 ${detailTab === k ? 'border-lime text-pult-text' : 'border-transparent text-pult-text2 hover:text-pult-text'}`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
+
         {offlineProgress && (
-          <div className="mb-6 bg-blue-900/30 border border-blue-500/50 rounded-xl p-4 flex items-center justify-between">
-            <div className="font-bold text-blue-400 flex items-center gap-2"><Loader2 className="animate-spin" size={20} /> Сохраняем в офлайн ({offlineProgress.current} из {offlineProgress.total})</div>
-            <div className="w-1/2 bg-gray-900 rounded-full h-2 overflow-hidden"><div className="bg-blue-500 h-full transition-all" style={{ width: `${(offlineProgress.current / offlineProgress.total) * 100}%` }} /></div>
+          <div className="mb-4 flex items-center gap-4 rounded-xl border border-white/[0.08] bg-pult-card px-4 py-3 text-sm">
+            <Loader2 className="animate-spin text-pult-muted" size={16} />
+            <span className="text-pult-text2">Сохраняем для офлайна</span>
+            <span className="font-mono tabular-nums text-pult-muted">{offlineProgress.current} / {offlineProgress.total}</span>
+            <div className="ml-auto w-1/3 h-1 rounded-full bg-pult-raised overflow-hidden">
+              <div className="h-full bg-lime transition-[width]" style={{ width: `${(offlineProgress.current / offlineProgress.total) * 100}%` }} />
+            </div>
           </div>
         )}
-        <div className="flex-1 overflow-y-auto pr-2 pb-10 custom-scrollbar">
-          {currentPlaylist.tracks.length === 0 ? (
-            <div className="text-center py-20 text-gray-500 bg-gray-900/50 rounded-2xl border border-dashed border-gray-800 flex flex-col items-center"><Music size={48} className="mb-4 opacity-50" /><p className="text-lg">Пусто. Загрузите свои MP3 или найдите треки в интернете.</p></div>
-          ) : filteredTracks.length === 0 ? (
-            <div className="text-center py-12 text-gray-500 bg-gray-900/50 rounded-2xl border border-dashed border-gray-800">
-              {dupesOnly ? (
-                <>
-                  <p className="text-base">Дублей-артистов не найдено — плейлист чистый.</p>
-                  <button onClick={() => setDupesOnly(false)} className="mt-3 text-purple-400 hover:text-purple-300 text-sm font-medium">Показать все</button>
-                </>
-              ) : (
-                <>
-                  <p className="text-base">Ничего не нашли по запросу «{trackSearch}».</p>
-                  <button onClick={() => setTrackSearch('')} className="mt-3 text-purple-400 hover:text-purple-300 text-sm font-medium">Сбросить поиск</button>
-                </>
-              )}
+
+        {detailTab === 'build' ? (
+          <PlaylistBuilder
+            playlist={currentPlaylist}
+            playlists={playlists}
+            dbTracks={dbTracks}
+            dbTags={dbTags}
+            games={games}
+            locked={locked}
+            onUnlockRequest={() => setUnlockAsk(currentPlaylist.id)}
+            onSave={next => savePlaylistTracks(currentPlaylist.id, next)}
+            showToast={showToast}
+            togglePlay={togglePlay}
+            playingTrackId={playingTrackId}
+            isPaused={isPaused}
+          />
+        ) : (
+          <div className="flex flex-col min-h-0 flex-1">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="relative w-72">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-pult-muted pointer-events-none" />
+                <input
+                  type="text" value={trackSearch} onChange={e => setTrackSearch(e.target.value)}
+                  placeholder="Песня, исполнитель или тег"
+                  className="h-9 w-full rounded-lg bg-pult-raised border border-white/[0.06] pl-8 pr-8 text-sm text-pult-text placeholder:text-pult-muted focus:outline-none focus:border-lime/60"
+                />
+                {trackSearch && (
+                  <button onClick={() => setTrackSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-pult-muted hover:text-pult-text" title="Сбросить"><X size={14} /></button>
+                )}
+              </div>
+              <button onClick={() => setDupesOnly(v => !v)} disabled={dupCount === 0} title="Показать песни, у которых исполнитель или фит повторяется"
+                className={`${quietBtn} ${dupesOnly ? 'border-lime/50 text-lime' : ''}`}>
+                <SearchCheck size={16} /> {dupesOnly ? 'Показать все' : 'Повторы исполнителей'}
+                {!dupesOnly && dupCount > 0 && <span className="font-mono tabular-nums text-pult-muted">{dupCount}</span>}
+              </button>
+              <span className="ml-auto text-sm text-pult-muted">
+                {locked
+                  ? 'Порядок закреплён — по плейлисту созданы бланки'
+                  : dupesOnly
+                    ? 'Удали лишние, чтобы исполнители не повторялись'
+                    : canReorder
+                      ? 'Перетащи песню за ручку слева — в этом порядке она зазвучит в туре'
+                      : q ? `Найдено: ${filteredTracks.length}. Чтобы менять порядок, сбрось поиск` : ''}
+              </span>
             </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <div className="text-sm text-gray-500 mb-2 font-medium bg-gray-900 p-3 rounded-lg border border-gray-800"><Timer size={16} className="inline mr-2 -mt-1" /> {dupesOnly
-                ? 'Это треки, у которых исполнитель (или фит) повторяется. Удали лишние, чтобы не было повторов в игре.'
-                : canReorder
-                  ? 'Перетаскивай треки мышкой за значок слева — в этом порядке они зазвучат в туре.'
-                  : 'Чтобы менять порядок, сбрось поиск — перетаскивать можно только полный список.'}</div>
-              {canReorder && builtRounds.length > 0 && (
-                <div className="text-sm text-yellow-300 mb-2 bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/30 flex gap-2">
-                  <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
-                  <span>
-                    По этому плейлисту уже собраны карточки: {builtRounds.join(', ')}. Если поменяешь порядок —
-                    перегенерируй их, иначе бланки будут выигрывать не на тех песнях.
-                  </span>
+
+            {locked && (
+              <div className="mb-3 flex items-center gap-3 rounded-xl border border-white/[0.08] bg-pult-card px-4 py-3 text-sm text-pult-text2">
+                <Lock size={16} className="text-pult-muted shrink-0" />
+                <span className="flex-1">По этому плейлисту уже созданы бланки. Если поменять песни или порядок, напечатанные карточки будут выигрывать не на тех песнях</span>
+                <button onClick={() => setUnlockAsk(currentPlaylist.id)} className={quietBtn}>Всё равно изменить</button>
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 pb-10">
+              {currentPlaylist.tracks.length === 0 ? (
+                <div className="py-16 text-center text-pult-text2 rounded-xl border border-dashed border-white/[0.08]">
+                  <p>Плейлист пуст</p>
+                  <button onClick={() => setDetailTab('build')} className="mt-2 text-sm text-lime hover:underline">Набрать песни из базы</button>
+                </div>
+              ) : filteredTracks.length === 0 ? (
+                <div className="py-12 text-center text-pult-text2 rounded-xl border border-dashed border-white/[0.08]">
+                  {dupesOnly ? (
+                    <>
+                      <p>Исполнители не повторяются</p>
+                      <button onClick={() => setDupesOnly(false)} className="mt-2 text-sm text-lime hover:underline">Показать все</button>
+                    </>
+                  ) : (
+                    <>
+                      <p>Ничего не нашли по запросу «{trackSearch}»</p>
+                      <button onClick={() => setTrackSearch('')} className="mt-2 text-sm text-lime hover:underline">Сбросить поиск</button>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-0.5">
+                  {filteredTracks.map((track, index) => {
+                    const isPlaying = playingTrackId === track.id && !isPaused;
+                    return (
+                      <div
+                        key={track.id}
+                        draggable={canReorder}
+                        onDragStart={e => {
+                          setDragIndex(index);
+                          e.dataTransfer.effectAllowed = 'move';
+                          e.dataTransfer.setData('text/plain', String(index)); // Firefox без этого не начинает перетаскивание
+                        }}
+                        onDragOver={e => {
+                          if (dragIndex === null) return;
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = 'move';
+                          if (overIndex !== index) setOverIndex(index);
+                        }}
+                        onDrop={e => {
+                          e.preventDefault();
+                          if (dragIndex !== null) moveTrack(currentPlaylist.id, dragIndex, index);
+                          setDragIndex(null); setOverIndex(null);
+                        }}
+                        onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
+                        className={`group grid grid-cols-[16px_40px_40px_1fr_auto_32px] items-center gap-3 h-14 px-3 rounded-lg transition-colors ${
+                          dragIndex === index ? 'opacity-40' : ''
+                        } ${
+                          overIndex === index && dragIndex !== null && dragIndex !== index
+                            ? (dragIndex < index ? 'shadow-[inset_0_-2px_0_#C9FF3B]' : 'shadow-[inset_0_2px_0_#C9FF3B]')
+                            : ''
+                        } ${isPlaying ? 'bg-pult-raised' : 'hover:bg-white/[0.03]'}`}
+                      >
+                        <span className={`text-pult-muted ${canReorder ? 'cursor-grab active:cursor-grabbing group-hover:text-pult-text2' : 'opacity-0'}`} title={canReorder ? 'Перетащи, чтобы поменять порядок' : undefined}>
+                          <GripVertical size={16} />
+                        </span>
+                        <span className="font-mono text-sm tabular-nums text-pult-muted text-right">{index + 1}</span>
+                        <button className="relative w-10 h-10 rounded-md overflow-hidden bg-pult-raised" onClick={() => togglePlay(track)} title="Послушать">
+                          {track.cover && <img src={track.cover} alt="" className="w-full h-full object-cover" loading="lazy" />}
+                          <span className={`absolute inset-0 flex items-center justify-center bg-black/50 transition-opacity ${isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                            {isPlaying ? <PauseCircle size={20} className="text-white" /> : <PlayCircle size={20} className="text-white" />}
+                          </span>
+                        </button>
+                        <div className="min-w-0">
+                          <p className={`truncate text-sm ${isPlaying ? 'text-lime' : 'text-pult-text'}`}>{track.title}</p>
+                          <p className="truncate text-sm text-pult-text2">{track.artist}</p>
+                        </div>
+                        <span className="text-xs text-pult-muted">{track.mp3Path || track.isCustom ? 'свой MP3' : ''}</span>
+                        <button
+                          onClick={() => removeTrackFromPlaylist(currentPlaylist.id, track.id)}
+                          disabled={locked}
+                          title="Убрать из плейлиста"
+                          className="p-1.5 rounded-md text-pult-muted hover:text-red-400 hover:bg-white/[0.04] transition-colors opacity-0 group-hover:opacity-100 disabled:hidden"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
-              {filteredTracks.map((track, index) => {
-                const isPlaying = playingTrackId === track.id && !isPaused;
-                return (
-                  <div
-                    key={track.id}
-                    draggable={canReorder}
-                    onDragStart={e => {
-                      setDragIndex(index);
-                      e.dataTransfer.effectAllowed = 'move';
-                      e.dataTransfer.setData('text/plain', String(index)); // Firefox без этого не начинает перетаскивание
-                    }}
-                    onDragOver={e => {
-                      if (dragIndex === null) return;
-                      e.preventDefault();
-                      e.dataTransfer.dropEffect = 'move';
-                      if (overIndex !== index) setOverIndex(index);
-                    }}
-                    onDrop={e => {
-                      e.preventDefault();
-                      if (dragIndex !== null) moveTrack(currentPlaylist.id, dragIndex, index);
-                      setDragIndex(null); setOverIndex(null);
-                    }}
-                    onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
-                    className={`flex items-center gap-4 p-3 rounded-xl border transition group ${
-                      dragIndex === index ? 'opacity-40' : ''
-                    } ${
-                      overIndex === index && dragIndex !== null && dragIndex !== index
-                        ? (dragIndex < index ? 'border-b-purple-400 border-b-2' : 'border-t-purple-400 border-t-2')
-                        : ''
-                    } ${isPlaying ? 'bg-gray-800 border-purple-500' : 'bg-gray-900 border-gray-800 hover:bg-gray-800'}`}
-                  >
-                    {canReorder && (
-                      <div className="text-gray-600 group-hover:text-gray-300 cursor-grab active:cursor-grabbing -mr-2" title="Перетащи, чтобы поменять порядок">
-                        <GripVertical size={18} />
-                      </div>
-                    )}
-                    <div className="w-8 text-center text-gray-500 font-medium">{index + 1}</div>
-                    <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => togglePlay(track)}>
-                      <img src={track.cover} alt="cover" className="w-full h-full object-cover" />
-                      <div className={`absolute inset-0 bg-black/50 flex items-center justify-center transition ${isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>{isPlaying ? <PauseCircle size={24} className="text-purple-400" /> : <PlayCircle size={24} className="text-white" />}</div>
-                    </div>
-                    <div className="flex-1"><p className={`font-bold ${isPlaying ? 'text-purple-400' : 'text-white'}`}>{track.title}</p><p className="text-sm text-gray-400">{track.artist}</p></div>
-                    {track.isCustom && <span className="text-[10px] px-2 py-1 bg-purple-500/20 text-purple-400 rounded uppercase font-bold tracking-widest mr-4">Свой MP3</span>}
-                    <button onClick={() => removeTrackFromPlaylist(currentPlaylist.id, track.id)} className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition opacity-0 group-hover:opacity-100"><Trash2 size={20} /></button>
-                  </div>
-                );
-              })}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {unlockAsk && (
+          <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setUnlockAsk(null)}>
+            <div className="w-full max-w-md rounded-2xl border border-white/[0.08] bg-pult-card p-6" onClick={e => e.stopPropagation()}>
+              <h3 className="text-lg font-medium mb-2">Изменить плейлист с готовыми бланками</h3>
+              <p className="text-sm text-pult-text2 mb-6">
+                По нему созданы бланки: {roundsWithCards(unlockAsk).join(', ')}. Если поменять песни или их порядок,
+                напечатанные карточки начнут выигрывать не на тех песнях. После правки перегенерируй бланки этих туров
+              </p>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setUnlockAsk(null)} className={quietBtn}>Отмена</button>
+                <button
+                  onClick={() => { setUnlockedIds(prev => new Set(prev).add(unlockAsk)); setUnlockAsk(null); }}
+                  className="h-9 px-4 rounded-lg text-sm font-medium bg-lime text-[#141415] hover:bg-[#d4ff63] transition-colors"
+                >
+                  Разблокировать
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="animate-in fade-in duration-300 h-full overflow-y-auto custom-scrollbar pr-2 pb-10">
-      <h1 className="text-3xl font-bold mb-2">Плейлисты</h1>
-      <p className="text-gray-400 mb-8">Создавайте папки с музыкой (по 60–80 треков).</p>
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        <div onClick={() => setIsCreatePlaylistModalOpen(true)} className="bg-gray-900/50 border-2 border-dashed border-gray-700 rounded-2xl h-56 flex flex-col items-center justify-center text-gray-400 hover:border-purple-500 hover:text-purple-400 transition cursor-pointer group"><FolderPlus size={40} className="mb-4 group-hover:scale-110 transition-transform" /><span className="font-bold text-lg">Новый плейлист</span></div>
-        {playlists.map(playlist => (
-          <div key={playlist.id} onClick={() => setViewingPlaylist(playlist)} className="bg-gray-900 border border-gray-800 rounded-2xl h-56 p-6 flex flex-col hover:border-gray-500 transition cursor-pointer relative group shadow-lg">
-            <div className="w-12 h-12 bg-gray-800 rounded-xl flex items-center justify-center mb-auto text-purple-400"><Music size={24} /></div>
-            <button onClick={e => deletePlaylist(playlist.id, e)} className="absolute top-4 right-4 p-2 text-gray-600 hover:text-red-400 hover:bg-gray-800 rounded-lg transition opacity-0 group-hover:opacity-100"><Trash2 size={18} /></button>
-            <div><h3 className="font-bold text-xl mb-1 truncate">{playlist.name}</h3><p className={`text-sm ${playlist.tracks.length >= 24 ? 'text-green-400' : 'text-gray-500'}`}>{playlist.tracks.length} треков</p></div>
-          </div>
-        ))}
+    <div className="h-full overflow-y-auto custom-scrollbar pr-1 pb-10 text-pult-text">
+      <header className="flex items-end justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-medium">Плейлисты</h1>
+          <p className="mt-1 text-sm text-pult-text2">Песни для туров, обычно 60–80 в плейлисте</p>
+        </div>
+        <button onClick={() => setIsCreatePlaylistModalOpen(true)}
+          className="h-9 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-2 bg-lime text-[#141415] hover:bg-[#d4ff63] transition-colors">
+          <FolderPlus size={16} /> Новый плейлист
+        </button>
+      </header>
+
+      <div className="rounded-xl border border-white/[0.08] bg-pult-card divide-y divide-white/[0.06]">
+        {playlists.length === 0 && <p className="p-6 text-sm text-pult-text2">Плейлистов пока нет</p>}
+        {playlists.map(playlist => {
+          const used = roundsWithCards(playlist.id);
+          return (
+            <div key={playlist.id} onClick={() => setViewingPlaylist(playlist)}
+              className="group grid grid-cols-[1fr_120px_1fr_32px] items-center gap-4 h-14 px-4 cursor-pointer hover:bg-white/[0.03] transition-colors">
+              <span className="truncate">{playlist.name}</span>
+              <span className={`font-mono text-sm tabular-nums ${playlist.tracks.length >= 24 ? 'text-pult-text2' : 'text-amber-300'}`}>
+                {playlist.tracks.length} песен
+              </span>
+              <span className="truncate text-sm text-pult-muted" title={used.join(', ')}>
+                {used.length ? `бланки: ${used.join(', ')}` : ''}
+              </span>
+              <button onClick={e => deletePlaylist(playlist.id, e)} title="Удалить плейлист"
+                className="p-1.5 rounded-md text-pult-muted hover:text-red-400 hover:bg-white/[0.04] transition-colors opacity-0 group-hover:opacity-100">
+                <Trash2 size={16} />
+              </button>
+            </div>
+          );
+        })}
       </div>
 
       {isCreatePlaylistModalOpen && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6">
-            <h3 className="text-xl font-bold mb-4">Новый плейлист</h3>
-            <input autoFocus type="text" value={newPlaylistName} onChange={e => setNewPlaylistName(e.target.value)} placeholder="Название..." className="w-full bg-gray-950 border border-gray-800 rounded-xl py-3 px-4 text-white mb-6" onKeyDown={e => e.key === 'Enter' && createPlaylist()} />
-            <div className="flex gap-4"><button onClick={() => setIsCreatePlaylistModalOpen(false)} className="flex-1 py-3 bg-gray-800 rounded-xl font-bold">Отмена</button><button onClick={createPlaylist} className="flex-1 py-3 bg-purple-600 rounded-xl font-bold">Создать</button></div>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setIsCreatePlaylistModalOpen(false)}>
+          <div className="w-full max-w-md rounded-2xl border border-white/[0.08] bg-pult-card p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-medium mb-4">Новый плейлист</h3>
+            <input autoFocus type="text" value={newPlaylistName} onChange={e => setNewPlaylistName(e.target.value)} placeholder="Название"
+              className="h-10 w-full rounded-lg bg-pult-raised border border-white/[0.06] px-3 text-sm text-pult-text placeholder:text-pult-muted focus:outline-none focus:border-lime/60 mb-6"
+              onKeyDown={e => e.key === 'Enter' && createPlaylist()} />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setIsCreatePlaylistModalOpen(false)} className="h-9 px-4 rounded-lg text-sm font-medium bg-pult-raised text-pult-text border border-white/[0.06] hover:bg-[#2b2b2e] transition-colors">Отмена</button>
+              <button onClick={createPlaylist} className="h-9 px-4 rounded-lg text-sm font-medium bg-lime text-[#141415] hover:bg-[#d4ff63] transition-colors">Создать</button>
+            </div>
           </div>
         </div>
       )}
