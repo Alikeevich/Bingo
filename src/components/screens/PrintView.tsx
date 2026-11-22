@@ -1,3 +1,4 @@
+import '../../lib/pdfPolyfill'; // Buffer для @react-pdf — до самой библиотеки
 import { useEffect, useState } from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { ChevronLeft, Printer, Download, Loader2, AlertTriangle } from 'lucide-react';

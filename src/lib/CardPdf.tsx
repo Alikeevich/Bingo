@@ -1,3 +1,4 @@
+import './pdfPolyfill'; // Buffer для @react-pdf — до самой библиотеки
 import { Document, Page, View, Text, Image, Font, StyleSheet } from '@react-pdf/renderer';
 import type { Style } from '@react-pdf/types';
 import { BingoCard, Template, Track, TextStyle, SlotRect, GridSlot, CellTextSource } from '../types';

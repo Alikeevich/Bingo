@@ -8,12 +8,15 @@
 
 export function registerOfflineCache() {
   if (!('serviceWorker' in navigator)) return;
-  // Регистрируем после загрузки страницы, чтобы не отнимать ресурсы у первого рендера
-  window.addEventListener('load', () => {
+  const register = () => {
     navigator.serviceWorker.register('/sw.js').catch((e) => {
       console.warn('[offline] не удалось зарегистрировать SW:', e);
     });
-  });
+  };
+  // Регистрируем после загрузки страницы, чтобы не отнимать ресурсы у первого рендера.
+  // Модуль ведущего грузится лениво — часто уже после события load, тогда сразу.
+  if (document.readyState === 'complete') register();
+  else window.addEventListener('load', register, { once: true });
 }
 
 export function isOfflineCacheReady(): boolean {

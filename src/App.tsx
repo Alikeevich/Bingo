@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { useNavigate, useLocation, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './supabase';
 import { useAuth } from './auth/AuthContext';
@@ -16,12 +16,18 @@ import PlaylistsTab from './components/tabs/PlaylistsTab';
 import TemplatesTab from './components/tabs/TemplatesTab';
 import GlobalSearchTab from './components/tabs/GlobalSearchTab';
 import MyDatabaseTab from './components/tabs/MyDatabaseTab';
-import MigrationTab from './components/tabs/MigrationTab';
 
 // Экраны
-import PrintView from './components/screens/PrintView';
 import HostScreen from './components/screens/HostScreen';
 import Projector from './components/screens/Projector';
+
+// Тяжёлое грузим только при первом использовании: генератор PDF (~2.5 МБ исходников)
+// нужен лишь при печати, MP3-кодировщик — лишь во вкладке миграции.
+const PrintView = lazy(() => import('./components/screens/PrintView'));
+const MigrationTab = lazy(() => import('./components/tabs/MigrationTab'));
+const TabLoader = () => (
+  <div className="flex h-full items-center justify-center text-gray-500"><Loader2 className="animate-spin" size={24} /></div>
+);
 
 export default function App() {
   const navigate = useNavigate();
@@ -882,7 +888,11 @@ export default function App() {
     showToast('Тег удалён');
   };
 
-  if (printViewCards) return <PrintView printViewCards={printViewCards} setPrintViewCards={setPrintViewCards} />;
+  if (printViewCards) return (
+    <Suspense fallback={<div className="fixed inset-0 bg-gray-900 flex items-center justify-center text-gray-400"><Loader2 className="animate-spin" size={28} /></div>}>
+      <PrintView printViewCards={printViewCards} setPrintViewCards={setPrintViewCards} />
+    </Suspense>
+  );
 
   if (hostSession) {
     if (isProjectorMode) {
@@ -966,7 +976,7 @@ export default function App() {
             setTrackToAddToDb={(t) => { setIsEditingTrack(false); setTrackToAddToDb(t); setSelectedTagsForNewTrack([]); setNewTagInput(''); }}
           />} />
           <Route path="playlists" element={<PlaylistsTab playlists={playlists} setPlaylists={setPlaylists} playingTrackId={playingTrackId} isPaused={isPaused} togglePlay={togglePlay} showToast={showToast} resolveTrackUrl={resolveTrackUrl} games={games} />} />
-          <Route path="migration" element={<MigrationTab dbTracks={dbTracks} setDbTracks={setDbTracks} showToast={showToast} />} />
+          <Route path="migration" element={<Suspense fallback={<TabLoader />}><MigrationTab dbTracks={dbTracks} setDbTracks={setDbTracks} showToast={showToast} /></Suspense>} />
           <Route path="templates" element={<TemplatesTab templates={templates} setTemplates={setTemplates} showToast={showToast} />} />
           {/* неизвестный адрес внутри инструмента — возвращаем к мероприятиям */}
           <Route path="*" element={<Navigate to="/app/games" replace />} />
