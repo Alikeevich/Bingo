@@ -43,51 +43,43 @@ export default function MyDatabaseTab({
   const hasMore = filteredTracks.length > visibleCount;
 
   return (
-    <div className="animate-in fade-in duration-300 flex flex-col h-full">
-      <div className="flex items-end justify-between mb-6">
+    <div className="flex flex-col h-full text-pult-text">
+      <header className="flex items-end justify-between mb-5">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Моя База Музыки</h1>
-          <p className="text-gray-400">Сохранённые вами треки. Выбирайте их для создания плейлистов.</p>
+          <h1 className="text-2xl font-medium">Моя база</h1>
+          <p className="mt-1 text-sm text-pult-text2">
+            <span className="font-mono tabular-nums">{dbTracks.length}</span> сохранённых песен — из них собираются плейлисты
+          </p>
         </div>
-        
-        {/* КНОПКА ЗАГРУЗКИ MP3 И СЧЕТЧИК */}
-        <div className="flex items-center gap-4">
-          <label className="bg-purple-600 hover:bg-purple-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 cursor-pointer transition shadow-lg shrink-0">
-            <UploadCloud size={20} />
-            <span>Загрузить свой MP3</span>
-            <input 
-              type="file" 
-              accept="audio/mpeg,audio/mp3,audio/wav" 
-              className="hidden" 
-              onChange={e => {
-                const file = e.target.files?.[0];
-                if (file) onUploadCustomFile(file);
-                e.target.value = ''; // сброс инпута
-              }} 
-            />
-          </label>
-          <div className="text-right shrink-0">
-            <div className="text-2xl font-black text-purple-400">{dbTracks.length}</div>
-            <div className="text-xs text-gray-500 uppercase tracking-widest font-bold">Всего треков</div>
-          </div>
-        </div>
+        <label className="h-9 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-2 bg-lime text-[#141415] hover:bg-[#d4ff63] cursor-pointer transition-colors shrink-0">
+          <UploadCloud size={16} /> Загрузить свой MP3
+          <input
+            type="file"
+            accept="audio/mpeg,audio/mp3,audio/wav"
+            className="hidden"
+            onChange={e => {
+              const file = e.target.files?.[0];
+              if (file) onUploadCustomFile(file);
+              e.target.value = ''; // сброс инпута
+            }}
+          />
+        </label>
+      </header>
+
+      <div className="relative max-w-sm mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-pult-muted" size={14} />
+        <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Песня или исполнитель"
+          className="h-9 w-full rounded-lg bg-pult-raised border border-white/[0.06] pl-8 pr-3 text-sm text-pult-text placeholder:text-pult-muted focus:outline-none focus:border-lime/60" />
       </div>
 
-      <div className="flex gap-4 mb-6">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по моей базе..." className="w-full bg-gray-900 border border-gray-800 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-purple-500 transition" />
-        </div>
-      </div>
-      
-      <div className="flex flex-wrap gap-2 mb-6 border-b border-gray-800 pb-6">
-        <button onClick={() => setActiveTag(null)} className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition ${activeTag === null ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/50' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
-          Все треки
+      <div className="flex flex-wrap gap-1.5 mb-4">
+        <button onClick={() => setActiveTag(null)} className={`h-8 px-3 rounded-lg text-sm transition-colors ${activeTag === null ? 'bg-pult-raised text-pult-text border border-white/[0.1]' : 'text-pult-text2 hover:bg-white/[0.04]'}`}>
+          Все
         </button>
         {dbTags.map(tag => (
-          <div key={tag.id} className={`group/tag flex items-center gap-2 pl-4 pr-1 py-2 rounded-full font-medium transition ${activeTag === tag.name ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/50' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
-            <button onClick={() => setActiveTag(tag.name)} className="flex items-center gap-2 outline-none">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color || '#8b5cf6' }} />
+          <div key={tag.id} className={`group/tag h-8 inline-flex items-center gap-2 pl-3 pr-1 rounded-lg text-sm transition-colors ${activeTag === tag.name ? 'bg-pult-raised text-pult-text border border-white/[0.1]' : 'text-pult-text2 hover:bg-white/[0.04]'}`}>
+            <button onClick={() => setActiveTag(tag.name)} className="inline-flex items-center gap-2 outline-none">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tag.color || '#85858b' }} />
               {tag.name}
             </button>
             <button
@@ -97,47 +89,44 @@ export default function MyDatabaseTab({
                 deleteTagFromDb(tag);
               }}
               title="Удалить тег"
-              className="ml-1 p-1 rounded-full opacity-0 group-hover/tag:opacity-100 hover:bg-red-500/30 hover:text-red-200 transition">
+              className="p-1 rounded-md text-pult-muted opacity-0 group-hover/tag:opacity-100 hover:text-red-400 hover:bg-white/[0.06] transition-[opacity,color]">
               <X size={12} />
             </button>
           </div>
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-10">
+      <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 pb-10">
         {dbTracks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-gray-500 bg-gray-900/30 rounded-3xl border border-dashed border-gray-800">
-            <Tags size={48} className="mb-4 opacity-30" />
-            <p className="text-lg font-medium">Ваша база пуста</p>
-            <p className="text-sm">Загрузите свои MP3 файлы или найдите треки через Глобальный Поиск.</p>
+          <div className="py-16 text-center text-pult-text2 rounded-xl border border-dashed border-white/[0.08]">
+            <Tags size={28} className="mx-auto mb-3 text-pult-muted" />
+            <p>База пуста</p>
+            <p className="mt-1 text-sm text-pult-muted">Загрузи свои MP3 или найди песни в поиске</p>
           </div>
         ) : filteredTracks.length === 0 ? (
-          <div className="text-center py-10 text-gray-500">По вашему запросу ничего не найдено.</div>
+          <div className="py-10 text-center text-sm text-pult-muted">Ничего не найдено</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="rounded-xl border border-white/[0.08] bg-pult-card p-1.5 flex flex-col gap-0.5">
             {visibleTracks.map(track => {
               const isPlaying = playingTrackId === track.id && !isPaused;
               return (
-                <div key={track.id} className={`bg-gray-900 p-3 rounded-xl flex gap-3 items-center border transition group ${isPlaying ? 'border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.2)]' : 'border-gray-800 hover:border-gray-600'}`}>
-                  <div className="relative w-14 h-14 rounded-md overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => togglePlay(track)}>
-                    <img src={track.cover} alt="cover" className={`w-full h-full object-cover transition-transform ${isPlaying ? 'scale-110 blur-[2px]' : ''}`} />
-                    <div className={`absolute inset-0 bg-black/50 flex items-center justify-center transition ${isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>{isPlaying ? <PauseCircle size={28} className="text-purple-400" /> : <PlayCircle size={28} className="text-white" />}</div>
+                <div key={track.id} className={`group grid grid-cols-[40px_1fr_220px_auto] items-center gap-3 h-14 px-2.5 rounded-lg transition-colors ${isPlaying ? 'bg-pult-raised' : 'hover:bg-white/[0.03]'}`}>
+                  <button className="relative w-10 h-10 rounded-md overflow-hidden bg-pult-raised" onClick={() => togglePlay(track)} title="Послушать">
+                    {track.cover && <img src={track.cover} alt="" className="w-full h-full object-cover" loading="lazy" />}
+                    <span className={`absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity ${isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>{isPlaying ? <PauseCircle size={20} className="text-white" /> : <PlayCircle size={20} className="text-white" />}</span>
+                  </button>
+                  <div className="min-w-0">
+                    <p className={`truncate text-sm ${isPlaying ? 'text-lime' : 'text-pult-text'}`}>{track.title}</p>
+                    <p className="truncate text-sm text-pult-text2">{track.artist}</p>
                   </div>
-                  <div className="flex-1 overflow-hidden">
-                    <h4 className={`font-bold truncate text-sm ${isPlaying ? 'text-purple-400' : 'text-white'}`}>{track.title}</h4>
-                    <p className="text-xs text-gray-400 truncate mb-1">{track.artist}</p>
-                    <div className="flex flex-wrap gap-1">
-                      {track.isCustom && <span className="text-[8px] bg-purple-500/20 text-purple-400 px-1 rounded uppercase font-bold tracking-wider">MP3</span>}
-                      {track.tags?.slice(0, 1).map((t, i) => (
-                        <span key={i} className="text-[9px] bg-gray-800 text-gray-300 px-1.5 py-0.5 rounded truncate max-w-[60px]">{t}</span>
-                      ))}
-                      {(track.tags?.length || 0) > 1 && <span className="text-[9px] bg-gray-800 text-gray-500 px-1 rounded">+{track.tags!.length - 1}</span>}
-                    </div>
+                  <div className="min-w-0 flex items-center gap-1.5 text-xs text-pult-muted">
+                    {(track.mp3Path || track.isCustom) && <span className="shrink-0">свой MP3 ·</span>}
+                    <span className="truncate">{(track.tags || []).join(', ')}</span>
                   </div>
-                  <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => setTrackToAdd(track)} className="p-1.5 bg-purple-600 rounded-lg hover:bg-purple-500 transition text-white" title="Добавить в плейлист"><Plus size={16} /></button>
-                    <button onClick={() => onEditTrack(track)} className="p-1.5 bg-gray-800 rounded-lg hover:bg-purple-500 hover:text-white transition text-gray-400" title="Редактировать"><Edit3 size={16} /></button>
-                    <button onClick={() => deleteTrackFromDb(track.id)} className="p-1.5 bg-gray-800 rounded-lg hover:bg-red-500/20 hover:text-red-400 transition text-gray-400" title="Удалить из Базы"><Trash2 size={16} /></button>
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => setTrackToAdd(track)} className="p-1.5 rounded-md text-pult-text2 hover:text-pult-text hover:bg-white/[0.06] transition-colors" title="Добавить в плейлист"><Plus size={16} /></button>
+                    <button onClick={() => onEditTrack(track)} className="p-1.5 rounded-md text-pult-text2 hover:text-pult-text hover:bg-white/[0.06] transition-colors" title="Редактировать"><Edit3 size={16} /></button>
+                    <button onClick={() => deleteTrackFromDb(track.id)} className="p-1.5 rounded-md text-pult-muted hover:text-red-400 hover:bg-white/[0.06] transition-colors" title="Удалить из базы"><Trash2 size={16} /></button>
                   </div>
                 </div>
               );
@@ -149,12 +138,12 @@ export default function MyDatabaseTab({
           <div className="flex flex-col items-center gap-2 py-8">
             <button
               onClick={() => setVisibleCount(c => c + PAGE)}
-              className="px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-xl font-bold transition"
+              className="h-9 px-4 rounded-lg text-sm bg-pult-raised border border-white/[0.06] hover:bg-[#2b2b2e] transition-colors"
             >
               Показать ещё {Math.min(PAGE, filteredTracks.length - visibleCount)}
             </button>
-            <span className="text-xs text-gray-500">
-              показано {visibleTracks.length} из {filteredTracks.length}
+            <span className="text-xs text-pult-muted">
+              показано <span className="font-mono tabular-nums">{visibleTracks.length}</span> из <span className="font-mono tabular-nums">{filteredTracks.length}</span>
             </span>
           </div>
         )}

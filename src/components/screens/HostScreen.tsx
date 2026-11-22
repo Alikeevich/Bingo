@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { 
   PartyPopper, MonitorPlay, CheckCircle2, Power, Music, EyeOff, Eye,
-  SkipBack, SkipForward, PauseCircle, Play, ListChecks, Loader2, Trophy, SearchCheck, Plus
+  SkipBack, SkipForward, PauseCircle, Play, ListChecks, Loader2, Trophy, SearchCheck, Plus, X
 } from 'lucide-react';
 import { Track, Game, Round, Playlist, BingoCard } from '../../types';
 import { formatTime, buildCellMatcher } from '../../utils';
@@ -62,9 +62,9 @@ export default function HostScreen(props: HostScreenProps) {
 
   const handleVerifyCard = () => {
     if (!verifyCardId.trim()) return;
-    if (!props.hostSession?.round.cards?.length) return alert('В этом туре ещё не сгенерированы карточки!');
+    if (!props.hostSession?.round.cards?.length) return alert('В этом туре ещё не сгенерированы карточки');
     const card = props.hostSession.round.cards.find(c => c.id === verifyCardId.trim());
-    if (!card) return alert(`Карточка #${verifyCardId} не найдена!`);
+    if (!card) return alert(`Карточка #${verifyCardId} не найдена`);
     
     const matches = card.cells.map(buildCellMatcher(props.shuffledTracks, props.playedTrackIds));
     const linesIndices = [
@@ -81,20 +81,19 @@ export default function HostScreen(props: HostScreenProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-950 text-white z-50 flex flex-col font-sans animate-in zoom-in-95 duration-300">
-      <div className="h-20 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-8 shadow-xl relative z-20 shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg"><PartyPopper size={28} className="text-white" /></div>
-          <div>
-            <h2 className="text-xl font-black uppercase tracking-wider">{props.hostSession.game.name}</h2>
-            <p className="text-gray-400 text-sm font-medium">{props.hostSession.round.name} • {props.hostSession.round.winCondition === 'full' ? 'Вся карточка' : props.hostSession.round.winCondition === '3_lines' ? '3 Линии' : props.hostSession.round.winCondition === '2_lines' ? '2 Линии' : '1 Линия'}</p>
-          </div>
+    <div className="fixed inset-0 bg-pult-bg text-white z-50 flex flex-col font-sans duration-300">
+      <div className="h-16 bg-pult-deep border-b border-white/[0.08] flex items-center justify-between px-6 relative z-20 shrink-0">
+        <div className="min-w-0">
+          <h2 className="text-base font-medium text-pult-text truncate">{props.hostSession.game.name}</h2>
+          <p className="text-sm text-pult-text2 truncate">{props.hostSession.round.name} · {props.hostSession.round.winCondition === 'full' ? 'вся карточка' : props.hostSession.round.winCondition === '3_lines' ? '3 линии' : props.hostSession.round.winCondition === '2_lines' ? '2 линии' : '1 линия'}</p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="text-center mr-4">
-            <div className="text-3xl font-black text-purple-400">{props.playedTrackIds.size} <span className="text-gray-600 text-xl">/ {props.shuffledTracks.length}</span></div>
-            <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Сыграно</div>
-          </div>
+        <div className="flex items-center gap-3">
+          {props.prewarm && (
+            <span className="inline-flex items-center gap-2 text-sm text-pult-text2" title="Обновляем ссылки на треки, чтобы во время игры не было пауз">
+              <Loader2 size={14} className="animate-spin text-pult-muted" />
+              Готовим треки <span className="font-mono tabular-nums text-pult-muted">{props.prewarm.done}/{props.prewarm.total}</span>
+            </span>
+          )}
           {/* Расписание побед: карточки знают, на какой песне закроются (winAt) */}
           {(() => {
             const next = (props.hostSession.round.cards || [])
@@ -102,70 +101,69 @@ export default function HostScreen(props: HostScreenProps) {
               .sort((a, b) => (a.winAt as number) - (b.winAt as number))[0];
             if (!next) return null;
             return (
-              <div className="text-center mr-4 px-3 py-2 rounded-xl bg-gray-800/60 border border-gray-700" title="Расчёт по сгенерированным карточкам и порядку очереди">
-                <div className="text-sm font-black text-white">#{next.id} <span className="text-gray-500">на {(next.winAt as number) + 1}-й</span></div>
-                <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Ближайшее бинго</div>
-              </div>
+              <span className="text-sm text-pult-text2" title="Расчёт по сгенерированным карточкам и порядку очереди">
+                ближайшее бинго: <span className="font-mono tabular-nums text-pult-text">#{next.id}</span> на песне № <span className="font-mono tabular-nums text-pult-text">{(next.winAt as number) + 1}</span>
+              </span>
             );
           })()}
-          {props.prewarm && (
-            <div className="flex items-center gap-2 mr-3 px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/30" title="Обновляем ссылки на треки, чтобы во время игры не было пауз">
-              <Loader2 size={16} className="animate-spin text-blue-400" />
-              <span className="text-xs font-bold text-blue-300">
-                Готовим треки {props.prewarm.done}/{props.prewarm.total}
-              </span>
-            </div>
-          )}
-          <div className="h-10 w-px bg-gray-800 mr-2" />
-          <button onClick={() => props.setIsProjectorMode(true)} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition shadow-lg"><MonitorPlay size={20} /> Проектор</button>
-          <button onClick={() => { setVerifyCardId(''); setVerifyResult(null); setIsBingoVerifyModalOpen(true); }} className="bg-green-600 hover:bg-green-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition shadow-lg"><CheckCircle2 size={20} /> БИНГО!</button>
-          <button onClick={props.endHostSession} className="p-3 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition ml-2"><Power size={24} /></button>
+          {/* Табло: номер звучащей песни — фирменная деталь пульта */}
+          <div className="ml-2 px-3 h-10 rounded-lg bg-pult-card border border-white/[0.08] flex items-center gap-2" title={`Сыграно ${props.playedTrackIds.size} из ${props.shuffledTracks.length}`}>
+            <span className="text-sm text-pult-muted">песня</span>
+            <span className="text-lg text-lime">№ <span className="font-mono tabular-nums">{props.currentHostTrackIndex + 1}</span></span>
+            <span className="font-mono text-sm tabular-nums text-pult-muted">/ {props.shuffledTracks.length}</span>
+          </div>
+          <button onClick={() => props.setIsProjectorMode(true)} className="h-10 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-2 bg-pult-raised text-pult-text border border-white/[0.06] hover:bg-[#2b2b2e] transition-colors"><MonitorPlay size={16} /> Проектор</button>
+          <button onClick={() => { setVerifyCardId(''); setVerifyResult(null); setIsBingoVerifyModalOpen(true); }} className="h-10 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-2 bg-magenta text-white hover:bg-[#ff4b98] transition-colors"><CheckCircle2 size={16} /> Проверить бинго</button>
+          <button onClick={props.endHostSession} title="Завершить тур" className="h-10 w-10 inline-flex items-center justify-center rounded-lg text-pult-muted hover:text-red-400 hover:bg-white/[0.04] transition-colors"><Power size={18} /></button>
         </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden relative">
-        <div className="flex-1 flex flex-col relative bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-900 to-gray-950 overflow-hidden">
+        <div className="flex-1 flex flex-col relative bg-pult-bg overflow-hidden">
           {props.autoWinners.length > 0 && (
-            <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-green-500 text-white px-8 py-3 rounded-full font-black text-2xl shadow-[0_0_50px_rgba(34,197,94,0.4)] z-[30] animate-bounce cursor-pointer" onClick={() => props.setAutoWinners([])}>
-              <PartyPopper size={28} /> ЕСТЬ БИНГО: {props.autoWinners.join(', ')}!
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[30] flex items-center gap-4 rounded-xl bg-magenta text-white pl-5 pr-2 h-14">
+              <PartyPopper size={22} />
+              <span className="text-lg font-medium">Бинго у карточек <span className="font-mono tabular-nums">{props.autoWinners.map(w => '#' + w).join(', ')}</span></span>
+              <button onClick={() => props.setAutoWinners([])} title="Скрыть" className="h-10 w-10 inline-flex items-center justify-center rounded-lg hover:bg-white/15 transition-colors"><X size={18} /></button>
             </div>
           )}
 
           <div className="flex-1 flex flex-col items-center justify-center p-6">
             {currentTrack && (
               <div className="w-full flex flex-col items-center">
-                <div className={`relative w-72 h-72 md:w-80 md:h-80 rounded-3xl overflow-hidden shadow-2xl mb-8 transition-all duration-700 ${isPlaying ? 'scale-105 shadow-purple-900/40' : ''}`}>
-                  <img src={currentTrack.cover} alt="cover" className={`w-full h-full object-cover transition-all duration-500 ${props.hideTrackInfo ? 'blur-3xl scale-110 opacity-60' : ''}`} />
-                  {props.hideTrackInfo && <div className="absolute inset-0 flex items-center justify-center"><Music size={100} className="text-white/20" /></div>}
+                {/* Обложка — главный момент экрана: крупно, с нейтральной тенью */}
+                <div className="relative w-72 h-72 md:w-80 md:h-80 rounded-2xl overflow-hidden mb-8 bg-pult-card shadow-[0_24px_60px_rgba(0,0,0,0.55)]">
+                  <img src={currentTrack.cover} alt="" className={`w-full h-full object-cover transition-[filter,opacity] duration-500 ${props.hideTrackInfo ? 'blur-2xl opacity-50' : ''}`} />
+                  {props.hideTrackInfo && <div className="absolute inset-0 flex items-center justify-center"><Music size={72} className="text-white/25" /></div>}
                 </div>
-                <div className="text-center mb-4">
-                  <h1 className={`text-4xl font-black mb-2 transition-all duration-300 ${props.hideTrackInfo ? 'text-gray-700 blur-sm select-none' : 'text-white'}`}>
-                    {props.hideTrackInfo ? 'Угадай трек' : currentTrack.title}
+                <div className="text-center mb-4 min-h-[76px]">
+                  <h1 className={`text-3xl font-medium mb-2 ${props.hideTrackInfo ? 'text-pult-muted' : 'text-pult-text'}`}>
+                    {props.hideTrackInfo ? 'Название скрыто' : currentTrack.title}
                   </h1>
-                  <p className={`text-xl transition-all duration-300 ${props.hideTrackInfo ? 'text-gray-800 blur-sm select-none' : 'text-purple-400 font-medium'}`}>
-                    {props.hideTrackInfo ? 'Исполнитель' : currentTrack.artist}
+                  <p className={`text-lg ${props.hideTrackInfo ? 'text-pult-muted/70' : 'text-pult-text2'}`}>
+                    {props.hideTrackInfo ? 'нажми на глаз, чтобы открыть' : currentTrack.artist}
                   </p>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="w-full bg-gray-900/60 backdrop-blur-xl border-t border-gray-800 p-8 shrink-0">
+          <div className="w-full bg-pult-card border-t border-white/[0.08] px-8 py-6 shrink-0">
             <div className="max-w-4xl mx-auto flex flex-col gap-6">
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-500 w-12">{formatTime(segPos)}</span>
-                  <div className="flex-1 h-2.5 bg-gray-800 rounded-full overflow-hidden relative mx-4">
+                  <span className="font-mono text-xs tabular-nums text-pult-muted w-12">{formatTime(segPos)}</span>
+                  <div className="flex-1 h-1.5 bg-pult-raised rounded-full overflow-hidden relative mx-4">
                     <div
-                      className={`absolute top-0 left-0 h-full transition-all duration-300 ease-linear ${props.isFullMode ? 'bg-gradient-to-r from-green-500 to-emerald-400' : 'bg-gradient-to-r from-purple-600 to-pink-500'}`}
+                      className={`absolute top-0 left-0 h-full ${props.isFullMode ? 'bg-pult-text' : 'bg-lime'}`}
                       style={{ width: `${progressPct}%` }}
                     />
                   </div>
-                  <span className="text-xs font-bold text-gray-500 w-12 text-right">{formatTime(segLength)}</span>
+                  <span className="font-mono text-xs tabular-nums text-pult-muted w-12 text-right">{formatTime(segLength)}</span>
                 </div>
                 {/* Подпись под шкалой: что именно сейчас звучит и сколько осталось */}
-                <div className="flex items-center justify-between text-[11px] -mt-2">
-                  <span className={props.isFullMode ? 'text-green-400 font-bold' : 'text-gray-500'}>
+                <div className="flex items-center justify-between text-xs -mt-2">
+                  <span className={props.isFullMode ? 'text-pult-text' : 'text-pult-muted'}>
                     {props.isFullMode
                       ? 'Полная версия — играет до конца песни'
                       : isTrimmed
@@ -173,7 +171,7 @@ export default function HostScreen(props: HostScreenProps) {
                         : 'Трек целиком'}
                   </span>
                   {isTrackLoaded && segLength > 0 && (
-                    <span className="text-gray-500">осталось {formatTime(segLeft)}</span>
+                    <span className="text-pult-muted">осталось <span className="font-mono tabular-nums">{formatTime(segLeft)}</span></span>
                   )}
                 </div>
               </div>
@@ -181,18 +179,18 @@ export default function HostScreen(props: HostScreenProps) {
               <div className="flex items-center justify-between">
                 <div className="w-48">
                   <label className="flex items-center gap-3 cursor-pointer group">
-                    <div className={`relative w-12 h-6 transition-all duration-300 rounded-full ${props.isAutoPlay ? 'bg-purple-600' : 'bg-gray-800 border border-gray-700'}`}>
-                      <div className={`absolute top-[3px] w-4 h-4 bg-white rounded-full transition-transform duration-300 shadow-md ${props.isAutoPlay ? 'translate-x-7' : 'translate-x-1'}`} />
+                    <div className={`relative w-12 h-6 transition-colors duration-300 rounded-full ${props.isAutoPlay ? 'bg-lime' : 'bg-pult-raised border border-white/[0.08]'}`}>
+                      <div className={`absolute top-[3px] w-4 h-4 rounded-full transition-transform duration-200 ${props.isAutoPlay ? 'translate-x-7 bg-[#141415]' : 'translate-x-1 bg-pult-text2'}`} />
                     </div>
                     <input type="checkbox" checked={props.isAutoPlay} onChange={e => props.setIsAutoPlay(e.target.checked)} className="hidden" />
-                    <span className={`text-xs font-black uppercase tracking-widest transition-colors ${props.isAutoPlay ? 'text-purple-400' : 'text-gray-500 group-hover:text-gray-400'}`}>Авто-ход</span>
+                    <span className={`text-sm transition-colors ${props.isAutoPlay ? 'text-pult-text' : 'text-pult-muted group-hover:text-pult-text2'}`}>Авто-ход</span>
                   </label>
                 </div>
                 <div className="flex items-center gap-6">
-                  <button onClick={() => props.setHideTrackInfo(!props.hideTrackInfo)} className={`w-14 h-14 rounded-full flex items-center justify-center transition ${props.hideTrackInfo ? 'bg-purple-600 text-white shadow-lg' : 'bg-gray-800 text-gray-400 hover:text-white'}`}>
-                    {props.hideTrackInfo ? <EyeOff size={24} /> : <Eye size={24} />}
+                  <button onClick={() => props.setHideTrackInfo(!props.hideTrackInfo)} title={props.hideTrackInfo ? 'Показать название' : 'Скрыть название'} className={`w-12 h-12 rounded-full flex items-center justify-center border transition-colors ${props.hideTrackInfo ? 'bg-pult-raised border-white/[0.06] text-pult-text2 hover:text-pult-text' : 'bg-pult-raised border-lime/50 text-lime'}`}>
+                    {props.hideTrackInfo ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
-                  <button onClick={() => props.playHostTrack(props.currentHostTrackIndex - 1)} disabled={props.currentHostTrackIndex === 0} className="w-14 h-14 bg-gray-800 rounded-full flex items-center justify-center text-white hover:bg-gray-700 disabled:opacity-30 transition"><SkipBack size={28} /></button>
+                  <button onClick={() => props.playHostTrack(props.currentHostTrackIndex - 1)} disabled={props.currentHostTrackIndex === 0} className="w-12 h-12 bg-pult-raised border border-white/[0.06] rounded-full flex items-center justify-center text-pult-text hover:bg-[#2b2b2e] disabled:opacity-30 transition-colors"><SkipBack size={20} /></button>
                   <button
                     onClick={() => {
                       // Если трек уже загружен (играет ИЛИ на паузе) — togglePlay сам решит pause/resume,
@@ -203,11 +201,12 @@ export default function HostScreen(props: HostScreenProps) {
                         props.playHostTrack(props.currentHostTrackIndex);
                       }
                     }}
-                    className={`w-20 h-20 rounded-full flex items-center justify-center text-white transition transform hover:scale-105 shadow-2xl ${isPlaying ? 'bg-orange-600 shadow-orange-900/40' : 'bg-purple-600 shadow-purple-900/40'}`}
+                    title={isPlaying ? 'Пауза' : 'Играть'}
+                    className="w-16 h-16 rounded-full flex items-center justify-center bg-lime text-[#141415] hover:bg-[#d4ff63] active:scale-[0.97] transition-[transform,background-color]"
                   >
-                    {isPlaying ? <PauseCircle size={44} /> : <Play size={44} className="ml-1" />}
+                    {isPlaying ? <PauseCircle size={32} /> : <Play size={30} className="ml-1" />}
                   </button>
-                  <button onClick={() => { props.playHostTrack(props.currentHostTrackIndex + 1); props.setHideTrackInfo(true); }} disabled={props.currentHostTrackIndex === props.shuffledTracks.length - 1} className="w-14 h-14 bg-gray-800 rounded-full flex items-center justify-center text-white hover:bg-gray-700 disabled:opacity-30 transition"><SkipForward size={28} /></button>
+                  <button onClick={() => { props.playHostTrack(props.currentHostTrackIndex + 1); props.setHideTrackInfo(true); }} disabled={props.currentHostTrackIndex === props.shuffledTracks.length - 1} className="w-12 h-12 bg-pult-raised border border-white/[0.06] rounded-full flex items-center justify-center text-pult-text hover:bg-[#2b2b2e] disabled:opacity-30 transition-colors"><SkipForward size={20} /></button>
                   <button
                     onClick={() => props.extendCurrentTrack(10)}
                     disabled={!isTrackLoaded || props.isFullMode}
@@ -216,10 +215,10 @@ export default function HostScreen(props: HostScreenProps) {
                         ? 'Уже играет полная версия — продлевать нечего'
                         : 'Продлить фрагмент на 10 секунд'
                     }
-                    className="w-14 h-14 bg-gray-800 rounded-full flex flex-col items-center justify-center text-white hover:bg-gray-700 disabled:opacity-30 transition leading-none"
+                    className="w-12 h-12 bg-pult-raised border border-white/[0.06] rounded-full flex items-center justify-center gap-0.5 text-pult-text hover:bg-[#2b2b2e] disabled:opacity-30 transition-colors"
                   >
-                    <Plus size={18} />
-                    <span className="text-[10px] font-black">10с</span>
+                    <Plus size={12} />
+                    <span className="font-mono text-xs tabular-nums">10с</span>
                   </button>
                   {/* Полная версия — когда зал подпевает: свой MP3 доигрывает целиком, офлайн */}
                   <button
@@ -232,45 +231,45 @@ export default function HostScreen(props: HostScreenProps) {
                           ? 'Доиграть песню целиком, точно с этого места (работает офлайн)'
                           : 'У этого трека нет полной версии — загрузи MP3 во вкладке «Миграция MP3»'
                     }
-                    className={`h-14 px-5 rounded-full flex items-center gap-2 font-bold transition disabled:opacity-40 text-white ${
+                    className={`h-12 px-4 rounded-full flex items-center gap-2 border transition-colors disabled:opacity-40 ${
                       props.isFullMode
-                        ? 'bg-green-800 ring-2 ring-green-400'
-                        : 'bg-green-600 hover:bg-green-500'
+                        ? 'bg-pult-raised border-lime/50 text-lime'
+                        : 'bg-pult-raised border-white/[0.06] text-pult-text hover:bg-[#2b2b2e]'
                     }`}
                   >
-                    <Music size={20} />
+                    <Music size={18} />
                     <span className="text-sm whitespace-nowrap">
                       {props.isFullMode ? 'Играет' : 'Полная'}
                     </span>
                   </button>
                 </div>
                 <div className="w-48 text-right">
-                   <span className="text-[10px] text-gray-500 uppercase font-black tracking-widest block">Осталось</span>
-                   <span className="text-xl font-black text-gray-400">{props.shuffledTracks.length - props.playedTrackIds.size}</span>
+                   <span className="text-sm text-pult-muted">осталось песен </span>
+                   <span className="font-mono text-lg tabular-nums text-pult-text">{props.shuffledTracks.length - props.playedTrackIds.size}</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="w-[400px] bg-gray-900 border-l border-gray-800 flex flex-col z-10 shrink-0">
-          <div className="p-6 border-b border-gray-800 flex items-center justify-between">
-            <div className="flex items-center gap-3"><ListChecks className="text-purple-400" /><h3 className="text-lg font-bold">Очередь</h3></div>
-            <span className="text-xs text-gray-500">{props.playedTrackIds.size}/{props.shuffledTracks.length}</span>
+        <div className="w-[400px] bg-pult-card border-l border-white/[0.08] flex flex-col z-10 shrink-0">
+          <div className="h-14 px-5 border-b border-white/[0.08] flex items-center justify-between">
+            <div className="flex items-center gap-2"><ListChecks size={16} className="text-pult-muted" /><h3 className="text-sm font-medium text-pult-text">Очередь</h3></div>
+            <span className="font-mono text-xs tabular-nums text-pult-muted">сыграно {props.playedTrackIds.size} / {props.shuffledTracks.length}</span>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-2">
+          <div className="flex-1 overflow-y-auto p-2 custom-scrollbar flex flex-col gap-0.5">
             {props.shuffledTracks.map((track, index) => {
               const isPlayed = props.playedTrackIds.has(String(track.id));
               const isCurrent = props.currentHostTrackIndex === index;
               return (
-                <button key={track.id} onClick={() => { props.playHostTrack(index); props.setHideTrackInfo(true); }} className={`w-full text-left p-3 rounded-xl flex items-center gap-4 transition border ${isCurrent ? 'bg-purple-900/30 border-purple-500 shadow-lg' : isPlayed ? 'bg-gray-900 border-gray-800 opacity-50 grayscale' : 'bg-gray-800 border-gray-700 hover:bg-gray-700'}`}>
-                  <div className="w-6 font-bold text-center text-xs text-gray-500">{index + 1}</div>
-                  <img src={track.cover} className="w-10 h-10 rounded-lg object-cover" alt="" />
+                <button key={track.id} onClick={() => { props.playHostTrack(index); props.setHideTrackInfo(true); }} className={`w-full text-left h-14 px-3 rounded-lg flex items-center gap-3 transition-colors ${isCurrent ? 'bg-pult-raised shadow-[inset_2px_0_0_#C9FF3B]' : isPlayed ? 'opacity-45 hover:opacity-70' : 'hover:bg-white/[0.03]'}`}>
+                  <div className="w-7 font-mono text-xs tabular-nums text-right text-pult-muted">{index + 1}</div>
+                  <img src={track.cover} className={`w-10 h-10 rounded-md object-cover bg-pult-raised ${isPlayed && !isCurrent ? 'grayscale' : ''}`} alt="" />
                   <div className="flex-1 overflow-hidden">
-                    <div className={`font-bold truncate text-sm ${isCurrent ? 'text-purple-400' : 'text-white'}`}>{track.title}</div>
-                    <div className="text-[11px] text-gray-500 truncate">{track.artist}</div>
+                    <div className={`truncate text-sm ${isCurrent ? 'text-pult-text' : 'text-pult-text'}`}>{track.title}</div>
+                    <div className="text-xs text-pult-text2 truncate">{track.artist}</div>
                   </div>
-                  {isCurrent && isPlaying && <Loader2 size={16} className="text-purple-400 animate-spin" />}
+                  {isCurrent && isPlaying && <span className="w-2 h-2 rounded-full bg-lime" title="Играет" />}
                 </button>
               );
             })}
@@ -279,37 +278,38 @@ export default function HostScreen(props: HostScreenProps) {
       </div>
 
       {isBingoVerifyModalOpen && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[110] p-4">
-          <div className={`bg-gray-900 p-8 rounded-3xl w-full border border-gray-800 text-center animate-in zoom-in-95 ${verifyResult ? 'max-w-xl' : 'max-w-md'}`}>
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[110] p-4" onClick={() => setIsBingoVerifyModalOpen(false)}>
+          <div onClick={e => e.stopPropagation()} className={`bg-pult-card p-8 rounded-2xl w-full border border-white/[0.08] text-center ${verifyResult ? 'max-w-xl' : 'max-w-md'}`}>
             {!verifyResult ? (
               <>
-                <Trophy size={64} className="mx-auto text-yellow-500 mb-6" />
-                <h2 className="text-3xl font-black mb-2">ПРОВЕРКА БИНГО</h2>
-                <input autoFocus type="text" value={verifyCardId} onChange={e => setVerifyCardId(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleVerifyCard()} placeholder="#ID (напр. 1042)" className="w-full bg-gray-950 border-2 border-gray-800 rounded-2xl py-4 px-6 text-2xl font-black text-center text-white mb-6 focus:border-purple-500 outline-none uppercase tracking-widest" />
+                <Trophy size={32} className="mx-auto text-pult-muted mb-4" />
+                <h2 className="text-xl font-medium mb-1">Проверка бинго</h2>
+                <p className="text-sm text-pult-text2 mb-6">Номер карточки — в углу бланка</p>
+                <input autoFocus type="text" inputMode="numeric" value={verifyCardId} onChange={e => setVerifyCardId(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleVerifyCard()} placeholder="1042" className="w-full bg-pult-raised border border-white/[0.08] rounded-xl h-14 px-6 font-mono text-2xl tabular-nums text-center text-pult-text placeholder:text-pult-muted mb-6 focus:border-lime/60 outline-none" />
                 <div className="flex gap-4">
-                  <button onClick={() => setIsBingoVerifyModalOpen(false)} className="flex-1 py-4 bg-gray-800 rounded-xl font-bold hover:bg-gray-700 transition">Отмена</button>
-                  <button onClick={handleVerifyCard} className="flex-1 py-4 bg-green-600 rounded-xl font-bold hover:bg-green-500 transition text-white flex items-center justify-center gap-2"><SearchCheck size={24} /> Проверить</button>
+                  <button onClick={() => setIsBingoVerifyModalOpen(false)} className="flex-1 py-4 bg-pult-raised rounded-xl font-medium hover:bg-[#2b2b2e] transition-colors">Отмена</button>
+                  <button onClick={handleVerifyCard} className="flex-1 py-4 bg-lime rounded-xl font-medium hover:bg-[#d4ff63] transition-colors text-[#141415] flex items-center justify-center gap-2"><SearchCheck size={18} /> Проверить</button>
                 </div>
               </>
             ) : (
               <div className="flex flex-col items-center">
-                <div className="flex items-center justify-between w-full mb-6 pb-6 border-b border-gray-800">
+                <div className="flex items-center justify-between w-full mb-6 pb-6 border-b border-white/[0.08]">
                   <div className="text-left">
-                    <div className="text-gray-400 font-bold uppercase tracking-widest text-sm mb-1">Карточка #{verifyResult.card.id}</div>
-                    <div className="text-xl font-black">Линий: <span className={verifyResult.linesCount > 0 ? 'text-purple-400' : 'text-gray-500'}>{verifyResult.linesCount}</span></div>
+                    <div className="text-pult-text2 text-sm mb-1">Карточка <span className="font-mono tabular-nums">#{verifyResult.card.id}</span></div>
+                    <div className="text-xl font-medium">Линий: <span className={verifyResult.linesCount > 0 ? 'text-lime' : 'text-pult-muted'}>{verifyResult.linesCount}</span></div>
                   </div>
-                  {verifyResult.isWinner ? <div className="px-4 py-2 bg-green-500/20 text-green-400 rounded-xl font-black text-2xl flex items-center gap-2 animate-pulse"><CheckCircle2 /> БИНГО!</div> : <div className="px-4 py-2 bg-red-500/10 text-red-400 rounded-xl font-bold text-lg">Нет Бинго</div>}
+                  {verifyResult.isWinner ? <div className="px-4 h-12 bg-magenta text-white rounded-xl font-medium text-xl flex items-center gap-2"><CheckCircle2 size={20} /> Бинго</div> : <div className="px-4 h-12 bg-pult-raised text-pult-text2 rounded-xl text-base flex items-center">Бинго нет</div>}
                 </div>
                 <div className="grid grid-cols-5 gap-2 mb-8 w-full max-w-[400px]">
                   {verifyResult.card.cells.map((cell: any, i: number) => (
-                    <div key={i} className={`aspect-square rounded-xl flex flex-col items-center justify-center p-1 border-2 ${verifyResult.matches[i] ? 'bg-green-600/20 border-green-500 text-green-400' : 'bg-gray-800 border-gray-700 text-gray-500'}`}>
-                      {'isFreeSpace' in cell ? <span className="font-black text-xs uppercase">FREE</span> : <span className="font-bold text-[8px] leading-tight text-center line-clamp-3">{(cell as Track).title}</span>}
+                    <div key={i} className={`aspect-square rounded-lg flex flex-col items-center justify-center p-1 border ${verifyResult.matches[i] ? 'bg-lime/15 border-lime/60 text-pult-text' : 'bg-pult-raised border-white/[0.06] text-pult-muted'}`}>
+                      {'isFreeSpace' in cell ? <span className="font-medium text-xs">FREE</span> : <span className="font-medium text-[8px] leading-tight text-center line-clamp-3">{(cell as Track).title}</span>}
                     </div>
                   ))}
                 </div>
                 <div className="flex gap-4 w-full">
-                  <button onClick={() => setIsBingoVerifyModalOpen(false)} className="flex-1 py-4 bg-gray-800 rounded-xl font-bold hover:bg-gray-700 transition">Закрыть</button>
-                  <button onClick={() => { setVerifyCardId(''); setVerifyResult(null); }} className="flex-1 py-4 bg-purple-600 rounded-xl font-bold hover:bg-purple-500 transition text-white">Другая</button>
+                  <button onClick={() => setIsBingoVerifyModalOpen(false)} className="flex-1 py-4 bg-pult-raised rounded-xl font-medium hover:bg-[#2b2b2e] transition-colors">Закрыть</button>
+                  <button onClick={() => { setVerifyCardId(''); setVerifyResult(null); }} className="flex-1 py-4 bg-lime rounded-xl font-medium hover:bg-[#d4ff63] transition-colors text-[#141415]">Другая</button>
                 </div>
               </div>
             )}

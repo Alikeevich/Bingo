@@ -3,7 +3,7 @@ import { supabase } from '../../supabase';
 import { Game, Round, Playlist, Template, BingoCard, Track } from '../../types';
 import { buildPlayQueue } from '../../utils';
 import { winIndexForCard, buildCardForWinIndex, buildRandomCells, minWinIndex, maxWinIndex, Cells } from '../../lib/cardBuilder';
-import { ChevronLeft, Calendar, Trash2, PlusCircle, ListMusic, LayoutTemplate, Play, Printer, PartyPopper, HardDriveDownload, Loader2, Download } from 'lucide-react';
+import { ChevronLeft, Calendar, Trash2, PlusCircle, ListMusic, LayoutTemplate, Play, Printer, HardDriveDownload, Loader2, Download } from 'lucide-react';
 import { cacheTracks, isOfflineCacheReady } from '../../lib/offlineCache';
 
 // Все 12 выигрышных линий в сетке 5×5 (строки, столбцы, 2 диагонали)
@@ -19,6 +19,14 @@ interface GamesTabProps {
   /** Ссылка, которую реально играет плеер (свой MP3 / R2 / свежий Deezer) */
   resolveTrackUrl: (track: Track) => Promise<string | null>;
 }
+
+// 1 тур, 2 тура, 5 туров
+const plural = (n: number, one: string, few: string, many: string) => {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+};
 
 export default function GamesTab({ games, setGames, playlists, dbTracks, templates, showToast, startHostSession, setPrintViewCards, resolveTrackUrl }: GamesTabProps) {
   // Скачивание всей игры в офлайн-кэш: { этап, сделано, всего } или null
@@ -130,7 +138,7 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
     if (!newGameName.trim()) return;
     setIsCreateGameModalOpen(false);
     const { data } = await supabase.from('games').insert([{ name: newGameName, rounds: [] }]).select();
-    if (data?.[0]) { setGames([data[0], ...games]); showToast('Игра создана!'); }
+    if (data?.[0]) { setGames([data[0], ...games]); showToast('Игра создана'); }
     setNewGameName('');
   };
 
@@ -156,7 +164,7 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
     setIsAddRoundModalOpen(false);
     setNewRound({ winCondition: '1_line' });
     await supabase.from('games').update({ rounds: updatedGame.rounds }).eq('id', viewingGame.id);
-    showToast('Тур добавлен!');
+    showToast('Тур добавлен');
   };
 
   const deleteRound = async (roundId: string) => {
@@ -189,7 +197,7 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
     if (!cardGeneratorSetup || !selectedTemplateId) return;
     const { game, round } = cardGeneratorSetup;
     const playlist = playlists.find(p => p.id === round.playlistId);
-    if (!playlist || playlist.tracks.length < 24) return showToast('Ошибка: в плейлисте меньше 24 треков!');
+    if (!playlist || playlist.tracks.length < 24) return showToast('Ошибка: в плейлисте меньше 24 треков');
     const template = templates.find(t => t.id === selectedTemplateId);
     if (!template) return;
     
@@ -202,7 +210,7 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
     // Порядок известен заранее, поэтому карточки раздаём так, чтобы они
     // «выстреливали» на РАЗНЫХ треках — тогда не будет 2-3 бинго одновременно.
     const uniqueTracks = buildPlayQueue(playlist.tracks, dbTracks);
-    if (uniqueTracks.length < 24) return showToast(`Ошибка: нужно минимум 24 уникальных трека (сейчас ${uniqueTracks.length})!`);
+    if (uniqueTracks.length < 24) return showToast(`Ошибка: нужно минимум 24 уникальных трека (сейчас ${uniqueTracks.length})`);
     const dropped = playlist.tracks.length - uniqueTracks.length;
 
     const playIndexOf = new Map<string, number>();
@@ -311,33 +319,33 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
   if (viewingGame) {
     const currentGame = games.find(g => g.id === viewingGame.id) || viewingGame;
     return (
-      <div className="animate-in slide-in-from-right-8 duration-300 flex flex-col h-full">
-        <button onClick={() => setViewingGame(null)} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition w-fit"><ChevronLeft size={20} /> Назад к списку игр</button>
-        <div className="flex items-end justify-between mb-8 border-b border-gray-800 pb-8">
+      <div className=" duration-300 flex flex-col h-full">
+        <button onClick={() => setViewingGame(null)} className="inline-flex items-center gap-1 text-sm text-pult-text2 hover:text-pult-text mb-4 transition-colors w-fit"><ChevronLeft size={16} /> Мероприятия</button>
+        <div className="flex items-end justify-between mb-6">
           <div>
-            <h1 className="text-4xl font-black mb-2">{currentGame.name}</h1>
-            <div className="flex items-center gap-4 text-gray-400"><Calendar size={16} /> {new Date(currentGame.created_at || Date.now()).toLocaleDateString('ru-RU')}<span className="w-1 h-1 bg-gray-600 rounded-full" /><span>{currentGame.rounds.length} туров</span></div>
+            <h1 className="text-2xl font-medium mb-2">{currentGame.name}</h1>
+            <div className="flex items-center gap-4 text-pult-text2"><Calendar size={16} /> {new Date(currentGame.created_at || Date.now()).toLocaleDateString('ru-RU')}<span className="text-pult-muted">·</span><span><span className="font-mono tabular-nums">{currentGame.rounds.length}</span> {plural(currentGame.rounds.length, 'тур', 'тура', 'туров')}</span></div>
           </div>
-          <button onClick={e => deleteGame(currentGame.id, e)} className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition font-bold"><Trash2 size={20} /> Удалить мероприятие</button>
+          <button onClick={e => deleteGame(currentGame.id, e)} className="h-9 px-3 rounded-lg text-sm inline-flex items-center gap-2 text-pult-muted hover:text-red-400 hover:bg-white/[0.04] transition-colors"><Trash2 size={16} /> Удалить игру</button>
         </div>
         <div className="flex-1 overflow-y-auto pr-2 pb-10 custom-scrollbar">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold">Туры</h2>
+            <h2 className="text-base font-medium text-pult-text">Туры</h2>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => cacheGameOffline(viewingGame)}
                 disabled={!!gameOffline || viewingGame.rounds.length === 0}
                 title="Скачать треки всех туров этой игры, чтобы они играли даже без интернета. Делай дома, заранее."
-                className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition flex items-center gap-2 disabled:opacity-50"
+                className="bg-pult-raised hover:bg-[#2b2b2e] text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
               >
                 {gameOffline ? <Loader2 size={18} className="animate-spin" /> : <HardDriveDownload size={18} />}
                 {gameOffline ? `${gameOffline.phase}: ${gameOffline.done}/${gameOffline.total}` : 'Скачать игру офлайн'}
               </button>
-              <button onClick={() => setIsAddRoundModalOpen(true)} className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition flex items-center gap-2"><PlusCircle size={18} /> Добавить тур</button>
+              <button onClick={() => setIsAddRoundModalOpen(true)} className="bg-pult-raised hover:bg-[#2b2b2e] text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"><PlusCircle size={18} /> Добавить тур</button>
             </div>
           </div>
           {currentGame.rounds.length === 0 ? (
-            <div className="text-center py-20 text-gray-500 bg-gray-900/50 rounded-2xl border border-dashed border-gray-800">В этой игре пока нет туров.</div>
+            <div className="text-center py-20 text-pult-muted bg-pult-card/60 rounded-2xl border border-dashed border-white/[0.08]">В этой игре пока нет туров.</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {currentGame.rounds.map((round, index) => {
@@ -345,26 +353,26 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
                 const cardsCountLabel = round.cards?.length ? `${round.cards.length} карточек` : 'Нет карточек';
                 const conditionText = round.winCondition === 'full' ? 'Вся карточка' : round.winCondition === '3_lines' ? '3 Линии' : round.winCondition === '2_lines' ? '2 Линии' : '1 Линия';
                 return (
-                  <div key={round.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-6 flex flex-col group relative shadow-lg">
+                  <div key={round.id} className="bg-pult-card border border-white/[0.08] rounded-xl p-5 flex flex-col group relative">
                     <div className="flex justify-between items-start mb-4">
-                      <span className="text-purple-400 font-bold bg-purple-500/10 px-3 py-1.5 rounded-lg text-sm flex gap-2 items-center">Тур {index + 1} <span className="text-gray-400 text-xs font-normal">({conditionText})</span></span>
-                      <button onClick={() => deleteRound(round.id)} className="text-gray-500 hover:text-red-400 transition opacity-0 group-hover:opacity-100"><Trash2 size={18} /></button>
+                      <span className="text-sm text-pult-text2">Тур <span className="font-mono tabular-nums">{index + 1}</span> · {conditionText.toLowerCase()}</span>
+                      <button onClick={() => deleteRound(round.id)} className="text-pult-muted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={18} /></button>
                     </div>
-                    <h3 className="text-2xl font-black mb-2 truncate">{round.name}</h3>
-                    <p className="text-gray-400 text-sm mb-2 flex items-center gap-2"><ListMusic size={16} /> {playlist ? `${playlist.name} (${playlist.tracks.length} треков)` : 'Плейлист удалён'}</p>
-                    <p className="text-gray-500 text-sm mb-6 flex items-center gap-2"><LayoutTemplate size={16} /> {cardsCountLabel}</p>
+                    <h3 className="text-lg font-medium mb-2 truncate">{round.name}</h3>
+                    <p className="text-pult-text2 text-sm mb-2 flex items-center gap-2"><ListMusic size={16} /> {playlist ? `${playlist.name} (${playlist.tracks.length} треков)` : 'Плейлист удалён'}</p>
+                    <p className="text-pult-muted text-sm mb-6 flex items-center gap-2"><LayoutTemplate size={16} /> {cardsCountLabel}</p>
                     {!!round.cards?.length && (
                       <button
                         onClick={() => openReprint(round, index)}
                         title="Открыть уже созданные карточки ещё раз — скачать или распечатать. Новые не создаются."
-                        className="mb-3 w-full bg-gray-950 border border-gray-800 hover:border-gray-600 text-gray-300 hover:text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition"
+                        className="mb-3 w-full bg-pult-bg border border-white/[0.08] hover:border-white/20 text-pult-text hover:text-white py-2.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-colors"
                       >
                         <Download size={16} /> Скачать готовые ({round.cards.length})
                       </button>
                     )}
                     <div className="mt-auto flex gap-3">
-                      <button onClick={() => startHostSession(currentGame, round)} disabled={!playlist} className="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition disabled:opacity-50"><Play size={20} fill="currentColor" /> Играть</button>
-                      <button onClick={() => { if (templates.length > 0 && !selectedTemplateId) setSelectedTemplateId(templates[0].id); openGenerator(currentGame, round); }} disabled={!playlist || playlist.tracks.length < 24} className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition disabled:opacity-50"><Printer size={20} /> Карточки</button>
+                      <button onClick={() => startHostSession(currentGame, round)} disabled={!playlist} className="flex-1 bg-lime hover:bg-[#d4ff63] text-[#141415] py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50"><Play size={20} fill="currentColor" /> Играть</button>
+                      <button onClick={() => { if (templates.length > 0 && !selectedTemplateId) setSelectedTemplateId(templates[0].id); openGenerator(currentGame, round); }} disabled={!playlist || playlist.tracks.length < 24} className="flex-1 bg-pult-raised hover:bg-[#2b2b2e] text-white py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50"><Printer size={20} /> Карточки</button>
                     </div>
                   </div>
                 );
@@ -376,19 +384,19 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
         {/* Повторное скачивание готовых карточек */}
         {reprint && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setReprint(null)}>
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
-              <h3 className="text-xl font-bold mb-1">Скачать готовые карточки</h3>
-              <p className="text-gray-400 text-sm mb-5">
+            <div className="bg-pult-card border border-white/[0.08] rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+              <h3 className="text-xl font-medium mb-1">Скачать готовые карточки</h3>
+              <p className="text-pult-text2 text-sm mb-5">
                 {reprint.round.name}: {reprint.round.cards?.length} карточек. Это те же карточки, что уже созданы, —
                 новые не генерируются, расписание побед не меняется.
               </p>
-              <label className="block text-xs text-gray-500 mb-1">Шаблон оформления</label>
+              <label className="block text-xs text-pult-muted mb-1">Шаблон оформления</label>
               <select value={reprintTemplateId} onChange={e => setReprintTemplateId(e.target.value)}
-                className="w-full bg-gray-950 border border-gray-800 rounded-xl py-3 px-4 text-white focus:border-purple-500 mb-6">
+                className="w-full bg-pult-bg border border-white/[0.08] rounded-xl py-3 px-4 text-white focus:border-lime/60 mb-6">
                 {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
               <div className="flex gap-3">
-                <button onClick={() => setReprint(null)} className="flex-1 py-3 bg-gray-800 rounded-xl font-bold">Отмена</button>
+                <button onClick={() => setReprint(null)} className="flex-1 py-3 bg-pult-raised rounded-xl font-medium">Отмена</button>
                 <button
                   onClick={() => {
                     const template = templates.find(t => t.id === reprintTemplateId);
@@ -396,7 +404,7 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
                     setPrintViewCards({ cards: reprint.round.cards, template });
                     setReprint(null);
                   }}
-                  className="flex-1 py-3 bg-purple-600 hover:bg-purple-500 rounded-xl font-bold flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-lime hover:bg-[#d4ff63] rounded-xl font-medium flex items-center justify-center gap-2 text-[#141415]"
                 >
                   <Download size={18} /> Открыть
                 </button>
@@ -408,22 +416,22 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
         {/* Модалки туров и генерации здесь же */}
         {isAddRoundModalOpen && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-             <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6">
-                <h3 className="text-xl font-bold mb-4">Добавить тур</h3>
-                <input type="text" value={newRound.name || ''} onChange={e => setNewRound({ ...newRound, name: e.target.value })} placeholder="Название тура" className="w-full bg-gray-950 border border-gray-800 rounded-xl py-3 px-4 text-white focus:border-purple-500 mb-4" />
-                <select value={newRound.playlistId || ''} onChange={e => setNewRound({ ...newRound, playlistId: e.target.value })} className="w-full bg-gray-950 border border-gray-800 rounded-xl py-3 px-4 text-white focus:border-purple-500 mb-4">
+             <div className="bg-pult-card border border-white/[0.08] rounded-2xl w-full max-w-md p-6">
+                <h3 className="text-xl font-medium mb-4">Добавить тур</h3>
+                <input type="text" value={newRound.name || ''} onChange={e => setNewRound({ ...newRound, name: e.target.value })} placeholder="Название тура" className="w-full bg-pult-bg border border-white/[0.08] rounded-xl py-3 px-4 text-white focus:border-lime/60 mb-4" />
+                <select value={newRound.playlistId || ''} onChange={e => setNewRound({ ...newRound, playlistId: e.target.value })} className="w-full bg-pult-bg border border-white/[0.08] rounded-xl py-3 px-4 text-white focus:border-lime/60 mb-4">
                   <option value="" disabled>Выберите плейлист (мин. 24 трека)...</option>
                   {playlists.filter(p => p.tracks.length >= 24).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
-                <select value={newRound.winCondition || '1_line'} onChange={e => setNewRound({ ...newRound, winCondition: e.target.value as any })} className="w-full bg-gray-950 border border-gray-800 rounded-xl py-3 px-4 text-white focus:border-purple-500 mb-4">
+                <select value={newRound.winCondition || '1_line'} onChange={e => setNewRound({ ...newRound, winCondition: e.target.value as any })} className="w-full bg-pult-bg border border-white/[0.08] rounded-xl py-3 px-4 text-white focus:border-lime/60 mb-4">
                   <option value="1_line">1 Линия</option>
                   <option value="2_lines">2 Линии</option>
                   <option value="3_lines">3 Линии</option>
                   <option value="full">Вся карточка</option>
                 </select>
                 <div className="flex gap-4">
-                  <button onClick={() => setIsAddRoundModalOpen(false)} className="flex-1 py-3 bg-gray-800 rounded-xl font-bold">Отмена</button>
-                  <button onClick={addRoundToGame} className="flex-1 py-3 bg-purple-600 rounded-xl font-bold">Добавить</button>
+                  <button onClick={() => setIsAddRoundModalOpen(false)} className="flex-1 py-3 bg-pult-raised rounded-xl font-medium">Отмена</button>
+                  <button onClick={addRoundToGame} className="flex-1 py-3 bg-lime rounded-xl font-medium text-[#141415]">Добавить</button>
                 </div>
              </div>
           </div>
@@ -431,31 +439,31 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
 
         {cardGeneratorSetup && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[110] p-4">
-            <div className="bg-gray-900 border border-gray-800 rounded-3xl w-full max-w-md p-6">
-              <h3 className="text-xl font-bold mb-6">Генератор карточек</h3>
+            <div className="bg-pult-card border border-white/[0.08] rounded-3xl w-full max-w-md p-6">
+              <h3 className="text-xl font-medium mb-6">Генератор карточек</h3>
               <div className="mb-4">
-                <label className="block text-sm text-gray-400 mb-2">Количество</label>
+                <label className="block text-sm text-pult-text2 mb-2">Количество</label>
                 <input type="text" inputMode="numeric" value={cardsDraft}
                   onChange={numInput(setCardsDraft, setCardsCount)}
                   onBlur={numBlur(cardsDraft, setCardsDraft, cardsCount)}
                   onFocus={e => e.target.select()}
-                  className="w-full bg-gray-950 border border-gray-800 py-3 text-center rounded-xl font-bold" />
+                  className="w-full bg-pult-bg border border-white/[0.08] py-3 text-center rounded-xl font-medium" />
               </div>
               <div className="mb-4">
-                <label className="block text-sm text-gray-400 mb-2">Шаблон</label>
-                <select value={selectedTemplateId} onChange={e => setSelectedTemplateId(e.target.value)} className="w-full bg-gray-950 border border-gray-800 rounded-xl py-3 px-4 text-white">{templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+                <label className="block text-sm text-pult-text2 mb-2">Шаблон</label>
+                <select value={selectedTemplateId} onChange={e => setSelectedTemplateId(e.target.value)} className="w-full bg-pult-bg border border-white/[0.08] rounded-xl py-3 px-4 text-white">{templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
               </div>
 
               {/* Моменты победы: авто или заданные вручную */}
               <div className="mb-6">
-                <label className="block text-sm text-gray-400 mb-2">Когда карточки выигрывают</label>
+                <label className="block text-sm text-pult-text2 mb-2">Когда карточки выигрывают</label>
                 <div className="flex gap-2 mb-3">
                   <button onClick={() => setWinMode('auto')}
-                    className={`flex-1 py-3 rounded-xl font-bold text-sm transition ${winMode === 'auto' ? 'bg-purple-600 text-white' : 'bg-gray-950 border border-gray-800 text-gray-400'}`}>
+                    className={`flex-1 py-3 rounded-xl font-medium text-sm transition-colors ${winMode === 'auto' ? 'bg-lime text-[#141415]' : 'bg-pult-bg border border-white/[0.08] text-pult-text2'}`}>
                     Автоматически
                   </button>
                   <button onClick={() => setWinMode('manual')}
-                    className={`flex-1 py-3 rounded-xl font-bold text-sm transition ${winMode === 'manual' ? 'bg-purple-600 text-white' : 'bg-gray-950 border border-gray-800 text-gray-400'}`}>
+                    className={`flex-1 py-3 rounded-xl font-medium text-sm transition-colors ${winMode === 'manual' ? 'bg-lime text-[#141415]' : 'bg-pult-bg border border-white/[0.08] text-pult-text2'}`}>
                     Задать самому
                   </button>
                 </div>
@@ -480,62 +488,62 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
                     <>
                       <div className="flex gap-3">
                         <div className="flex-1">
-                          <span className="block text-xs text-gray-500 mb-1">Первое бинго на песне №</span>
+                          <span className="block text-xs text-pult-muted mb-1">Первое бинго на песне №</span>
                           <input type="text" inputMode="numeric" value={firstDraft}
                             onChange={numInput(setFirstDraft, setFirstWinSong)}
                             onBlur={numBlur(firstDraft, setFirstDraft, firstWinSong)}
                             onFocus={e => e.target.select()}
-                            className="w-full bg-gray-950 border border-gray-800 py-3 text-center rounded-xl font-bold" />
+                            className="w-full bg-pult-bg border border-white/[0.08] py-3 text-center rounded-xl font-medium" />
                         </div>
                         <div className="flex-1">
-                          <span className="block text-xs text-gray-500 mb-1">Последнее бинго на песне №</span>
+                          <span className="block text-xs text-pult-muted mb-1">Последнее бинго на песне №</span>
                           <input type="text" inputMode="numeric" value={lastDraft}
                             onChange={numInput(setLastDraft, setLastWinSong)}
                             onBlur={numBlur(lastDraft, setLastDraft, lastWinSong)}
                             onFocus={e => e.target.select()}
-                            className="w-full bg-gray-950 border border-gray-800 py-3 text-center rounded-xl font-bold" />
+                            className="w-full bg-pult-bg border border-white/[0.08] py-3 text-center rounded-xl font-medium" />
                         </div>
                       </div>
                       {queue.length < 24 ? (
-                        <p className="text-xs mt-2 text-orange-400">В плейлисте меньше 24 песен.</p>
+                        <p className="text-xs mt-2 text-amber-300">В плейлисте меньше 24 песен.</p>
                       ) : (
-                        <p className="text-xs mt-2 text-gray-500">
+                        <p className="text-xs mt-2 text-pult-muted">
                           Победы на песнях: {at(0)}, {at(1)}, {at(2)}… последняя на {at(cardsCount - 1)}-й из {queue.length}.
                           {' '}Номера карточек раздаются вразнобой, чтобы зал не понял, что победители расписаны — тебе порядок виден в экране игры.
                         </p>
                       )}
                       {clamped && queue.length >= 24 && (
-                        <p className="text-xs mt-1 text-orange-400">
+                        <p className="text-xs mt-1 text-amber-300">
                           Для условия «{condName}» победа возможна с {lo}-й по {hi}-ю песню — цифры подогнаны под диапазон.
                           {' '}Раньше {lo}-й не закрыть {cond === 'full' ? '24 клетки' : `${minWinIndex(cond) + 1} клеток`};
                           {cond !== 'full' && ` последние ${queue.length - hi} песен нужны как запас — иначе остальные линии закроются раньше и карточка выиграет не тогда, когда задумано.`}
                         </p>
                       )}
                       {sameSong && queue.length >= 24 && (
-                        <p className="text-xs mt-1 text-orange-400">
+                        <p className="text-xs mt-1 text-amber-300">
                           Карточек больше, чем песен в промежутке — несколько закроются на одной песне.
                         </p>
                       )}
                     </>
                   );
                 })() : (
-                  <p className="text-xs text-gray-500">Приложение само разведёт карточки по разным песням, чтобы не было двух бинго подряд.</p>
+                  <p className="text-xs text-pult-muted">Приложение само разведёт карточки по разным песням, чтобы не было двух бинго подряд.</p>
                 )}
               </div>
               {(cardGeneratorSetup.round.cards?.length || 0) > 0 && (
-                <label className="flex items-start gap-3 mb-6 p-3 rounded-xl bg-gray-950 border border-gray-800 cursor-pointer">
+                <label className="flex items-start gap-3 mb-6 p-3 rounded-xl bg-pult-bg border border-white/[0.08] cursor-pointer">
                   <input type="checkbox" checked={replaceCards} onChange={e => setReplaceCards(e.target.checked)} className="mt-1 accent-purple-500 w-4 h-4" />
                   <span className="text-sm">
                     Заменить старые карточки ({cardGeneratorSetup.round.cards?.length} шт.)
-                    <span className="block text-xs text-gray-500 mt-1">
+                    <span className="block text-xs text-pult-muted mt-1">
                       Старые уже напечатаны и раздадите их снова? Сними галочку — новые добавятся к ним. Но тогда старые выиграют вразнобой и собьют расписание.
                     </span>
                   </span>
                 </label>
               )}
               <div className="flex gap-4">
-                <button onClick={() => setCardGeneratorSetup(null)} className="flex-1 py-4 bg-gray-800 rounded-xl font-bold">Отмена</button>
-                <button onClick={generateCards} className="flex-1 py-4 bg-purple-600 rounded-xl font-bold">Сгенерировать</button>
+                <button onClick={() => setCardGeneratorSetup(null)} className="flex-1 py-4 bg-pult-raised rounded-xl font-medium">Отмена</button>
+                <button onClick={generateCards} className="flex-1 py-4 bg-lime rounded-xl font-medium text-[#141415]">Сгенерировать</button>
               </div>
             </div>
           </div>
@@ -545,26 +553,40 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
   }
 
   return (
-    <div className="animate-in fade-in duration-300 h-full overflow-y-auto custom-scrollbar pr-2 pb-10">
-      <h1 className="text-3xl font-bold mb-2">Мероприятия</h1>
-      <p className="text-gray-400 mb-8">Создавайте игры, добавляйте в них туры и генерируйте карточки.</p>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        <div onClick={() => setIsCreateGameModalOpen(true)} className="bg-gray-900/50 border-2 border-dashed border-gray-700 rounded-2xl h-56 flex flex-col items-center justify-center text-gray-400 hover:border-purple-500 hover:text-purple-400 transition cursor-pointer"><PartyPopper size={40} className="mb-4" /><span className="font-bold text-lg">Создать игру</span></div>
-        {games.map(game => (
-          <div key={game.id} onClick={() => setViewingGame(game)} className="bg-gray-900 border border-gray-800 rounded-2xl h-56 p-6 flex flex-col hover:border-purple-500/50 transition cursor-pointer relative shadow-lg group">
-            <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center mb-auto text-purple-400"><PartyPopper size={24} /></div>
-            <button onClick={e => deleteGame(game.id, e)} className="absolute top-4 right-4 p-2 text-gray-600 hover:text-red-400 transition opacity-0 group-hover:opacity-100"><Trash2 size={18} /></button>
-            <div><h3 className="font-bold text-xl mb-1 truncate">{game.name}</h3><p className="text-sm text-gray-500">{game.rounds?.length || 0} туров</p></div>
-          </div>
-        ))}
+    <div className=" duration-300 h-full overflow-y-auto custom-scrollbar pr-2 pb-10">
+      <header className="flex items-end justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-medium">Мероприятия</h1>
+          <p className="mt-1 text-sm text-pult-text2">Игра — это вечер в заведении: туры, бланки и сам ход игры</p>
+        </div>
+        <button onClick={() => setIsCreateGameModalOpen(true)} className="h-9 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-2 bg-lime text-[#141415] hover:bg-[#d4ff63] transition-colors">
+          <PlusCircle size={16} /> Новая игра
+        </button>
+      </header>
+      <div className="rounded-xl border border-white/[0.08] bg-pult-card divide-y divide-white/[0.06]">
+        {games.length === 0 && <p className="p-6 text-sm text-pult-text2">Игр пока нет</p>}
+        {games.map(game => {
+          const rounds = game.rounds?.length || 0;
+          const cards = (game.rounds || []).reduce((n, r) => n + (r.cards?.length || 0), 0);
+          return (
+            <div key={game.id} onClick={() => setViewingGame(game)}
+              className="group grid grid-cols-[1fr_120px_140px_110px_32px] items-center gap-4 h-14 px-4 cursor-pointer hover:bg-white/[0.03] transition-colors">
+              <span className="truncate">{game.name}</span>
+              <span className="text-sm text-pult-text2"><span className="font-mono tabular-nums">{rounds}</span> {plural(rounds, 'тур', 'тура', 'туров')}</span>
+              <span className="text-sm text-pult-muted">{cards ? <><span className="font-mono tabular-nums">{cards}</span> {plural(cards, 'бланк', 'бланка', 'бланков')}</> : 'без бланков'}</span>
+              <span className="font-mono text-sm tabular-nums text-pult-muted">{game.created_at ? new Date(game.created_at).toLocaleDateString('ru-RU') : ''}</span>
+              <button onClick={e => deleteGame(game.id, e)} title="Удалить игру" className="p-1.5 rounded-md text-pult-muted hover:text-red-400 hover:bg-white/[0.04] transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={16} /></button>
+            </div>
+          );
+        })}
       </div>
 
       {isCreateGameModalOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6">
-            <h3 className="text-xl font-bold mb-4">Новое мероприятие</h3>
-            <input autoFocus type="text" value={newGameName} onChange={e => setNewGameName(e.target.value)} placeholder="Название игры" className="w-full bg-gray-950 border border-gray-800 rounded-xl py-3 px-4 text-white mb-6" onKeyDown={e => e.key === 'Enter' && createGame()} />
-            <div className="flex gap-4"><button onClick={() => setIsCreateGameModalOpen(false)} className="flex-1 py-3 rounded-xl font-bold bg-gray-800">Отмена</button><button onClick={createGame} className="flex-1 py-3 rounded-xl font-bold bg-purple-600">Создать</button></div>
+          <div className="bg-pult-card border border-white/[0.08] rounded-2xl w-full max-w-md p-6">
+            <h3 className="text-xl font-medium mb-4">Новое мероприятие</h3>
+            <input autoFocus type="text" value={newGameName} onChange={e => setNewGameName(e.target.value)} placeholder="Название игры"  />
+            <div className="flex gap-4"><button onClick={() => setIsCreateGameModalOpen(false)} className="flex-1 py-3 rounded-xl font-medium bg-pult-raised">Отмена</button><button onClick={createGame} className="flex-1 py-3 rounded-xl font-medium bg-lime text-[#141415]">Создать</button></div>
           </div>
         </div>
       )}

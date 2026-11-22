@@ -3,8 +3,8 @@ import { supabase } from '../../supabase';
 import { Track } from '../../types';
 import { compressAudioToMp3, fmtMB } from '../../lib/compressAudio';
 import {
-  Search, X, UploadCloud, Loader2, CheckCircle2, HardDriveDownload,
-  Music, Trash2, AlertTriangle, Scissors,
+  Search, X, UploadCloud, Loader2, CheckCircle2,
+  Trash2, Scissors,
 } from 'lucide-react';
 import AudioTrimmer from '../AudioTrimmer';
 
@@ -168,49 +168,48 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
   const pct = dbTracks.length ? Math.round((doneCount / dbTracks.length) * 100) : 0;
 
   return (
-    <div className="animate-in fade-in duration-300 flex flex-col h-full">
-      <h1 className="text-3xl font-bold mb-2">Миграция на свои MP3</h1>
-      <p className="text-gray-400 mb-6">
+    <div className="flex flex-col h-full text-pult-text">
+      <h1 className="text-2xl font-medium">Полные MP3</h1>
+      <p className="mt-1 text-sm text-pult-text2 mb-5 max-w-3xl">
         Заливай полные версии песен бірақ файл сжимается до {BITRATE} kbps прямо в браузере.
-        Полная версия играет <span className="text-green-400 font-medium">офлайн</span> и
+        Полная версия играет <span className="text-pult-text">офлайн</span> и
         позволяет «Продолжить» песню точно с того места, где остановились.
       </p>
 
       {/* Прогресс миграции */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 mb-6">
+      <div className="bg-pult-card border border-white/[0.08] rounded-xl p-5 mb-5 max-w-3xl">
         <div className="flex items-end justify-between mb-3">
           <div>
-            <div className="text-sm text-gray-400">Полные версии загружены</div>
-            <div className="text-3xl font-black">
-              {doneCount} <span className="text-gray-600 text-xl">/ {dbTracks.length}</span>
+            <div className="text-sm text-pult-text2">Полные версии загружены</div>
+            <div className="text-2xl font-medium font-mono tabular-nums">
+              {doneCount} <span className="text-pult-muted text-lg">/ {dbTracks.length}</span>
             </div>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-black text-purple-400">{pct}%</div>
-            <div className="text-xs text-gray-500">готово</div>
+            <div className="text-2xl font-medium font-mono tabular-nums text-lime">{pct}%</div>
+            <div className="text-xs text-pult-muted">готово</div>
           </div>
         </div>
-        <div className="h-2.5 bg-gray-950 rounded-full overflow-hidden">
-          <div className="h-full bg-gradient-to-r from-purple-600 to-green-500 transition-all duration-500" style={{ width: `${pct}%` }} />
+        <div className="h-1.5 bg-pult-raised rounded-full overflow-hidden">
+          <div className="h-full bg-lime transition-[width] duration-500" style={{ width: `${pct}%` }} />
         </div>
-        <p className="text-[11px] text-gray-500 mt-3 leading-relaxed">
-          <AlertTriangle size={12} className="inline mr-1 -mt-0.5 text-yellow-500" />
+        <p className="text-xs text-pult-muted mt-3 leading-relaxed">
           Не обязательно заливать всё. Хитовый музыкадан бастай бер бауырым.
         </p>
       </div>
 
       {/* Поиск + фильтры */}
-      <div className="flex flex-wrap gap-3 mb-5">
-        <div className="relative flex-1 min-w-[240px]">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+      <div className="flex flex-wrap items-center gap-1.5 mb-4">
+        <div className="relative w-72 mr-2">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-pult-muted pointer-events-none" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Поиск: трек или исполнитель…"
-            className="w-full bg-gray-900 border border-gray-800 rounded-xl pl-9 pr-9 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+            placeholder="Песня или исполнитель"
+            className="h-9 w-full rounded-lg bg-pult-raised border border-white/[0.06] pl-9 pr-9 text-sm text-pult-text placeholder:text-pult-muted focus:outline-none focus:border-lime/60"
           />
           {search && (
-            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"><X size={14} /></button>
+            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-pult-muted hover:text-white"><X size={14} /></button>
           )}
         </div>
         {([
@@ -221,7 +220,7 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
           <button
             key={key}
             onClick={() => setFilter(key)}
-            className={`px-4 py-2.5 rounded-xl text-sm font-bold transition ${filter === key ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+            className={`h-9 px-3 rounded-lg text-sm transition-colors ${filter === key ? 'bg-pult-raised text-pult-text border border-white/[0.1]' : 'text-pult-text2 hover:bg-white/[0.04]'}`}
           >
             {label}
           </button>
@@ -231,49 +230,49 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
       {/* Список треков */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-10">
         {visible.length === 0 ? (
-          <div className="text-center py-16 text-gray-500 bg-gray-900/50 rounded-2xl border border-dashed border-gray-800">
+          <div className="text-center py-16 text-pult-muted bg-pult-card/60 rounded-2xl border border-dashed border-white/[0.08]">
             {filter === 'todo' && dbTracks.length > 0 && doneCount === dbTracks.length
-              ? <><CheckCircle2 size={40} className="mx-auto mb-3 text-green-500" /><p>Все треки уже с полными версиями.</p></>
-              : <p>Ничего не найдено.</p>}
+              ? <><CheckCircle2 size={28} className="mx-auto mb-3 text-lime" /><p>У всех песен уже есть полные версии</p></>
+              : <p>Ничего не найдено</p>}
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="rounded-xl border border-white/[0.08] bg-pult-card p-1.5 flex flex-col gap-0.5">
             {shown.map(track => {
               const id = String(track.id);
               const state = busy[id];
               const done = hasFull(track);
               return (
-                <div key={id} className={`flex items-center gap-4 p-3 rounded-xl border transition ${done ? 'bg-green-950/20 border-green-900/40' : 'bg-gray-900 border-gray-800'}`}>
-                  <img src={track.cover} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                <div key={id} className="flex items-center gap-3 h-14 px-2.5 rounded-lg hover:bg-white/[0.03] transition-colors">
+                  <img src={track.cover} alt="" className="w-10 h-10 rounded-md object-cover flex-shrink-0 bg-pult-raised" loading="lazy" />
                   <div className="flex-1 overflow-hidden">
-                    <p className="font-bold truncate">{track.title}</p>
-                    <p className="text-sm text-gray-400 truncate">{track.artist}</p>
+                    <p className="text-sm truncate">{track.title}</p>
+                    <p className="text-sm text-pult-text2 truncate">{track.artist}</p>
                   </div>
 
                   {state ? (
                     <div className="w-56 flex-shrink-0">
-                      <div className="flex items-center gap-2 text-xs text-purple-300 mb-1">
+                      <div className="flex items-center gap-2 text-xs text-pult-text2 mb-1">
                         <Loader2 size={14} className="animate-spin" />
                         {state.phase}… {Math.round(state.ratio * 100)}%
                       </div>
-                      <div className="h-1.5 bg-gray-950 rounded-full overflow-hidden">
-                        <div className="h-full bg-purple-500 transition-all" style={{ width: `${state.ratio * 100}%` }} />
+                      <div className="h-1 bg-pult-raised rounded-full overflow-hidden">
+                        <div className="h-full bg-lime transition-[width]" style={{ width: `${state.ratio * 100}%` }} />
                       </div>
                     </div>
                   ) : done ? (
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/15 text-green-400 rounded-lg text-xs font-bold">
-                        {track.isCustom && !track.mp3Path ? <Music size={14} /> : <HardDriveDownload size={14} />}
+                      <span className="flex items-center gap-1.5 text-sm text-pult-text2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-lime" />
                         Полная есть
                       </span>
                       {track.mp3Path && (
-                        <button onClick={() => removeMp3(track)} title="Убрать полную версию" className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition">
+                        <button onClick={() => removeMp3(track)} title="Убрать полную версию" className="p-1.5 text-pult-muted hover:text-red-400 hover:bg-white/[0.06] rounded-md transition-colors">
                           <Trash2 size={16} />
                         </button>
                       )}
                     </div>
                   ) : (
-                    <label className="flex-shrink-0 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 cursor-pointer transition">
+                    <label className="flex-shrink-0 h-8 px-3 rounded-md text-sm inline-flex items-center gap-1.5 text-pult-text2 hover:text-[#141415] hover:bg-lime cursor-pointer transition-colors">
                       <UploadCloud size={16} /> Загрузить MP3
                       <input
                         ref={el => { inputsRef.current[id] = el; }}
@@ -294,32 +293,32 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
           <div className="flex flex-col items-center gap-2 py-8">
             <button
               onClick={() => setVisibleCount(c => c + PAGE)}
-              className="px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-xl font-bold transition"
+              className="px-6 py-3 bg-pult-raised hover:bg-[#2b2b2e] rounded-xl font-medium transition-colors"
             >
               Показать ещё {Math.min(PAGE, visible.length - visibleCount)}
             </button>
-            <span className="text-xs text-gray-500">показано {shown.length} из {visible.length}</span>
+            <span className="text-xs text-pult-muted">показано {shown.length} из {visible.length}</span>
           </div>
         )}
       </div>
 
       {/* ─── МОДАЛКА: ВЫБОР ФРАГМЕНТА ПЕРЕД ЗАГРУЗКОЙ ─── */}
       {pending && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4 animate-in fade-in">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">
+          <div className="bg-pult-card border border-white/[0.08] rounded-2xl w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-start mb-5">
               <div className="flex items-center gap-4 overflow-hidden">
                 <img src={pending.track.cover} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
                 <div className="overflow-hidden">
-                  <h3 className="text-lg font-bold truncate">{pending.track.title}</h3>
-                  <p className="text-sm text-gray-400 truncate">{pending.track.artist}</p>
+                  <h3 className="text-lg font-medium truncate">{pending.track.title}</h3>
+                  <p className="text-sm text-pult-text2 truncate">{pending.track.artist}</p>
                 </div>
               </div>
-              <button onClick={closePending} className="text-gray-400 hover:text-white flex-shrink-0"><X size={22} /></button>
+              <button onClick={closePending} className="text-pult-text2 hover:text-white flex-shrink-0"><X size={22} /></button>
             </div>
 
-            <label className="text-sm font-bold text-gray-400 mb-2 flex items-center gap-2">
-              <Scissors size={14} className="text-purple-400" />
+            <label className="text-sm font-medium text-pult-text2 mb-2 flex items-center gap-2">
+              <Scissors size={14} className="text-lime" />
               С какого момента играть в игре
             </label>
             <AudioTrimmer
@@ -328,14 +327,14 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
               end={trimEnd}
               onChange={(s, e) => { setTrimStart(s); setTrimEnd(e); }}
             />
-            <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+            <p className="text-[11px] text-pult-muted mt-2 leading-relaxed">
               Трек начнётся с зелёной метки и остановится на красной — ставь на узнаваемый
               момент (припев). Кнопка «Полная» в игре снимет ограничение и доиграет песню
               до конца. Не трогай — будет играть с начала.
             </p>
 
             <div className="flex gap-3 mt-6">
-              <button onClick={closePending} className="flex-1 py-3 bg-gray-800 rounded-xl font-bold hover:bg-gray-700 transition">
+              <button onClick={closePending} className="flex-1 py-3 bg-pult-raised rounded-xl font-medium hover:bg-[#2b2b2e] transition-colors">
                 Отмена
               </button>
               <button
@@ -345,7 +344,7 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
                   closePending();
                   handleFile(track, file, seg);
                 }}
-                className="flex-[2] py-3 bg-purple-600 hover:bg-purple-500 rounded-xl font-bold text-white transition flex items-center justify-center gap-2"
+                className="flex-[2] py-3 bg-lime hover:bg-[#d4ff63] rounded-xl font-medium text-[#141415] transition-colors flex items-center justify-center gap-2"
               >
                 <UploadCloud size={18} /> Сжать и загрузить
               </button>

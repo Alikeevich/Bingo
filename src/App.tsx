@@ -26,7 +26,7 @@ import Projector from './components/screens/Projector';
 const PrintView = lazy(() => import('./components/screens/PrintView'));
 const MigrationTab = lazy(() => import('./components/tabs/MigrationTab'));
 const TabLoader = () => (
-  <div className="flex h-full items-center justify-center text-gray-500"><Loader2 className="animate-spin" size={24} /></div>
+  <div className="flex h-full items-center justify-center text-pult-muted"><Loader2 className="animate-spin" size={24} /></div>
 );
 
 export default function App() {
@@ -61,7 +61,7 @@ export default function App() {
   // Активный фрагмент (preview_start / preview_end в секундах) текущего проигрываемого трека.
   // Хранится в ref чтобы onTimeUpdate (статичный хендлер) знал актуальные границы без re-attach.
   const currentSegmentRef = useRef<{ start?: number; end?: number; finished?: boolean }>({});
-  // Интервал плавного изменения громкости (fade-in / fade-out)
+  // Интервал плавного изменения громкости ( / fade-out)
   const fadeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Защита от двойного авто-перехода: onTimeUpdate (preview_end) и onEnded могут
   // оба вызвать handleTrackFinished для одного трека → трек проскакивал/перезапускался.
@@ -137,7 +137,7 @@ export default function App() {
       setCurrentHostTrackIndex(saved.currentHostTrackIndex);
       setHideTrackInfo(saved.hideTrackInfo);
       needsRehydrateRef.current = true;
-      showToast('Игра восстановлена после обновления страницы!');
+      showToast('Игра восстановлена после обновления страницы');
     }
   }, []);
 
@@ -463,7 +463,7 @@ export default function App() {
         audioEl.removeEventListener('loadedmetadata', onMeta);
       };
       audioEl.addEventListener('loadedmetadata', onMeta);
-      // Короткий fade-in (60мс) — звук не прыгает с тишины во весь объём
+      // Короткий (60мс) — звук не прыгает с тишины во весь объём
       audioEl.volume = 0;
       audioEl.play().then(() => fadeVolume(audioEl, 0, 1, 60)).catch(err => { console.error(err); setPlayingTrackId(null); });
     } catch (err) { console.error(err); setPlayingTrackId(null); }
@@ -563,7 +563,7 @@ export default function App() {
 
   const startHostSession = (game: Game, round: Round) => {
     const playlist = playlists.find(p => p.id === round.playlistId);
-    if (!playlist) return showToast('Плейлист не найден!');
+    if (!playlist) return showToast('Плейлист не найден');
     // Очередь строит общий с генератором карточек код (см. buildPlayQueue):
     // карточки обязаны собираться ровно из этих треков, иначе клетка с треком,
     // которого в очереди нет, не закроется никогда.
@@ -847,7 +847,7 @@ export default function App() {
          };
          return [addedTrack, ...filtered];
        });
-       showToast('Трек сохранен!');
+       showToast('Трек сохранен');
     }
     setTrackToAddToDb(null);
     setCustomFile(null);
@@ -889,7 +889,7 @@ export default function App() {
   };
 
   if (printViewCards) return (
-    <Suspense fallback={<div className="fixed inset-0 bg-gray-900 flex items-center justify-center text-gray-400"><Loader2 className="animate-spin" size={28} /></div>}>
+    <Suspense fallback={<div className="fixed inset-0 bg-pult-card flex items-center justify-center text-pult-text2"><Loader2 className="animate-spin" size={28} /></div>}>
       <PrintView printViewCards={printViewCards} setPrintViewCards={setPrintViewCards} />
     </Suspense>
   );
@@ -916,18 +916,18 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-950 text-white font-sans selection:bg-purple-500 overflow-hidden relative">
+    <div className="flex h-screen bg-pult-bg text-[#141415] font-sans selection:bg-lime overflow-hidden relative">
       <audio ref={audioRef} preload="auto" crossOrigin="anonymous" {...audioHandlers} />
       {/* Скрытый второй элемент — только для пре-кеша следующего трека (звук не воспроизводится) */}
       <audio ref={preloadAudioRef} preload="auto" crossOrigin="anonymous" muted aria-hidden="true" style={{ display: 'none' }} />
 
       {toast && (
-        <div className="absolute top-6 right-6 max-w-md bg-green-600 text-white pl-6 pr-3 py-4 rounded-xl shadow-2xl font-bold flex items-start gap-3 z-[300] animate-in slide-in-from-top-4">
-          <CheckCircle2 size={20} className="flex-shrink-0 mt-0.5" />
+        <div className="absolute top-5 right-6 max-w-md bg-pult-raised border border-white/[0.08] text-pult-text pl-4 pr-2 py-3 rounded-xl text-sm flex items-start gap-3 z-[300] shadow-[0_12px_32px_rgba(0,0,0,0.45)]">
+          <CheckCircle2 size={18} className="flex-shrink-0 mt-px text-lime" />
           <span className="flex-1 leading-snug">{toast.text}</span>
           <button
             onClick={() => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); setToast(null); }}
-            className="flex-shrink-0 p-1 -mt-1 rounded-lg hover:bg-white/20 transition"
+            className="flex-shrink-0 p-1 -mt-0.5 rounded-md text-pult-muted hover:text-pult-text hover:bg-white/[0.06] transition-colors"
             title="Закрыть"
           >
             <X size={18} />
@@ -935,27 +935,44 @@ export default function App() {
         </div>
       )}
 
-      <aside className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col z-10 flex-shrink-0">
-        <div className="p-6 flex items-center border-b border-gray-800/50">
-          <Logo className="h-9 w-auto" />
+      <aside className="w-60 bg-pult-deep border-r border-white/[0.06] flex flex-col z-10 flex-shrink-0">
+        <div className="h-16 px-5 flex items-center">
+          <Logo className="h-8 w-auto" />
         </div>
-        <nav className="flex-1 px-4 py-6 flex flex-col gap-2">
-          <button onClick={() => setActiveTab('games')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === 'games' ? 'bg-purple-600 text-white font-bold' : 'text-gray-400 hover:bg-gray-800'}`}><PartyPopper size={20} /> Мероприятия</button>
-          <div className="h-px bg-gray-800 my-2 mx-4" />
-          <button onClick={() => setActiveTab('mydatabase')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === 'mydatabase' ? 'bg-purple-600 text-white font-bold' : 'text-gray-400 hover:bg-gray-800'}`}><Database size={20} /> Моя База</button>
-          <button onClick={() => setActiveTab('global_search')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === 'global_search' ? 'bg-purple-600 text-white font-bold' : 'text-gray-400 hover:bg-gray-800'}`}><Globe size={20} /> Глобальный Поиск</button>
-          <button onClick={() => setActiveTab('migration')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === 'migration' ? 'bg-purple-600 text-white font-bold' : 'text-gray-400 hover:bg-gray-800'}`}><HardDriveDownload size={20} /> Миграция MP3</button>
-          <div className="h-px bg-gray-800 my-2 mx-4" />
-          <button onClick={() => setActiveTab('playlists')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === 'playlists' ? 'bg-purple-600 text-white font-bold' : 'text-gray-400 hover:bg-gray-800'}`}><ListMusic size={20} /> Плейлисты</button>
-          <button onClick={() => setActiveTab('templates')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === 'templates' ? 'bg-purple-600 text-white font-bold' : 'text-gray-400 hover:bg-gray-800'}`}><LayoutTemplate size={20} /> Шаблоны</button>
+        <nav className="flex-1 px-3 pt-2 flex flex-col">
+          {([
+            ['Игра', [['games', 'Мероприятия', PartyPopper]]],
+            ['Музыка', [['playlists', 'Плейлисты', ListMusic], ['mydatabase', 'Моя база', Database], ['global_search', 'Поиск песен', Globe], ['migration', 'Полные MP3', HardDriveDownload]]],
+            ['Печать', [['templates', 'Шаблоны бланков', LayoutTemplate]]],
+          ] as const).map(([section, items], si) => (
+            <div key={section} className={si > 0 ? 'mt-6' : ''}>
+              <p className="px-3 mb-2 text-xs text-pult-muted">{section}</p>
+              <div className="flex flex-col gap-0.5">
+                {items.map(([key, label, Icon]) => (
+                  <button
+                    key={key}
+                    onClick={() => setActiveTab(key)}
+                    className={`h-9 px-3 rounded-lg flex items-center gap-2.5 text-sm transition-colors ${
+                      activeTab === key
+                        ? 'bg-pult-raised text-pult-text shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
+                        : 'text-pult-text2 hover:text-pult-text hover:bg-white/[0.03]'
+                    }`}
+                  >
+                    <Icon size={16} className={activeTab === key ? 'text-lime' : 'text-pult-muted'} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </nav>
-        <div className="px-4 pb-5 pt-2 border-t border-gray-800/50">
-          {profile?.email && <p className="px-4 pb-2 text-xs text-gray-500 truncate" title={profile.email}>{profile.email}</p>}
-          <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-gray-800 hover:text-white transition"><LogOut size={20} /> Выйти</button>
+        <div className="px-3 pb-4 pt-3 border-t border-white/[0.06]">
+          {profile?.email && <p className="px-3 pb-2 text-xs text-pult-muted truncate" title={profile.email}>{profile.email}</p>}
+          <button onClick={handleSignOut} className="w-full h-9 px-3 rounded-lg flex items-center gap-2.5 text-sm text-pult-text2 hover:text-pult-text hover:bg-white/[0.03] transition-colors"><LogOut size={16} className="text-pult-muted" /> Выйти</button>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-hidden p-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-gray-900 via-gray-950 to-gray-950">
+      <main className="flex-1 overflow-hidden px-8 py-6 bg-pult-bg">
         <Routes>
           <Route index element={<Navigate to="games" replace />} />
           <Route path="games" element={<GamesTab games={games} setGames={setGames} playlists={playlists} templates={templates} dbTracks={dbTracks} showToast={showToast} startHostSession={startHostSession} setPrintViewCards={setPrintViewCards} resolveTrackUrl={resolveTrackUrl} />} />
@@ -993,37 +1010,37 @@ export default function App() {
             : null);
 
         return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4 animate-in fade-in">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">
+          <div className="bg-pult-card border border-white/[0.08] rounded-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold flex items-center gap-2">
-                <Database size={20} className="text-purple-400"/>
+              <h3 className="text-xl font-medium flex items-center gap-2">
+                <Database size={20} className="text-lime"/>
                 {customFile ? 'Загрузка MP3' : 'Сохранить в Базу'}
               </h3>
-              <button onClick={() => { setTrackToAddToDb(null); setCustomFile(null); }} className="text-gray-400"><X size={24}/></button>
+              <button onClick={() => { setTrackToAddToDb(null); setCustomFile(null); }} className="text-pult-text2"><X size={24}/></button>
             </div>
 
-            <div className="flex items-center gap-4 mb-6 p-4 bg-gray-950 rounded-xl">
+            <div className="flex items-center gap-4 mb-6 p-4 bg-pult-bg rounded-xl">
               <img src={trackToAddToDb.cover} className="w-14 h-14 rounded-md object-cover" alt="" />
               <div className="overflow-hidden flex-1 space-y-2">
                 {/* РЕДАКТИРУЕМЫЕ ПОЛЯ */}
                 <div>
-                  <label className="block text-[10px] uppercase tracking-widest font-bold text-gray-500 mb-0.5">Название трека</label>
+                  <label className="block text-[10px] font-medium text-pult-muted mb-0.5">Название трека</label>
                   <input
                     type="text"
                     value={editedTitle}
                     onChange={e => setEditedTitle(e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-sm text-white focus:border-purple-500 outline-none"
+                    className="w-full bg-pult-card border border-white/[0.08] rounded-lg px-3 py-1.5 text-sm text-white focus:border-lime/60 outline-none"
                     placeholder="Название трека"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase tracking-widest font-bold text-gray-500 mb-0.5">Исполнитель</label>
+                  <label className="block text-[10px] font-medium text-pult-muted mb-0.5">Исполнитель</label>
                   <input
                     type="text"
                     value={editedArtist}
                     onChange={e => setEditedArtist(e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-sm text-white focus:border-purple-500 outline-none"
+                    className="w-full bg-pult-card border border-white/[0.08] rounded-lg px-3 py-1.5 text-sm text-white focus:border-lime/60 outline-none"
                     placeholder="Исполнитель"
                   />
                 </div>
@@ -1033,8 +1050,8 @@ export default function App() {
             {/* ─── ТРИММЕР АУДИО (только для кастомных MP3) ─── */}
             {trimmerSrc && (
               <div className="mb-6">
-                <label className="text-sm font-bold text-gray-400 mb-2 flex items-center gap-2">
-                  <Scissors size={14} className="text-purple-400"/>
+                <label className="text-sm font-medium text-pult-text2 mb-2 flex items-center gap-2">
+                  <Scissors size={14} className="text-lime"/>
                   Фрагмент трека для игры
                 </label>
                 <AudioTrimmer
@@ -1043,7 +1060,7 @@ export default function App() {
                   end={editedPreviewEnd}
                   onChange={(s, e) => { setEditedPreviewStart(s); setEditedPreviewEnd(e); }}
                 />
-                <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+                <p className="text-[11px] text-pult-muted mt-2 leading-relaxed">
                   В игре трек начнётся с зелёной метки и автоматически остановится на красной.
                   Сбрось чтобы играть с начала до конца.
                 </p>
@@ -1051,13 +1068,13 @@ export default function App() {
             )}
 
             <div className="mb-8">
-              <label className="block text-sm font-bold text-gray-400 mb-2">Жанр или категория:</label>
+              <label className="block text-sm font-medium text-pult-text2 mb-2">Жанр или категория:</label>
               
-              <div className="flex flex-wrap gap-2 mb-3 bg-gray-950 p-3 rounded-xl border border-gray-800 items-center min-h-[50px]">
+              <div className="flex flex-wrap gap-2 mb-3 bg-pult-bg p-3 rounded-xl border border-white/[0.08] items-center min-h-[50px]">
                 {selectedTagsForNewTrack.map(tag => (
-                  <span key={tag} className="flex items-center gap-1 px-2.5 py-1 bg-purple-600 text-white rounded-lg text-xs font-medium shadow-md">
+                  <span key={tag} className="flex items-center gap-1 px-2.5 py-1 bg-lime text-[#141415] rounded-lg text-xs font-medium shadow-md">
                     {tag}
-                    <button onClick={() => setSelectedTagsForNewTrack(prev => prev.filter(t => t !== tag))} className="hover:text-red-300 transition ml-1"><X size={12} /></button>
+                    <button onClick={() => setSelectedTagsForNewTrack(prev => prev.filter(t => t !== tag))} className="hover:text-red-300 transition-colors ml-1"><X size={12} /></button>
                   </span>
                 ))}
                 <input 
@@ -1072,10 +1089,10 @@ export default function App() {
 
               {dbTags.length > 0 && (
                 <>
-                  <div className="text-xs text-gray-500 mb-2 font-medium">Или выберите из существующих:</div>
+                  <div className="text-xs text-pult-muted mb-2 font-medium">Или выберите из существующих:</div>
                   <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto custom-scrollbar pr-1">
                     {dbTags.filter(t => !selectedTagsForNewTrack.includes(t.name)).map(tag => (
-                      <button key={tag.id} onClick={() => handleAddTag(tag.name)} className="px-3 py-1 bg-gray-800 border border-gray-700 rounded-lg text-xs font-medium text-gray-400 hover:border-gray-500 hover:text-gray-200 transition">
+                      <button key={tag.id} onClick={() => handleAddTag(tag.name)} className="px-3 py-1 bg-pult-raised border border-white/[0.08] rounded-lg text-xs font-medium text-pult-text2 hover:border-gray-500 hover:text-gray-200 transition-colors">
                         + {tag.name}
                       </button>
                     ))}
@@ -1085,8 +1102,8 @@ export default function App() {
             </div>
 
             <div className="flex gap-4">
-              <button onClick={() => { setTrackToAddToDb(null); setCustomFile(null); }} disabled={isUploadingMp3} className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 transition rounded-xl font-bold disabled:opacity-50">Отмена</button>
-              <button onClick={() => saveTrackToDb()} disabled={isUploadingMp3 || !editedTitle.trim() || !editedArtist.trim()} className="flex-1 py-3 bg-purple-600 hover:bg-purple-500 transition rounded-xl font-bold shadow-lg shadow-purple-900/30 flex items-center justify-center gap-2 disabled:opacity-50">
+              <button onClick={() => { setTrackToAddToDb(null); setCustomFile(null); }} disabled={isUploadingMp3} className="flex-1 py-3 bg-pult-raised hover:bg-[#2b2b2e] transition-colors rounded-xl font-medium disabled:opacity-50">Отмена</button>
+              <button onClick={() => saveTrackToDb()} disabled={isUploadingMp3 || !editedTitle.trim() || !editedArtist.trim()} className="flex-1 py-3 bg-lime hover:bg-[#d4ff63] transition-colors rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-50 text-[#141415]">
                 {isUploadingMp3 ? <Loader2 size={18} className="animate-spin" /> : 'В Мою Базу'}
               </button>
             </div>
@@ -1101,48 +1118,48 @@ export default function App() {
         const incomingArtist = normForCheck(editedArtist || trackToAddToDb?.artist || '');
         const sameArtist = normForCheck(dupWarning.artist) === incomingArtist;
         return (
-        <div className="fixed inset-0 bg-black/85 z-[70] flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-gray-900 border border-yellow-500/40 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+        <div className="fixed inset-0 bg-black/85 z-[70] flex items-center justify-center p-4">
+          <div className="bg-pult-card border border-yellow-500/40 rounded-2xl w-full max-w-md p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center shrink-0">
                 <span className="text-yellow-400 text-xl">⚠</span>
               </div>
-              <h3 className="text-lg font-bold">
+              <h3 className="text-lg font-medium">
                 {sameArtist ? 'Такой трек уже есть в базе' : 'Возможно дубликат — название совпадает'}
               </h3>
             </div>
 
-            <div className="bg-gray-950 rounded-xl p-4 mb-4 border border-gray-800">
-              <div className="text-[10px] uppercase tracking-widest font-bold text-gray-500 mb-2">Уже в базе:</div>
+            <div className="bg-pult-bg rounded-xl p-4 mb-4 border border-white/[0.08]">
+              <div className="text-[10px] font-medium text-pult-muted mb-2">Уже в базе:</div>
               <div className="flex items-center gap-3">
                 <img src={dupWarning.cover} className="w-12 h-12 rounded object-cover shrink-0" alt="" />
                 <div className="overflow-hidden">
-                  <div className="font-bold truncate">{dupWarning.title}</div>
-                  <div className="text-sm text-gray-400 truncate">{dupWarning.artist}</div>
+                  <div className="font-medium truncate">{dupWarning.title}</div>
+                  <div className="text-sm text-pult-text2 truncate">{dupWarning.artist}</div>
                 </div>
               </div>
               {dupWarning.tags && dupWarning.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-3">
                   {dupWarning.tags.map((tag, i) => (
-                    <span key={i} className="text-[10px] px-2 py-0.5 bg-purple-600/20 text-purple-300 rounded">{tag}</span>
+                    <span key={i} className="text-[10px] px-2 py-0.5 bg-lime/20 text-lime rounded">{tag}</span>
                   ))}
                 </div>
               )}
               {!sameArtist && trackToAddToDb && (
-                <div className="mt-3 pt-3 border-t border-gray-800">
-                  <div className="text-[10px] uppercase tracking-widest font-bold text-yellow-500 mb-2">Хочешь добавить:</div>
+                <div className="mt-3 pt-3 border-t border-white/[0.08]">
+                  <div className="text-[10px] font-medium text-yellow-500 mb-2">Хочешь добавить:</div>
                   <div className="flex items-center gap-3">
                     <img src={trackToAddToDb.cover} className="w-12 h-12 rounded object-cover shrink-0" alt="" />
                     <div className="overflow-hidden">
-                      <div className="font-bold truncate">{editedTitle || trackToAddToDb.title}</div>
-                      <div className="text-sm text-gray-400 truncate">{editedArtist || trackToAddToDb.artist}</div>
+                      <div className="font-medium truncate">{editedTitle || trackToAddToDb.title}</div>
+                      <div className="text-sm text-pult-text2 truncate">{editedArtist || trackToAddToDb.artist}</div>
                     </div>
                   </div>
                 </div>
               )}
             </div>
 
-            <p className="text-sm text-gray-400 mb-6 leading-relaxed">
+            <p className="text-sm text-pult-text2 mb-6 leading-relaxed">
               {sameArtist
                 ? 'Лучше нажми «Отмена» и отредактируй уже сохранённый трек (карандашик в Моей Базе) — добавь там нужный жанр. Если это правда другая версия (live, ремикс) — жми «Сохранить дубль».'
                 : 'Название одинаковое, а исполнитель пишется иначе (часто бывает: латиница vs кириллица). Если это один и тот же трек — жми «Отмена» и подправь исполнителя у существующего трека в Моей Базе. Если разные песни с одинаковым названием — жми «Сохранить дубль».'}
@@ -1150,11 +1167,11 @@ export default function App() {
 
             <div className="flex gap-3">
               <button onClick={() => setDupWarning(null)}
-                className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 rounded-xl font-bold transition">
+                className="flex-1 py-3 bg-pult-raised hover:bg-[#2b2b2e] rounded-xl font-medium transition-colors">
                 Отмена
               </button>
               <button onClick={() => { setDupWarning(null); saveTrackToDb(true); }}
-                className="flex-1 py-3 bg-yellow-600 hover:bg-yellow-500 rounded-xl font-bold transition">
+                className="flex-1 py-3 bg-yellow-600 hover:bg-yellow-500 rounded-xl font-medium transition-colors">
                 Сохранить дубль
               </button>
             </div>
@@ -1166,11 +1183,11 @@ export default function App() {
       {/* --- МОДАЛКА ДОБАВЛЕНИЯ В ПЛЕЙЛИСТ --- */}
       {trackToAdd && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[50] p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6">
-            <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold">Добавить в плейлист</h3><button onClick={() => setTrackToAdd(null)} className="text-gray-400 hover:text-white"><X size={24}/></button></div>
-            <div className="flex items-center gap-4 mb-6 p-4 bg-gray-950 rounded-xl"><img src={trackToAdd.cover} className="w-12 h-12 rounded-md object-cover" alt="" /><div className="overflow-hidden"><p className="font-bold truncate">{trackToAdd.title}</p><p className="text-sm text-gray-400">{trackToAdd.artist}</p></div></div>
+          <div className="bg-pult-card border border-white/[0.08] rounded-2xl w-full max-w-md p-6">
+            <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-medium">Добавить в плейлист</h3><button onClick={() => setTrackToAdd(null)} className="text-pult-text2 hover:text-white"><X size={24}/></button></div>
+            <div className="flex items-center gap-4 mb-6 p-4 bg-pult-bg rounded-xl"><img src={trackToAdd.cover} className="w-12 h-12 rounded-md object-cover" alt="" /><div className="overflow-hidden"><p className="font-medium truncate">{trackToAdd.title}</p><p className="text-sm text-pult-text2">{trackToAdd.artist}</p></div></div>
             {playlists.length === 0 ? (
-               <div className="text-center py-6 text-gray-500">Нет плейлистов. Создайте их во вкладке "Плейлисты".</div>
+               <div className="text-center py-6 text-pult-muted">Нет плейлистов. Создайте их во вкладке "Плейлисты".</div>
             ) : (
               <div className="max-h-60 overflow-y-auto pr-2 flex flex-col gap-2 custom-scrollbar">{playlists.map(p => {
                 // Уникальность исполнителя считаем по ОТДЕЛЬНЫМ артистам (фиты тоже учитываются),
@@ -1185,11 +1202,11 @@ export default function App() {
                     const newTracks = [...p.tracks, trackToAdd];
                     setPlaylists(playlists.map(pl => pl.id === p.id ? { ...pl, tracks: newTracks } : pl));
                     await supabase.from('playlists').update({ tracks: newTracks }).eq('id', p.id);
-                    showToast('Трек добавлен!');
+                    showToast('Трек добавлен');
                     setTrackToAdd(null);
-                  }} disabled={isAdded} className={`flex justify-between p-4 rounded-xl border text-left ${isAdded ? 'bg-gray-800/50 border-gray-800 opacity-50' : 'bg-gray-800 border-gray-700 hover:border-purple-500'}`}>
-                    <span className="font-bold truncate pr-4">{p.name}</span>
-                    <span className="text-xs text-gray-400 whitespace-nowrap">
+                  }} disabled={isAdded} className={`flex justify-between p-4 rounded-xl border text-left ${isAdded ? 'bg-pult-raised/60 border-white/[0.08] opacity-50' : 'bg-pult-raised border-white/[0.08] hover:border-lime/50'}`}>
+                    <span className="font-medium truncate pr-4">{p.name}</span>
+                    <span className="text-xs text-pult-text2 whitespace-nowrap">
                       {alreadyById ? 'Уже добавлен' : artistClash ? `Исполнитель есть` : `${p.tracks.length} треков`}
                     </span>
                   </button>

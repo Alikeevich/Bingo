@@ -101,23 +101,23 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
   const { cards, template } = printViewCards;
 
   return (
-    <div className="fixed inset-0 bg-gray-900 text-black z-[500] flex flex-col font-sans overflow-hidden">
+    <div className="fixed inset-0 bg-pult-card text-black z-[500] flex flex-col font-sans overflow-hidden">
       {/* ШАПКА */}
-      <div className="h-20 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-6 shrink-0 shadow-xl relative z-10 text-white">
+      <div className="h-20 bg-pult-card border-b border-white/[0.08] flex items-center justify-between px-6 shrink-0 relative z-10 text-white">
         <div className="flex items-center gap-6">
           <button onClick={() => setPrintViewCards(null)}
-            className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
+            className="flex items-center gap-2 text-pult-text2 hover:text-white transition-colors">
             <ChevronLeft size={24} />
-            <span className="font-bold">Назад</span>
+            <span className="font-medium">Назад</span>
           </button>
           <div className="flex flex-col">
-            <span className="text-white font-bold text-lg leading-none">Печать карточек</span>
-            <span className="text-gray-500 text-sm">{cards.length} шт. · {template.name}</span>
+            <span className="text-white font-medium text-lg leading-none">Печать карточек</span>
+            <span className="text-pult-muted text-sm">{cards.length} шт. · {template.name}</span>
           </div>
         </div>
 
         {qrError || bgError || docError ? (
-          <div className="text-gray-400 text-sm flex items-center gap-2">
+          <div className="text-pult-text2 text-sm flex items-center gap-2">
             <AlertTriangle size={16} className="text-red-400" /> {qrError || bgError || docError}
           </div>
         ) : (
@@ -131,14 +131,14 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
                 a.download = `${sanitize(template.name)}_${cards.length}cards.pdf`;
                 a.click();
               }}
-              className="bg-gray-800 hover:bg-gray-700 disabled:opacity-50 px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition border border-gray-700">
+              className="bg-pult-raised hover:bg-[#2b2b2e] disabled:opacity-50 px-5 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-colors border border-white/[0.08]">
               {doc ? <Download size={18} /> : <Loader2 size={18} className="animate-spin" />}
               Скачать PDF
             </button>
             <button
               disabled={!doc}
               onClick={() => { if (doc) printBlob(doc.blob); }}
-              className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white px-8 py-2.5 rounded-xl font-black flex items-center gap-2 transition shadow-lg shadow-purple-500/20">
+              className="bg-lime hover:bg-[#d4ff63] disabled:opacity-50 text-[#141415] px-8 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-colors">
               {doc ? <Printer size={20} /> : <Loader2 size={18} className="animate-spin" />}
               ПЕЧАТЬ
             </button>
@@ -147,7 +147,7 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
       </div>
 
       {/* ПРЕВЬЮ PDF */}
-      <div className="flex-1 bg-gray-800/50 relative overflow-hidden">
+      <div className="flex-1 bg-pult-raised/60 relative overflow-hidden">
         {bgError ? (
           <CenterError text={bgError} />
         ) : qrError ? (
@@ -165,7 +165,7 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
             key={doc.url}
             title="cards-pdf"
             src={doc.url}
-            className="w-full h-full border-0 bg-gray-900"
+            className="w-full h-full border-0 bg-pult-card"
           />
         )}
       </div>
@@ -176,8 +176,8 @@ export default function PrintView({ printViewCards, setPrintViewCards }: PrintVi
 function CenterLoader({ text }: { text: string }) {
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white">
-      <Loader2 size={36} className="animate-spin text-purple-400" />
-      <span className="text-gray-300">{text}</span>
+      <Loader2 size={36} className="animate-spin text-lime" />
+      <span className="text-pult-text">{text}</span>
     </div>
   );
 }
@@ -186,7 +186,7 @@ function CenterError({ text }: { text: string }) {
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-red-300 px-10 text-center">
       <AlertTriangle size={36} />
-      <span className="font-bold">Не удалось собрать PDF</span>
+      <span className="font-medium">Не удалось собрать PDF</span>
       <span className="text-sm text-red-200/80">{text}</span>
     </div>
   );

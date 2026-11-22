@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Loader2, PauseCircle, PlayCircle, Flame, ChevronLeft, Database, ListMusic } from 'lucide-react';
+import { Search, Loader2, PauseCircle, PlayCircle, ChevronLeft, Database, ListMusic } from 'lucide-react';
 import { Track } from '../../types';
 
 // Пресеты: чарт (RSS Apple) или поисковый запрос (iTunes Search)
@@ -98,51 +98,55 @@ export default function GlobalSearchTab({ playingTrackId, isPaused, togglePlay, 
   };
 
   return (
-    <div className="animate-in fade-in duration-300 flex flex-col h-full">
-      <h1 className="text-3xl font-bold mb-2">Глобальный поиск (iTunes)</h1>
-      <p className="text-gray-400 mb-6">Ищите музыку для плейлистов или сохраняйте её в свою Базу с тегами.</p>
+    <div className="flex flex-col h-full text-pult-text">
+      <header className="mb-5">
+        <h1 className="text-2xl font-medium">Поиск песен</h1>
+        <p className="mt-1 text-sm text-pult-text2">Каталог iTunes: найди песню и сразу добавь в плейлист или сохрани в базу с тегами</p>
+      </header>
 
-      <form onSubmit={handleSearchSubmit} className="flex gap-4 mb-4">
+      <form onSubmit={handleSearchSubmit} className="flex gap-2 mb-3 max-w-2xl">
         <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Исполнитель, трек или жанр..." className="w-full bg-gray-900 border border-gray-800 rounded-xl py-4 pl-12 pr-4 text-white focus:outline-none focus:border-purple-500 transition" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-pult-muted" size={14} />
+          <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Исполнитель, песня или жанр"
+            className="h-10 w-full rounded-lg bg-pult-raised border border-white/[0.06] pl-8 pr-3 text-sm text-pult-text placeholder:text-pult-muted focus:outline-none focus:border-lime/60" />
         </div>
-        <button type="submit" disabled={isSearching} className="bg-purple-600 hover:bg-purple-500 px-8 rounded-xl font-bold transition disabled:opacity-50 min-w-[120px] flex items-center justify-center">
-          {isSearching ? <Loader2 className="animate-spin" size={20} /> : 'Найти'}
+        <button type="submit" disabled={isSearching} className="h-10 px-5 rounded-lg text-sm font-medium bg-lime text-[#141415] hover:bg-[#d4ff63] transition-colors disabled:opacity-50 inline-flex items-center justify-center min-w-[88px]">
+          {isSearching ? <Loader2 className="animate-spin" size={16} /> : 'Найти'}
         </button>
       </form>
 
-      <div className="flex flex-wrap gap-2 mb-8">
+      <div className="flex flex-wrap gap-1.5 mb-4">
         {FILTERS.map(f => (
-          <button key={f.name} onClick={() => { if (f.kind === 'chart') loadChart(f.name); else { setSearchQuery(f.query!); searchITunes(f.query!, f.name); } }} className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition ${activeFilter === f.name ? f.name === 'Топ Чарт' ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white' : 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
-            {f.name === 'Топ Чарт' && <Flame size={16} />}{f.name}
+          <button key={f.name} onClick={() => { if (f.kind === 'chart') loadChart(f.name); else { setSearchQuery(f.query!); searchITunes(f.query!, f.name); } }}
+            className={`h-8 px-3 rounded-lg text-sm transition-colors ${activeFilter === f.name ? 'bg-pult-raised text-pult-text border border-white/[0.1]' : 'text-pult-text2 hover:bg-white/[0.04]'}`}>
+            {f.name === 'Топ Чарт' ? 'Топ-чарт Казахстана' : f.name}
           </button>
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-10">
+      <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 pb-10">
         {isSearching && allResults.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-40 text-gray-500"><Loader2 className="animate-spin mb-4" size={32} /><p>Ищем музыку...</p></div>
+          <div className="flex items-center justify-center gap-2 h-40 text-sm text-pult-muted"><Loader2 className="animate-spin" size={16} /> Ищем</div>
         ) : allResults.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-40 text-gray-500"><p>Ничего не найдено. Попробуй другой запрос.</p></div>
+          <div className="flex items-center justify-center h-40 text-sm text-pult-muted">Ничего не найдено — попробуй другой запрос</div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+            <div className="rounded-xl border border-white/[0.08] bg-pult-card p-1.5 flex flex-col gap-0.5 mb-4">
               {pageItems.map(track => {
                 const isPlaying = playingTrackId === track.id && !isPaused;
                 return (
-                  <div key={track.id} className={`bg-gray-900 p-3 rounded-xl flex gap-3 items-center border transition group ${isPlaying ? 'border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.2)]' : 'border-gray-800 hover:border-gray-600'}`}>
-                    <div className="relative w-14 h-14 rounded-md overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => togglePlay(track)}>
-                      <img src={track.cover} alt="cover" className={`w-full h-full object-cover transition-transform ${isPlaying ? 'scale-110 blur-[2px]' : ''}`} />
-                      <div className={`absolute inset-0 bg-black/50 flex items-center justify-center transition ${isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>{isPlaying ? <PauseCircle size={28} className="text-purple-400" /> : <PlayCircle size={28} className="text-white" />}</div>
+                  <div key={track.id} className={`group grid grid-cols-[40px_1fr_auto] items-center gap-3 h-14 px-2.5 rounded-lg transition-colors ${isPlaying ? 'bg-pult-raised' : 'hover:bg-white/[0.03]'}`}>
+                    <button className="relative w-10 h-10 rounded-md overflow-hidden bg-pult-raised" onClick={() => togglePlay(track)} title="Послушать">
+                      {track.cover && <img src={track.cover} alt="" className="w-full h-full object-cover" loading="lazy" />}
+                      <span className={`absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity ${isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>{isPlaying ? <PauseCircle size={20} className="text-white" /> : <PlayCircle size={20} className="text-white" />}</span>
+                    </button>
+                    <div className="min-w-0">
+                      <p className={`truncate text-sm ${isPlaying ? 'text-lime' : 'text-pult-text'}`}>{track.title}</p>
+                      <p className="truncate text-sm text-pult-text2">{track.artist}</p>
                     </div>
-                    <div className="flex-1 overflow-hidden">
-                      <h4 className={`font-bold truncate text-sm ${isPlaying ? 'text-purple-400' : 'text-white'}`}>{track.title}</h4>
-                      <p className="text-xs text-gray-400 truncate">{track.artist}</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <button onClick={() => setTrackToAdd(track)} className="p-2 bg-gray-800 rounded-lg hover:bg-purple-600 transition text-gray-400 hover:text-white" title="Сразу в плейлист"><ListMusic size={18} /></button>
-                      <button onClick={() => setTrackToAddToDb(track)} className="p-2 bg-gray-800 rounded-lg hover:bg-purple-600 transition text-gray-400 hover:text-white" title="Сохранить в Мою Базу"><Database size={18} /></button>
+                    <div className="flex items-center gap-0.5">
+                      <button onClick={() => setTrackToAdd(track)} className="h-8 px-2.5 rounded-md text-sm inline-flex items-center gap-1.5 text-pult-text2 hover:text-pult-text hover:bg-white/[0.06] transition-colors" title="Сразу в плейлист"><ListMusic size={16} /> В плейлист</button>
+                      <button onClick={() => setTrackToAddToDb(track)} className="h-8 px-2.5 rounded-md text-sm inline-flex items-center gap-1.5 text-pult-text2 hover:text-pult-text hover:bg-white/[0.06] transition-colors" title="Сохранить в Мою базу"><Database size={16} /> В базу</button>
                     </div>
                   </div>
                 );
@@ -150,10 +154,10 @@ export default function GlobalSearchTab({ playingTrackId, isPaused, togglePlay, 
             </div>
 
             {allResults.length > PAGE && (
-              <div className="flex items-center justify-between border-t border-gray-800 pt-6 pb-2 mt-2">
-                <button onClick={() => goToPage(page - 1)} disabled={page === 0} className="flex items-center gap-2 px-5 py-2.5 bg-gray-800 hover:bg-gray-700 rounded-xl font-bold transition disabled:opacity-30 disabled:cursor-not-allowed"><ChevronLeft size={18} /> Назад</button>
-                <div className="text-center"><span className="text-white font-bold">Страница {page + 1}</span><div className="text-gray-500 text-xs mt-0.5">треки {page * PAGE + 1}–{page * PAGE + pageItems.length} из {allResults.length}</div></div>
-                <button onClick={() => goToPage(page + 1)} disabled={!hasNext} className="flex items-center gap-2 px-5 py-2.5 bg-gray-800 hover:bg-gray-700 rounded-xl font-bold transition disabled:opacity-30 disabled:cursor-not-allowed">Вперёд <ChevronLeft size={18} className="rotate-180" /></button>
+              <div className="flex items-center justify-between">
+                <button onClick={() => goToPage(page - 1)} disabled={page === 0} className="h-9 px-3 rounded-lg text-sm inline-flex items-center gap-1.5 bg-pult-raised border border-white/[0.06] hover:bg-[#2b2b2e] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"><ChevronLeft size={16} /> Назад</button>
+                <span className="font-mono text-sm tabular-nums text-pult-muted">{page * PAGE + 1}–{page * PAGE + pageItems.length} из {allResults.length}</span>
+                <button onClick={() => goToPage(page + 1)} disabled={!hasNext} className="h-9 px-3 rounded-lg text-sm inline-flex items-center gap-1.5 bg-pult-raised border border-white/[0.06] hover:bg-[#2b2b2e] transition-colors disabled:opacity-30 disabled:cursor-not-allowed">Вперёд <ChevronLeft size={16} className="rotate-180" /></button>
               </div>
             )}
           </>

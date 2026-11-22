@@ -1,4 +1,4 @@
-import { PartyPopper, Minimize } from 'lucide-react';
+import { PartyPopper, Minimize, Music } from 'lucide-react';
 import { Track } from '../../types';
 import { useEffect } from 'react';
 
@@ -21,17 +21,21 @@ export default function Projector({ currentTrack, hideTrackInfo, autoWinners, se
   }, [setIsProjectorMode, setHideTrackInfo]);
 
   return (
-    <div className="fixed inset-0 bg-black text-white z-[100] flex flex-col items-center justify-center animate-in fade-in duration-500 group overflow-hidden">
+    <div className="fixed inset-0 bg-[#0b0b0c] text-pult-text z-[100] flex flex-col items-center justify-center group overflow-hidden">
+      {/* Момент бинго — единственное место с маджентой */}
       {autoWinners.length > 0 && (
-        <div className="absolute top-10 flex items-center gap-4 bg-green-600 text-white px-10 py-4 rounded-full font-black text-4xl shadow-[0_0_80px_rgba(34,197,94,0.8)] z-[200] animate-bounce border-4 border-white">
-          <PartyPopper size={40} /> БИНГО У КАРТОЧЕК: {autoWinners.join(', ')}!
+        <div className="absolute top-10 flex items-center gap-4 bg-magenta text-white px-10 h-20 rounded-2xl text-4xl font-medium z-[200]">
+          <PartyPopper size={36} /> Бинго у карточек <span className="font-mono tabular-nums">{autoWinners.map(w => '#' + w).join(', ')}</span>
         </div>
       )}
-      <button onClick={() => setIsProjectorMode(false)} className="absolute top-8 right-8 p-4 bg-white/10 rounded-full opacity-0 group-hover:opacity-100 transition-all text-white z-50"><Minimize size={32} /></button>
+      <button onClick={() => setIsProjectorMode(false)} title="Выйти из проектора (Esc)" className="absolute top-8 right-8 p-4 bg-white/10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity text-white z-50"><Minimize size={28} /></button>
       <div className="text-center">
-         <img src={currentTrack?.cover} className={`w-[45vh] h-[45vh] mx-auto rounded-[3rem] mb-10 transition-all duration-700 ${hideTrackInfo ? 'blur-[80px] scale-90 opacity-50' : 'shadow-[0_0_100px_rgba(139,92,246,0.3)]'}`} />
-         <h1 className={`text-7xl font-black mb-4 transition-all duration-500 ${hideTrackInfo ? 'text-gray-800 blur-sm' : 'text-white'}`}>{hideTrackInfo ? 'Угадай трек!' : currentTrack?.title}</h1>
-         <p className={`text-4xl transition-all duration-500 ${hideTrackInfo ? 'text-gray-900 blur-sm' : 'text-purple-400 font-bold'}`}>{hideTrackInfo ? 'Исполнитель' : currentTrack?.artist}</p>
+        <div className="relative w-[45vh] h-[45vh] mx-auto mb-10 rounded-3xl overflow-hidden bg-pult-card shadow-[0_40px_120px_rgba(0,0,0,0.6)]">
+          {currentTrack?.cover && <img src={currentTrack.cover} alt="" className={`w-full h-full object-cover transition-[filter,opacity] duration-700 ${hideTrackInfo ? 'blur-[60px] opacity-50' : ''}`} />}
+          {hideTrackInfo && <div className="absolute inset-0 flex items-center justify-center"><Music size={120} className="text-white/20" /></div>}
+        </div>
+        <h1 className={`text-7xl font-medium mb-4 ${hideTrackInfo ? 'text-pult-text2' : 'text-pult-text'}`}>{hideTrackInfo ? 'Угадай трек' : currentTrack?.title}</h1>
+        <p className={`text-4xl min-h-[1.25em] ${hideTrackInfo ? 'invisible' : 'text-pult-text2'}`}>{currentTrack?.artist}</p>
       </div>
     </div>
   );
