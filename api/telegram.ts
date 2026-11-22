@@ -25,6 +25,43 @@ function normCity(raw: string): string {
   return c ? c.charAt(0).toUpperCase() + c.slice(1).toLowerCase() : '';
 }
 
+export type AddGame = { startsAt: string; city: string; venue: string | null; price: number | null };
+
+/**
+ * Разбор аргументов /addgame: «YYYY-MM-DD HH:MM [Город |] Место [| Цена]».
+ * Время — казахстанское (UTC+5). Несуществующие даты (31.02, 24:30) отклоняем:
+ * JS молча превращает их в другой день, и игра ушла бы в календарь не тем числом.
+ */
+export function parseAddGame(args: string): AddGame | { error: string } {
+  const m = args.trim().match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})(?:\s+(.+))?$/);
+  if (!m) return { error: 'Формат: /addgame 2026-10-21 20:00 Экибастуз | Harat’s Pub | 5000' };
+  const [, y, mo, d, hh, mm, rest] = m;
+  const [Y, M, D, H, Min] = [y, mo, d, hh, mm].map(Number);
+  const probe = new Date(Date.UTC(Y, M - 1, D, H, Min));
+  if (H > 23 || Min > 59 || probe.getUTCFullYear() !== Y || probe.getUTCMonth() !== M - 1 || probe.getUTCDate() !== D) {
+    return { error: `Такой даты или времени нет: ${y}-${mo}-${d} ${hh}:${mm}` };
+  }
+  // «Город | Место | Цена». Без разделителя — старый формат, город по умолчанию Астана.
+  let city = DEFAULT_CITY;
+  let venue: string | null = rest?.trim() || null;
+  let price: number | null = null;
+  if (rest && rest.includes('|')) {
+    const parts = rest.split('|').map((x) => x.trim());
+    city = normCity(parts[0]) || DEFAULT_CITY;
+    // Последний кусок — цена, если он целиком число («5000», «5 000», «5000 тг»)
+    if (parts.length >= 3) {
+      const parsed = parsePrice(parts[parts.length - 1]);
+      if (parsed !== undefined) {
+        price = parsed;
+        parts.pop();
+      }
+    }
+    venue = parts.slice(1).join(' | ').trim() || null;
+  }
+  const startsAt = new Date(probe.getTime() - 5 * 3600_000).toISOString();
+  return { startsAt, city, venue, price };
+}
+
 const HELP_TEXT = `Команды:
 /games — список будущих игр
 /addgame YYYY-MM-DD HH:MM Город | Место | Цена — добавить игру
@@ -47,15 +84,34 @@ function fmt(iso: string): string {
   });
 }
 
+// Telegram не принимает сообщения длиннее 4096 символов — и молча не доставляет их.
+// Перед игрой с толпой гостей /signups легко вылезает за предел, поэтому режем
+// по строкам (запас до 4000), чтобы ни одна запись не порвалась пополам.
+const TG_LIMIT = 4000;
+export function splitForTelegram(text: string, limit = TG_LIMIT): string[] {
+  if (text.length <= limit) return [text];
+  const parts: string[] = [];
+  let cur = '';
+  for (const line of text.split('\n')) {
+    const piece = line.length > limit ? line.slice(0, limit) : line;
+    if (cur && cur.length + 1 + piece.length > limit) { parts.push(cur); cur = piece; }
+    else cur = cur ? cur + '\n' + piece : piece;
+  }
+  if (cur) parts.push(cur);
+  return parts;
+}
+
 async function send(token: string, chatId: string, text: string): Promise<void> {
-  try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text }),
-    });
-  } catch {
-    /* пусть; в воркфлоу владельца это не критично */
+  for (const part of splitForTelegram(text)) {
+    try {
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: part }),
+      });
+    } catch {
+      /* пусть; в воркфлоу владельца это не критично */
+    }
   }
 }
 
@@ -76,44 +132,15 @@ async function runCommand(
   }
 
   if (cmd === '/addgame') {
-    // Формат: YYYY-MM-DD HH:MM Место...
-    const m = args.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})(?:\s+(.+))?$/);
-    if (!m) {
-      await send(
-        token,
-        chatId,
-        'Формат: /addgame 2026-10-21 20:00 Экибастуз | Harat’s Pub | 5000'
-      );
+    const g = parseAddGame(args);
+    if ('error' in g) {
+      await send(token, chatId, g.error);
       return;
     }
-    const [, date, time, rest] = m;
-    // «Город | Место | Цена». Без разделителя — старый формат, город по умолчанию Астана.
-    let city = DEFAULT_CITY;
-    let venue: string | undefined = rest?.trim() || undefined;
-    let price: number | null = null;
-    if (rest && rest.includes('|')) {
-      const parts = rest.split('|').map((x) => x.trim());
-      city = normCity(parts[0]) || DEFAULT_CITY;
-      // Последний кусок — цена, если он целиком число («5000», «5 000», «5000 тг»)
-      if (parts.length >= 3) {
-        const parsed = parsePrice(parts[parts.length - 1]);
-        if (parsed !== undefined) {
-          price = parsed;
-          parts.pop();
-        }
-      }
-      venue = parts.slice(1).join(' | ').trim() || undefined;
-    }
-    const [hh, mm] = time.split(':');
-    const iso = `${date}T${hh.padStart(2, '0')}:${mm.padStart(2, '0')}:00+05:00`;
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) {
-      await send(token, chatId, 'Не понимаю дату/время.');
-      return;
-    }
+    const { startsAt, city, venue, price } = g;
     const { data, error } = await supabase
       .from('events')
-      .insert({ starts_at: d.toISOString(), venue: venue || null, city, price })
+      .insert({ starts_at: startsAt, venue, city, price })
       .select('id')
       .single();
     if (error || !data) {
@@ -123,7 +150,7 @@ async function runCommand(
     await send(
       token,
       chatId,
-      `Добавил игру #${data.id} — ${city}, ${fmt(d.toISOString())}${venue ? ' · ' + venue : ''}${priceLabel(price)}`
+      `Добавил игру #${data.id} — ${city}, ${fmt(startsAt)}${venue ? ' · ' + venue : ''}${priceLabel(price)}`
     );
     return;
   }
@@ -276,7 +303,9 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const msg = update?.message ?? update?.edited_message;
+  // Только новые сообщения. Отредактированное сообщение Telegram присылает заново,
+  // и правка старого «/addgame» создавала вторую такую же игру на сайте.
+  const msg = update?.message;
   const chatId = String(msg?.chat?.id || '');
   let text: string = typeof msg?.text === 'string' ? msg.text.trim() : '';
 
