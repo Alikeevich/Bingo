@@ -7,6 +7,28 @@
 // Секреты живут только в env на сервере и в браузер не попадают.
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { createClient } from '@supabase/supabase-js';
+
+// Только вошедший ведущий. Раньше функция подписывала загрузку и удаляла файлы для
+// любого: ключ файла виден в публичной ссылке на трек, и посторонний мог стереть
+// полные версии песен прямо перед игрой.
+async function isSignedIn(req: any): Promise<boolean> {
+  const auth = String(req.headers?.authorization || '');
+  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  const url = process.env.VITE_SUPABASE_URL;
+  const anon = process.env.VITE_SUPABASE_ANON_KEY;
+  if (!token || !url || !anon) return false;
+  try {
+    const sb = createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { data, error } = await sb.auth.getUser(token);
+    return !error && !!data?.user;
+  } catch {
+    return false;
+  }
+}
+
+// Удалять можно только файлы треков, которые сами и загружали: tracks/<id>_<время>.mp3
+const TRACK_KEY = /^tracks\/[A-Za-z0-9_-]+\.mp3$/;
 
 function client() {
   const endpoint = process.env.R2_ENDPOINT;
@@ -34,6 +56,11 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  if (!(await isSignedIn(req))) {
+    res.status(401).json({ error: 'sign in required' });
+    return;
+  }
+
   let body: any = {};
   try {
     body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
@@ -45,7 +72,7 @@ export default async function handler(req: any, res: any) {
   // Удаление файла (когда убираем полную версию у трека)
   if (body.action === 'delete') {
     const key = String(body.key || '');
-    if (!key || key.includes('..') || key.startsWith('/')) {
+    if (!TRACK_KEY.test(key)) {
       res.status(400).json({ error: 'bad key' });
       return;
     }

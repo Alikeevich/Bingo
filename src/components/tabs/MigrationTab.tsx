@@ -8,6 +8,13 @@ import {
 } from 'lucide-react';
 import AudioTrimmer from '../AudioTrimmer';
 
+// /api/r2-sign пускает только вошедшего ведущего — передаём его токен Supabase
+const authHeader = async (): Promise<Record<string, string>> => {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 interface Props {
   dbTracks: Track[];
   setDbTracks: React.Dispatch<React.SetStateAction<Track[]>>;
@@ -89,7 +96,7 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
       try {
         const signRes = await fetch('/api/r2-sign', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
           body: JSON.stringify({ trackId: id }),
         });
         if (!signRes.ok) throw new Error('r2 not configured');
@@ -154,7 +161,7 @@ export default function MigrationTab({ dbTracks, setDbTracks, showToast }: Props
       const key = track.mp3Path.split('/').slice(-2).join('/'); // tracks/<file>.mp3
       await fetch('/api/r2-sign', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
         body: JSON.stringify({ action: 'delete', key }),
       }).catch(() => {});
     } else {
