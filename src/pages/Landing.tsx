@@ -37,7 +37,7 @@ export default function Landing() {
       <div className="sm:hidden fixed bottom-0 inset-x-0 z-50 p-3 bg-gradient-to-t from-ink via-ink/95 to-transparent">
         <a
           href="#events"
-          className="block text-center w-full rounded-full bg-magenta py-4 font-display text-lg font-extrabold text-white shadow-lg shadow-magenta/30 active:scale-95 transition"
+          className="block text-center w-full rounded-full bg-magenta py-4 font-display text-lg font-extrabold text-white shadow-lg active:scale-[0.98] transition-[color,background-color,transform] hover:bg-[#ff4b98]"
         >
           Записаться на игру
         </a>
@@ -59,13 +59,13 @@ function Nav() {
           <Logo className="h-9 w-auto" />
         </a>
         <nav className="hidden md:flex items-center gap-7 text-sm font-semibold text-cream/70">
-          <a href="#how" className="hover:text-cream transition">Как играем</a>
-          <a href="#events" className="hover:text-cream transition">Расписание</a>
-          <a href="#franchise" className="hover:text-cream transition">Франшиза</a>
+          <a href="#how" className="hover:text-cream transition-[color,background-color,transform]">Как играем</a>
+          <a href="#events" className="hover:text-cream transition-[color,background-color,transform]">Расписание</a>
+          <a href="#franchise" className="hover:text-cream transition-[color,background-color,transform]">Франшиза</a>
         </nav>
         <a
           href="#events"
-          className="hidden sm:block rounded-full bg-lime px-5 py-2.5 font-display font-bold text-ink text-sm hover:scale-105 active:scale-95 transition"
+          className="hidden sm:block rounded-full bg-lime px-5 py-2.5 font-display font-bold text-ink text-sm active:scale-[0.98] transition-[color,background-color,transform] hover:bg-[#d4ff63]"
         >
           Записаться
         </a>
@@ -80,7 +80,7 @@ function Hero() {
     <section id="top" className="relative mx-auto max-w-6xl px-5 pt-12 pb-16 sm:pt-20 sm:pb-24">
       <div className="grid lg:grid-cols-2 gap-10 lg:gap-6 items-center">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-lime/30 bg-lime/10 px-4 py-1.5 text-sm font-semibold text-lime mb-6 animate-pop-in">
+          <div className="inline-flex items-center gap-2 text-sm font-semibold text-lime mb-6">
             <Equalizer />
             живая музыкальная вечеринка
           </div>
@@ -98,13 +98,13 @@ function Hero() {
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
             <a
               href="#events"
-              className="rounded-full bg-magenta px-8 py-4 font-display text-lg font-extrabold text-white text-center hover:scale-[1.03] active:scale-95 transition shadow-lg shadow-magenta/30"
+              className="rounded-full bg-magenta px-8 py-4 font-display text-lg font-extrabold text-white text-center active:scale-[0.98] transition-[color,background-color,transform] shadow-lg hover:bg-[#ff4b98]"
             >
               Записаться на игру
             </a>
             <a
               href="#how"
-              className="rounded-full border border-white/15 px-8 py-4 font-display text-lg font-bold text-cream text-center hover:bg-white/5 transition"
+              className="rounded-full border border-white/15 px-8 py-4 font-display text-lg font-bold text-cream text-center hover:bg-white/5 transition-[color,background-color,transform]"
             >
               Как это работает
             </a>
@@ -159,7 +159,6 @@ function BingoCardMock() {
   const marked = new Set([0, 4, 5, 7]);
   return (
     <div className="relative">
-      <div className="absolute -inset-4 rounded-[32px] bg-gradient-to-br from-magenta/30 to-lime/20 blur-2xl" />
       <div className="relative w-[280px] sm:w-[340px] rounded-[28px] bg-ink-card border-2 border-white/10 p-5 rotate-[4deg] shadow-2xl">
         <div className="flex items-center justify-between mb-4">
           <span className="font-display font-extrabold text-2xl tracking-tight">
@@ -171,7 +170,7 @@ function BingoCardMock() {
           {tints.map((t, i) => (
             <div
               key={i}
-              className={`aspect-square rounded-2xl grid place-items-center transition ${
+              className={`aspect-square rounded-2xl grid place-items-center transition-[color,background-color,transform] ${
                 marked.has(i)
                   ? 'bg-magenta text-white scale-95 shadow-inner'
                   : `bg-ink-soft border border-white/5 ${t}`
@@ -188,7 +187,7 @@ function BingoCardMock() {
           ))}
         </div>
       </div>
-      <div className="absolute -bottom-4 -left-6 rotate-[-8deg] rounded-2xl bg-lime px-4 py-2 font-display font-extrabold text-ink shadow-xl text-sm">
+      <div className="absolute -bottom-4 -left-6 rotate-[-8deg] rounded-2xl bg-lime px-4 py-2 font-display font-extrabold text-ink shadow-xl text-sm hover:bg-[#d4ff63]">
         БИНГО!
       </div>
     </div>
@@ -243,7 +242,7 @@ function HowItWorks() {
         {steps.map((s) => (
           <div
             key={s.n}
-            className="group relative overflow-hidden rounded-3xl bg-ink-card border border-white/10 p-7 hover:border-magenta/50 transition"
+            className="group relative overflow-hidden rounded-3xl bg-ink-card border border-white/10 p-7 hover:border-magenta/50 transition-[color,background-color,transform]"
           >
             <span className="block font-display font-black text-6xl text-magenta mb-4">{s.n}</span>
             <h3 className="font-display font-extrabold text-xl mb-2">{s.title}</h3>
@@ -268,7 +267,7 @@ function Stats() {
   ];
   return (
     <section className="mx-auto max-w-6xl px-5 py-10">
-      <div className="rounded-[32px] bg-gradient-to-br from-magenta to-grape p-8 sm:p-12">
+      <div className="rounded-[32px] bg-magenta p-8 sm:p-12">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
           {stats.map((s) => (
             <div key={s.label}>
@@ -301,7 +300,7 @@ function Franchise({ onFranchise }: { onFranchise: () => void }) {
           </p>
           <button
             onClick={onFranchise}
-            className="mt-8 rounded-full bg-lime px-8 py-4 font-display text-lg font-extrabold text-ink hover:scale-[1.03] active:scale-95 transition shadow-lg shadow-lime/20"
+            className="mt-8 rounded-full bg-lime px-8 py-4 font-display text-lg font-extrabold text-ink active:scale-[0.98] transition-[color,background-color,transform] shadow-lg hover:bg-[#d4ff63]"
           >
             Зарегистрироваться по франшизе
           </button>
@@ -323,7 +322,7 @@ function FinalCta() {
       </p>
       <a
         href="#events"
-        className="inline-block mt-8 rounded-full bg-magenta px-10 py-5 font-display text-xl font-extrabold text-white hover:scale-[1.03] active:scale-95 transition shadow-xl shadow-magenta/30"
+        className="inline-block mt-8 rounded-full bg-magenta px-10 py-5 font-display text-xl font-extrabold text-white active:scale-[0.98] transition-[color,background-color,transform] shadow-xl hover:bg-[#ff4b98]"
       >
         Записаться на игру
       </a>
@@ -363,7 +362,7 @@ function Footer() {
       </div>
       <div className="mx-auto max-w-6xl px-5 py-5 border-t border-white/5 flex items-center justify-between text-xs text-cream/30">
         <span>© {new Date().getFullYear()} MuzBingo</span>
-        <Link to="/app" className="hover:text-cream/60 transition">
+        <Link to="/app" className="hover:text-cream/60 transition-[color,background-color,transform]">
           Вход для ведущего
         </Link>
       </div>
@@ -405,7 +404,7 @@ function VibeGallery() {
           {strip.map((src, i) => (
             <div
               key={i}
-              className="shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-ink-card shadow-xl shadow-black/40"
+              className="shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-ink-card shadow-xl"
               style={{ transform: `rotate(${i % 2 === 0 ? -1.5 : 1.5}deg)` }}
             >
               <picture>
@@ -444,14 +443,14 @@ function Partners() {
             href={`https://instagram.com/${p.handle}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="group relative overflow-hidden rounded-3xl bg-ink-card border border-white/10 p-6 hover:border-magenta/50 hover:-translate-y-1 transition"
+            className="group relative overflow-hidden rounded-3xl bg-ink-card border border-white/10 p-6 hover:border-magenta/50 hover:-translate-y-1 transition-[color,background-color,transform]"
           >
             <span className={`block h-1.5 w-10 rounded-full ${accents[i % accents.length]} mb-4`} />
             <h3 className="font-display font-extrabold text-xl leading-tight">{p.name}</h3>
             <p className="text-cream/60 text-sm mt-2 leading-relaxed">{p.description}</p>
             <div className="mt-5 flex items-center justify-between">
               <span className="text-lime font-mono text-sm truncate">@{p.handle}</span>
-              <span className="text-cream/40 group-hover:text-cream transition text-sm font-semibold shrink-0 ml-3">
+              <span className="text-cream/40 group-hover:text-cream transition-[color,background-color,transform] text-sm font-semibold shrink-0 ml-3">
                 Открыть
               </span>
             </div>
@@ -486,7 +485,7 @@ function InstagramPreview() {
       <div className="mt-10 rounded-[32px] bg-ink-card border border-white/10 overflow-hidden">
         <div className="p-5 sm:p-7 flex items-center gap-4 sm:gap-5 border-b border-white/5">
           <div className="relative shrink-0">
-            <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-full p-[3px] bg-gradient-to-tr from-magenta via-lime to-grape">
+            <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-full p-[3px] bg-lime">
               <div className="h-full w-full rounded-full bg-ink-card grid place-items-center overflow-hidden">
                 <picture>
                   <source srcSet="/logo.webp" type="image/webp" />
@@ -505,7 +504,7 @@ function InstagramPreview() {
             href={igUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:inline-flex rounded-full bg-magenta px-5 py-2.5 font-display font-bold text-white text-sm hover:scale-105 active:scale-95 transition shrink-0"
+            className="hidden sm:inline-flex rounded-full bg-magenta px-5 py-2.5 font-display font-bold text-white text-sm active:scale-[0.98] transition-[color,background-color,transform] shrink-0 hover:bg-[#ff4b98]"
           >
             Подписаться
           </a>
@@ -520,7 +519,7 @@ function InstagramPreview() {
             href={igUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="sm:hidden rounded-full bg-magenta px-5 py-2.5 font-display font-bold text-white text-sm shrink-0"
+            className="sm:hidden rounded-full bg-magenta px-5 py-2.5 font-display font-bold text-white text-sm shrink-0 hover:bg-[#ff4b98]"
           >
             Подписаться
           </a>

@@ -60,7 +60,7 @@ export default function Register() {
           </p>
           <Link
             to="/login"
-            className="inline-block mt-6 rounded-full bg-magenta px-7 py-3.5 font-display font-bold text-white hover:scale-[1.03] active:scale-95 transition"
+            className="inline-block mt-6 rounded-full bg-magenta px-7 py-3.5 font-display font-bold text-white active:scale-[0.98] transition-[color,background-color,transform] hover:bg-[#ff4b98]"
           >
             Перейти ко входу
           </Link>
@@ -100,7 +100,7 @@ export default function Register() {
         <button
           type="submit"
           disabled={busy}
-          className="w-full rounded-full bg-lime px-7 py-4 font-display text-lg font-extrabold text-ink hover:scale-[1.02] active:scale-95 transition shadow-lg shadow-lime/20 disabled:opacity-60 disabled:hover:scale-100"
+          className="w-full rounded-full bg-lime px-7 py-4 font-display text-lg font-extrabold text-ink active:scale-[0.98] transition-[color,background-color,transform] shadow-lg disabled:opacity-60 disabled: hover:bg-[#d4ff63]"
         >
           {busy ? 'Создаём аккаунт…' : 'Зарегистрироваться'}
         </button>

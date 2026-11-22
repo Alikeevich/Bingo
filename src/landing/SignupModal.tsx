@@ -5,7 +5,7 @@ const TZ = 'Asia/Almaty';
 
 const inputCls =
   'w-full rounded-2xl bg-ink-soft border border-white/10 px-4 py-3.5 text-cream placeholder-white/35 ' +
-  'outline-none transition focus:border-magenta focus:ring-2 focus:ring-magenta/40 text-base';
+  'outline-none transition-[color,background-color,transform] focus:border-magenta focus:ring-2 focus:ring-magenta/40 text-base';
 const labelCls = 'block text-sm font-semibold text-cream/70 mb-1.5';
 
 function formatEventDate(iso: string): string {
@@ -93,11 +93,11 @@ export default function SignupModal({
         onClick={onClose}
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
       />
-      <div className="relative w-full sm:max-w-lg max-h-[92vh] overflow-y-auto no-scrollbar bg-ink-card border-t-2 sm:border-2 border-magenta/40 rounded-t-[28px] sm:rounded-[28px] p-6 sm:p-8 animate-pop-in shadow-2xl shadow-magenta/20">
+      <div className="relative w-full sm:max-w-lg max-h-[92vh] overflow-y-auto no-scrollbar bg-ink-card border-t-2 sm:border-2 border-magenta/40 rounded-t-[28px] sm:rounded-[28px] p-6 sm:p-8 animate-pop-in shadow-2xl">
         <button
           onClick={onClose}
           aria-label="Закрыть"
-          className="absolute top-4 right-4 grid h-10 w-10 place-items-center rounded-full bg-white/5 text-cream/60 hover:bg-white/10 hover:text-cream transition"
+          className="absolute top-4 right-4 grid h-10 w-10 place-items-center rounded-full bg-white/5 text-cream/60 hover:bg-white/10 hover:text-cream transition-[color,background-color,transform]"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
             <path d="M6 6l12 12M18 6L6 18" />
@@ -120,7 +120,7 @@ export default function SignupModal({
             </p>
             <button
               onClick={onClose}
-              className="rounded-full bg-magenta px-8 py-3.5 font-display font-bold text-white hover:scale-[1.03] active:scale-95 transition"
+              className="rounded-full bg-magenta px-8 py-3.5 font-display font-bold text-white active:scale-[0.98] transition-[color,background-color,transform] hover:bg-[#ff4b98]"
             >
               Отлично
             </button>
@@ -179,7 +179,7 @@ export default function SignupModal({
               <button
                 type="submit"
                 disabled={status === 'sending'}
-                className="w-full rounded-full bg-lime px-7 py-4 font-display text-lg font-extrabold text-ink hover:scale-[1.02] active:scale-95 transition shadow-lg shadow-lime/20 disabled:opacity-60 disabled:hover:scale-100"
+                className="w-full rounded-full bg-lime px-7 py-4 font-display text-lg font-extrabold text-ink active:scale-[0.98] transition-[color,background-color,transform] shadow-lg disabled:opacity-60 disabled: hover:bg-[#d4ff63]"
               >
                 {status === 'sending' ? 'Записываем…' : 'Записаться'}
               </button>

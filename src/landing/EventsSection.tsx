@@ -87,7 +87,7 @@ export default function EventsSection({ onPick }: { onPick: (e: EventItem) => vo
             <button
               key={c}
               onClick={() => pickCity(c)}
-              className={`rounded-full px-5 py-2.5 font-display font-bold text-sm transition ${
+              className={`rounded-full px-5 py-2.5 font-display font-bold text-sm transition-[color,background-color,transform] ${
                 activeCity === c ? 'bg-lime text-ink' : 'bg-white/5 text-cream/70 hover:bg-white/10'
               }`}
             >
@@ -141,7 +141,7 @@ function EventCard({
 }) {
   const p = partsOf(event.starts_at);
   return (
-    <div className="group relative overflow-hidden rounded-3xl bg-ink-card border border-white/10 p-6 hover:border-magenta/50 hover:-translate-y-1 transition flex flex-col">
+    <div className="group relative overflow-hidden rounded-3xl bg-ink-card border border-white/10 p-6 hover:border-magenta/50 hover:-translate-y-1 transition-[color,background-color,transform] flex flex-col">
       <div className="flex items-center justify-between mb-5">
         <span className={`block h-1.5 w-10 rounded-full ${accent}`} />
         {showCity && (
@@ -167,7 +167,7 @@ function EventCard({
       )}
       <button
         onClick={onPick}
-        className="mt-6 rounded-full bg-lime px-6 py-3 font-display font-extrabold text-ink hover:scale-[1.03] active:scale-95 transition self-start"
+        className="mt-6 rounded-full bg-lime px-6 py-3 font-display font-extrabold text-ink active:scale-[0.98] transition-[color,background-color,transform] self-start hover:bg-[#d4ff63]"
       >
         Записаться
       </button>
@@ -186,7 +186,7 @@ function EmptyState() {
         href={`https://instagram.com/${CONTACTS.instagram}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-block rounded-full bg-magenta px-6 py-3 font-display font-bold text-white hover:scale-105 active:scale-95 transition"
+        className="inline-block rounded-full bg-magenta px-6 py-3 font-display font-bold text-white active:scale-[0.98] transition-[color,background-color,transform] hover:bg-[#ff4b98]"
       >
         @{CONTACTS.instagram}
       </a>
