@@ -469,8 +469,9 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
       </header>
 
       <div className="rounded-xl border border-white/[0.08] bg-pult-card divide-y divide-white/[0.06]">
-        {playlists.length === 0 && <p className="p-6 text-sm text-pult-text2">Плейлистов пока нет</p>}
-        {playlists.map(playlist => {
+        {/* Плейлисты туров, собранных прямо в игре, здесь не показываем — они живут в своей игре */}
+        {playlists.filter(p => !p.game_id).length === 0 && <p className="p-6 text-sm text-pult-text2">Плейлистов пока нет</p>}
+        {playlists.filter(p => !p.game_id).map(playlist => {
           const used = roundsWithCards(playlist.id);
           return (
             <div key={playlist.id} onClick={() => setViewingPlaylist(playlist)}

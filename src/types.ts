@@ -27,6 +27,8 @@ export interface Playlist {
   name: string;
   tracks: Track[];
   created_at?: string;
+  /** Скрытый плейлист тура, собранного прямо в игре. Во вкладке «Плейлисты» не показывается */
+  game_id?: string | null;
 }
 
 export interface BingoCard {

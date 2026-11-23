@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { supabase } from '../../supabase';
-import { Game, Round, Playlist, Template, BingoCard, Track } from '../../types';
-import { buildPlayQueue } from '../../utils';
+import { Game, Round, Playlist, Template, BingoCard, Track, Tag } from '../../types';
+import { buildPlayQueue, songKey } from '../../utils';
+import PlaylistBuilder from './PlaylistBuilder';
 import { winIndexForCard, buildCardForWinIndex, buildRandomCells, minWinIndex, maxWinIndex, Cells } from '../../lib/cardBuilder';
-import { ChevronLeft, Calendar, Trash2, PlusCircle, ListMusic, LayoutTemplate, Play, Printer, HardDriveDownload, Loader2, Download } from 'lucide-react';
+import { ChevronLeft, Calendar, Trash2, PlusCircle, ListMusic, LayoutTemplate, Play, Printer, HardDriveDownload, Loader2, Download, Plus, Shuffle, BookmarkPlus } from 'lucide-react';
 import { cacheTracks, isOfflineCacheReady } from '../../lib/offlineCache';
 
 // Все 12 выигрышных линий в сетке 5×5 (строки, столбцы, 2 диагонали)
@@ -11,7 +12,12 @@ interface GamesTabProps {
   games: Game[];
   setGames: (val: Game[]) => void;
   playlists: Playlist[];
+  setPlaylists: React.Dispatch<React.SetStateAction<Playlist[]>>;
   dbTracks: Track[];
+  dbTags: Tag[];
+  togglePlay: (track: Track) => void;
+  playingTrackId: string | number | null;
+  isPaused: boolean;
   templates: Template[];
   showToast: (msg: string, opts?: { sticky?: boolean }) => void;
   startHostSession: (game: Game, round: Round) => void;
@@ -28,7 +34,7 @@ const plural = (n: number, one: string, few: string, many: string) => {
   return many;
 };
 
-export default function GamesTab({ games, setGames, playlists, dbTracks, templates, showToast, startHostSession, setPrintViewCards, resolveTrackUrl }: GamesTabProps) {
+export default function GamesTab({ games, setGames, playlists, setPlaylists, dbTracks, dbTags, togglePlay, playingTrackId, isPaused, templates, showToast, startHostSession, setPrintViewCards, resolveTrackUrl }: GamesTabProps) {
   // Скачивание всей игры в офлайн-кэш: { этап, сделано, всего } или null
   const [gameOffline, setGameOffline] = useState<{ phase: string; done: number; total: number } | null>(null);
 
@@ -81,6 +87,37 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
   const [newGameName, setNewGameName] = useState('');
   const [isAddRoundModalOpen, setIsAddRoundModalOpen] = useState(false);
   const[newRound, setNewRound] = useState<Partial<Round>>({ winCondition: '1_line' });
+  // Тур собираем прямо в игре (скрытый плейлист игры) или берём готовый плейлист
+  const [roundMode, setRoundMode] = useState<'build' | 'existing'>('build');
+  // Открытый сборщик песен тура и туры, которые ведущий разрешил менять несмотря на бланки
+  const [builderRoundId, setBuilderRoundId] = useState<string | null>(null);
+  const [unlockedRounds, setUnlockedRounds] = useState<Set<string>>(new Set());
+
+  const openAddRound = (game: Game) => {
+    setNewRound({ winCondition: '1_line', name: `Тур ${game.rounds.length + 1}` });
+    setRoundMode('build');
+    setIsAddRoundModalOpen(true);
+  };
+
+  const savePlaylistTracks = async (playlistId: string, next: Track[]) => {
+    setPlaylists(prev => prev.map(p => p.id === playlistId ? { ...p, tracks: next } : p));
+    const { error } = await supabase.from('playlists').update({ tracks: next }).eq('id', playlistId);
+    if (error) showToast('Не удалось сохранить песни тура: ' + error.message, { sticky: true });
+  };
+
+  // Удачный тур — в обычные плейлисты, чтобы брать его на другие игры
+  const saveRoundAsPlaylist = async (pl: Playlist) => {
+    const name = prompt('Название плейлиста', pl.name);
+    if (!name?.trim()) return;
+    const { error } = await supabase.from('playlists').update({ game_id: null, name: name.trim() }).eq('id', pl.id);
+    if (error) return showToast('Не удалось сохранить: ' + error.message, { sticky: true });
+    setPlaylists(prev => prev.map(p => p.id === pl.id ? { ...p, game_id: null, name: name.trim() } : p));
+    showToast(`«${name.trim()}» теперь во вкладке «Плейлисты»`);
+  };
+
+  // По плейлисту где-то уже напечатаны бланки — менять песни опасно
+  const hasPrintedCards = (playlistId: string) =>
+    games.some(g => g.rounds.some(r => r.playlistId === playlistId && (r.cards?.length || 0) > 0));
 
   const [cardGeneratorSetup, setCardGeneratorSetup] = useState<{ game: Game; round: Round } | null>(null);
   // Повторное скачивание уже созданных карточек (без новой генерации)
@@ -137,8 +174,13 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
   const createGame = async () => {
     if (!newGameName.trim()) return;
     setIsCreateGameModalOpen(false);
-    const { data } = await supabase.from('games').insert([{ name: newGameName, rounds: [] }]).select();
-    if (data?.[0]) { setGames([data[0], ...games]); showToast('Игра создана'); }
+    const { data } = await supabase.from('games').insert([{ name: newGameName.trim(), rounds: [] }]).select();
+    if (data?.[0]) {
+      setGames([data[0], ...games]);
+      // Сразу к делу: открываем игру и предлагаем собрать первый тур
+      setViewingGame(data[0]);
+      openAddRound(data[0]);
+    }
     setNewGameName('');
   };
 
@@ -147,34 +189,62 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
     if (confirm('Удалить мероприятие со всеми его турами?')) {
       setGames(games.filter(g => g.id !== id));
       if (viewingGame?.id === id) setViewingGame(null);
+      // Плейлисты туров этой игры база удалит сама (каскадом), убираем и из списка
+      setPlaylists(prev => prev.filter(p => p.game_id !== id));
       await supabase.from('games').delete().eq('id', id);
       showToast('Мероприятие удалено');
     }
   };
 
   const addRoundToGame = async () => {
-    if (!viewingGame || !newRound.name || !newRound.playlistId) return;
+    if (!viewingGame || !newRound.name?.trim()) return;
+    const game = games.find(g => g.id === viewingGame.id) || viewingGame;
+    let playlistId = newRound.playlistId;
+    if (roundMode === 'build') {
+      // Песни тура храним скрытым плейлистом игры: очередь, бланки и проверка бинго
+      // работают с ним как с обычным плейлистом, а во вкладке «Плейлисты» его не видно.
+      const { data, error } = await supabase.from('playlists')
+        .insert([{ name: `${game.name} — ${newRound.name.trim()}`, tracks: [], game_id: game.id }]).select();
+      if (error || !data?.[0]) {
+        showToast(/game_id/.test(error?.message || '')
+          ? 'В базе ещё нет колонки для туров игры — запусти SQL из инструкции и попробуй снова'
+          : 'Не удалось создать тур: ' + (error?.message || 'ошибка'), { sticky: true });
+        return;
+      }
+      setPlaylists(prev => [data[0], ...prev]);
+      playlistId = data[0].id;
+    }
+    if (!playlistId) return;
     const roundToAdd: Round = {
-      id: crypto.randomUUID(), name: newRound.name,
-      playlistId: newRound.playlistId, winCondition: newRound.winCondition as any, cards:[],
+      id: crypto.randomUUID(), name: newRound.name.trim(),
+      playlistId, winCondition: newRound.winCondition as any, cards:[],
     };
-    const updatedGame = { ...viewingGame, rounds:[...viewingGame.rounds, roundToAdd] };
+    const updatedGame = { ...game, rounds:[...game.rounds, roundToAdd] };
     setGames(games.map(g => g.id === viewingGame.id ? updatedGame : g));
     setViewingGame(updatedGame);
     setIsAddRoundModalOpen(false);
     setNewRound({ winCondition: '1_line' });
     await supabase.from('games').update({ rounds: updatedGame.rounds }).eq('id', viewingGame.id);
-    showToast('Тур добавлен');
+    if (roundMode === 'build') setBuilderRoundId(roundToAdd.id);
+    else showToast('Тур добавлен');
   };
 
   const deleteRound = async (roundId: string) => {
     if (!viewingGame) return;
     if (confirm('Удалить тур? Все карточки будут удалены.')) {
-      const updatedRounds = viewingGame.rounds.filter(r => r.id !== roundId);
-      const updatedGame = { ...viewingGame, rounds: updatedRounds };
+      const game = games.find(g => g.id === viewingGame.id) || viewingGame;
+      const removed = game.rounds.find(r => r.id === roundId);
+      const updatedRounds = game.rounds.filter(r => r.id !== roundId);
+      const updatedGame = { ...game, rounds: updatedRounds };
       setGames(games.map(g => g.id === viewingGame.id ? updatedGame : g));
       setViewingGame(updatedGame);
       await supabase.from('games').update({ rounds: updatedRounds }).eq('id', viewingGame.id);
+      // Скрытый плейлист этого тура больше никому не нужен — удаляем, чтобы не копился мусор
+      const pl = playlists.find(p => p.id === removed?.playlistId);
+      if (pl?.game_id === game.id && !updatedRounds.some(r => r.playlistId === pl.id)) {
+        setPlaylists(prev => prev.filter(p => p.id !== pl.id));
+        await supabase.from('playlists').delete().eq('id', pl.id);
+      }
       showToast('Тур удалён');
     }
   };
@@ -341,7 +411,7 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
                 {gameOffline ? <Loader2 size={18} className="animate-spin" /> : <HardDriveDownload size={18} />}
                 {gameOffline ? `${gameOffline.phase}: ${gameOffline.done}/${gameOffline.total}` : 'Скачать игру офлайн'}
               </button>
-              <button onClick={() => setIsAddRoundModalOpen(true)} className="bg-pult-raised hover:bg-[#2b2b2e] text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"><PlusCircle size={18} /> Добавить тур</button>
+              <button onClick={() => openAddRound(currentGame)} className="bg-pult-raised hover:bg-[#2b2b2e] text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"><PlusCircle size={18} /> Добавить тур</button>
             </div>
           </div>
           {currentGame.rounds.length === 0 ? (
@@ -359,8 +429,16 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
                       <button onClick={() => deleteRound(round.id)} className="text-pult-muted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={18} /></button>
                     </div>
                     <h3 className="text-lg font-medium mb-2 truncate">{round.name}</h3>
-                    <p className="text-pult-text2 text-sm mb-2 flex items-center gap-2"><ListMusic size={16} /> {playlist ? `${playlist.name} (${playlist.tracks.length} треков)` : 'Плейлист удалён'}</p>
+                    <p className="text-pult-text2 text-sm mb-2 flex items-center gap-2"><ListMusic size={16} /> {!playlist ? 'Плейлист удалён' : playlist.game_id ? `Собран в игре · ${playlist.tracks.length} песен` : `${playlist.name} (${playlist.tracks.length} треков)`}</p>
                     <p className="text-pult-muted text-sm mb-6 flex items-center gap-2"><LayoutTemplate size={16} /> {cardsCountLabel}</p>
+                    {playlist && (
+                      <button
+                        onClick={() => setBuilderRoundId(round.id)}
+                        className="mb-3 w-full bg-pult-bg border border-white/[0.08] hover:border-white/20 text-pult-text py-2.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-colors"
+                      >
+                        <ListMusic size={16} /> {playlist.tracks.length === 0 ? 'Набрать песни' : 'Песни тура'}
+                      </button>
+                    )}
                     {!!round.cards?.length && (
                       <button
                         onClick={() => openReprint(round, index)}
@@ -371,7 +449,7 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
                       </button>
                     )}
                     <div className="mt-auto flex gap-3">
-                      <button onClick={() => startHostSession(currentGame, round)} disabled={!playlist} className="flex-1 bg-lime hover:bg-[#d4ff63] text-[#141415] py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50"><Play size={20} fill="currentColor" /> Играть</button>
+                      <button onClick={() => startHostSession(currentGame, round)} disabled={!playlist || playlist.tracks.length < 24} title={playlist && playlist.tracks.length < 24 ? 'Нужно минимум 24 песни' : undefined} className="flex-1 bg-lime hover:bg-[#d4ff63] text-[#141415] py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50"><Play size={20} fill="currentColor" /> Играть</button>
                       <button onClick={() => { if (templates.length > 0 && !selectedTemplateId) setSelectedTemplateId(templates[0].id); openGenerator(currentGame, round); }} disabled={!playlist || playlist.tracks.length < 24} className="flex-1 bg-pult-raised hover:bg-[#2b2b2e] text-white py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50"><Printer size={20} /> Карточки</button>
                     </div>
                   </div>
@@ -380,6 +458,79 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
             </div>
           )}
         </div>
+
+        {/* ── Сборщик песен туров прямо в игре ── */}
+        {(() => {
+          const round = currentGame.rounds.find(r => r.id === builderRoundId);
+          const pl = round && playlists.find(p => p.id === round.playlistId);
+          if (!round || !pl) return null;
+          // Песни, которые уже стоят в других турах этой игры, — с пометкой «в туре N»
+          const marks = new Map<string, string>();
+          currentGame.rounds.forEach((r, i) => {
+            if (r.id === round.id) return;
+            for (const t of playlists.find(p => p.id === r.playlistId)?.tracks || []) {
+              marks.set('id:' + String(t.id), `в туре ${i + 1}`);
+              marks.set('song:' + songKey(t.title, t.artist), `в туре ${i + 1}`);
+            }
+          });
+          const locked = hasPrintedCards(pl.id) && !unlockedRounds.has(round.id);
+          return (
+            <div className="fixed inset-0 z-40 bg-pult-bg text-pult-text flex flex-col gap-4 p-6">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4 min-w-0">
+                  <button onClick={() => setBuilderRoundId(null)} className="h-9 px-3 rounded-lg text-sm inline-flex items-center gap-1.5 bg-pult-raised border border-white/[0.06] hover:bg-[#2b2b2e] transition-colors"><ChevronLeft size={16} /> Готово</button>
+                  <h2 className="text-lg font-medium truncate">{currentGame.name}</h2>
+                </div>
+                <div className="flex items-center gap-1 rounded-lg bg-pult-raised p-0.5 border border-white/[0.06]">
+                  {currentGame.rounds.map((r, i) => {
+                    const n = playlists.find(p => p.id === r.playlistId)?.tracks.length ?? 0;
+                    return (
+                      <button key={r.id} onClick={() => setBuilderRoundId(r.id)}
+                        className={`h-8 px-3 rounded-md text-sm inline-flex items-center gap-2 transition-colors ${r.id === round.id ? 'bg-pult-card text-pult-text' : 'text-pult-text2 hover:text-pult-text'}`}>
+                        Тур {i + 1}<span className={`font-mono text-xs tabular-nums ${n >= 24 ? 'text-pult-muted' : 'text-amber-300'}`}>{n}</span>
+                      </button>
+                    );
+                  })}
+                  <button onClick={() => openAddRound(currentGame)} title="Добавить тур" className="h-8 w-8 rounded-md inline-flex items-center justify-center text-pult-text2 hover:text-pult-text"><Plus size={16} /></button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button disabled={locked || pl.tracks.length < 2}
+                    onClick={() => { const a = [...pl.tracks]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } savePlaylistTracks(pl.id, a); showToast('Порядок песен перемешан'); }}
+                    title="Порядок песен = порядок игры в туре"
+                    className="h-9 px-3 rounded-lg text-sm inline-flex items-center gap-2 bg-pult-raised border border-white/[0.06] hover:bg-[#2b2b2e] transition-colors disabled:opacity-40"><Shuffle size={16} /> Перемешать</button>
+                  {pl.game_id ? (
+                    <button onClick={() => saveRoundAsPlaylist(pl)} title="Сделать обычным плейлистом, чтобы использовать на других играх"
+                      className="h-9 px-3 rounded-lg text-sm inline-flex items-center gap-2 bg-pult-raised border border-white/[0.06] hover:bg-[#2b2b2e] transition-colors"><BookmarkPlus size={16} /> Сохранить как плейлист</button>
+                  ) : (
+                    <span className="text-sm text-pult-text2 max-w-[260px] truncate" title="Изменения видны везде, где стоит этот плейлист">Общий плейлист «{pl.name}»</span>
+                  )}
+                </div>
+              </div>
+              <div className="text-sm text-pult-text2">
+                {round.name} · {round.winCondition === 'full' ? 'вся карточка' : round.winCondition === '3_lines' ? '3 линии' : round.winCondition === '2_lines' ? '2 линии' : '1 линия'}
+                {pl.tracks.length < 24 && <span className="text-amber-300"> · для игры нужно минимум 24 песни, сейчас {pl.tracks.length}</span>}
+              </div>
+              <PlaylistBuilder
+                playlist={pl}
+                playlists={playlists}
+                dbTracks={dbTracks}
+                dbTags={dbTags}
+                games={games}
+                locked={locked}
+                onUnlockRequest={() => {
+                  if (confirm('По этому туру уже напечатаны бланки. Если поменять песни, напечатанные карточки будут выигрывать не на тех песнях. Всё равно изменить?'))
+                    setUnlockedRounds(prev => new Set(prev).add(round.id));
+                }}
+                onSave={next => savePlaylistTracks(pl.id, next)}
+                showToast={showToast}
+                togglePlay={togglePlay}
+                playingTrackId={playingTrackId}
+                isPaused={isPaused}
+                labelFor={t => marks.get('id:' + String(t.id)) || marks.get('song:' + songKey(t.title, t.artist)) || null}
+              />
+            </div>
+          );
+        })()}
 
         {/* Повторное скачивание готовых карточек */}
         {reprint && (
@@ -419,10 +570,22 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
              <div className="bg-pult-card border border-white/[0.08] rounded-2xl w-full max-w-md p-6">
                 <h3 className="text-xl font-medium mb-4">Добавить тур</h3>
                 <input type="text" value={newRound.name || ''} onChange={e => setNewRound({ ...newRound, name: e.target.value })} placeholder="Название тура" className="w-full bg-pult-bg border border-white/[0.08] rounded-xl py-3 px-4 text-white focus:border-lime/60 mb-4" />
-                <select value={newRound.playlistId || ''} onChange={e => setNewRound({ ...newRound, playlistId: e.target.value })} className="w-full bg-pult-bg border border-white/[0.08] rounded-xl py-3 px-4 text-white focus:border-lime/60 mb-4">
-                  <option value="" disabled>Выберите плейлист (мин. 24 трека)...</option>
-                  {playlists.filter(p => p.tracks.length >= 24).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                <div className="flex gap-2 mb-4">
+                  {([['build', 'Собрать песни здесь'], ['existing', 'Готовый плейлист']] as const).map(([k, label]) => (
+                    <button key={k} type="button" onClick={() => setRoundMode(k)}
+                      className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${roundMode === k ? 'bg-lime text-[#141415]' : 'bg-pult-bg border border-white/[0.08] text-pult-text2 hover:text-pult-text'}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {roundMode === 'existing' ? (
+                  <select value={newRound.playlistId || ''} onChange={e => setNewRound({ ...newRound, playlistId: e.target.value })} className="w-full bg-pult-bg border border-white/[0.08] rounded-xl py-3 px-4 text-white focus:border-lime/60 mb-4">
+                    <option value="" disabled>Выберите плейлист (мин. 24 трека)...</option>
+                    {playlists.filter(p => !p.game_id && p.tracks.length >= 24).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                ) : (
+                  <p className="text-sm text-pult-text2 mb-4">Откроется набор песен: база, каталог или готовые плейлисты. Отдельный плейлист не создаётся.</p>
+                )}
                 <select value={newRound.winCondition || '1_line'} onChange={e => setNewRound({ ...newRound, winCondition: e.target.value as any })} className="w-full bg-pult-bg border border-white/[0.08] rounded-xl py-3 px-4 text-white focus:border-lime/60 mb-4">
                   <option value="1_line">1 Линия</option>
                   <option value="2_lines">2 Линии</option>
@@ -431,7 +594,7 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
                 </select>
                 <div className="flex gap-4">
                   <button onClick={() => setIsAddRoundModalOpen(false)} className="flex-1 py-3 bg-pult-raised rounded-xl font-medium">Отмена</button>
-                  <button onClick={addRoundToGame} className="flex-1 py-3 bg-lime rounded-xl font-medium text-[#141415]">Добавить</button>
+                  <button onClick={addRoundToGame} disabled={!newRound.name?.trim() || (roundMode === 'existing' && !newRound.playlistId)} className="flex-1 py-3 bg-lime rounded-xl font-medium text-[#141415] disabled:opacity-40">{roundMode === 'build' ? 'Собрать песни' : 'Добавить'}</button>
                 </div>
              </div>
           </div>
@@ -585,7 +748,7 @@ export default function GamesTab({ games, setGames, playlists, dbTracks, templat
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-pult-card border border-white/[0.08] rounded-2xl w-full max-w-md p-6">
             <h3 className="text-xl font-medium mb-4">Новое мероприятие</h3>
-            <input autoFocus type="text" value={newGameName} onChange={e => setNewGameName(e.target.value)} placeholder="Название игры"  />
+            <input autoFocus type="text" value={newGameName} onChange={e => setNewGameName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') createGame(); }} placeholder="Название игры" className="w-full bg-pult-bg border border-white/[0.08] rounded-xl py-3 px-4 text-white focus:border-lime/60 focus:outline-none mb-4" />
             <div className="flex gap-4"><button onClick={() => setIsCreateGameModalOpen(false)} className="flex-1 py-3 rounded-xl font-medium bg-pult-raised">Отмена</button><button onClick={createGame} className="flex-1 py-3 rounded-xl font-medium bg-lime text-[#141415]">Создать</button></div>
           </div>
         </div>

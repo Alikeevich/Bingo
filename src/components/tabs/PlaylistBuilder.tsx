@@ -3,14 +3,14 @@ import { Game, Playlist, Tag, Track } from '../../types';
 import { searchITunes } from '../../lib/itunes';
 import { playlistArtistSet, sharesArtist, splitArtists, songKey } from '../../utils';
 import {
-  ArrowRight, ArrowLeft, Search, X, Shuffle, Download, Layers, Lock, Play, Pause, ChevronLeft, ChevronRight, Loader2,
+  ArrowRight, ArrowLeft, Search, X, Shuffle, Layers, Lock, Play, Pause, ChevronLeft, ChevronRight, Loader2,
 } from 'lucide-react';
 
 /**
- * Набор песен в плейлист: слева «Моя база» или общий каталог (iTunes), справа плейлист.
- * Галочками отмечаешь, кнопкой переносишь пачкой. Плюс три помощника:
- * случайное добавление, загрузка из другого тура и подсветка песен,
- * которые уже звучали на другой игре.
+ * Набор песен в плейлист или тур: слева «Моя база», общий каталог (iTunes) или
+ * готовый плейлист / тур прошлой игры, справа то, что собираем.
+ * Галочками отмечаешь, кнопкой переносишь пачкой. Плюс помощники: случайное
+ * добавление и подсветка песен, которые уже звучали на другой игре.
  *
  * Правило «один исполнитель на плейлист» (с учётом фитов) действует при любом
  * способе добавления — поэтому добавиться может меньше, чем выбрано.
@@ -29,6 +29,8 @@ interface Props {
   togglePlay: (t: Track) => void;
   playingTrackId: string | number | null;
   isPaused: boolean;
+  /** Своя пометка у песни, например «в туре 1» — когда собираем туры одной игры */
+  labelFor?: (t: Track) => string | null;
 }
 
 const PAGE = 50;
@@ -62,7 +64,8 @@ export default function PlaylistBuilder(p: Props) {
   const inPlaylist = useMemo(() => new Set(p.playlist.tracks.map(t => String(t.id))), [p.playlist.tracks]);
 
   // ── источник левой панели: своя база или общий каталог ──
-  const [source, setSource] = useState<'db' | 'catalog'>('db');
+  const [source, setSource] = useState<'db' | 'catalog' | 'playlist'>('db');
+  const [srcPlaylistId, setSrcPlaylistId] = useState('');
   const [catalogQuery, setCatalogQuery] = useState('');
   const [catalog, setCatalog] = useState<Track[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
@@ -82,7 +85,7 @@ export default function PlaylistBuilder(p: Props) {
       if (rid === reqRef.current) setCatalogLoading(false);
     }
   };
-  const switchSource = (next: 'db' | 'catalog') => { setSource(next); setPage(0); setLeftSel(new Set()); };
+  const switchSource = (next: 'db' | 'catalog' | 'playlist') => { setSource(next); setPage(0); setLeftSel(new Set()); };
 
   // ── фильтры левой панели ──
   const [query, setQuery] = useState('');
@@ -109,10 +112,14 @@ export default function PlaylistBuilder(p: Props) {
     !!crossKeys && (crossKeys.has('id:' + String(t.id)) || crossKeys.has('song:' + songKey(t.title, t.artist)));
 
   // ── модалки ──
-  const [modal, setModal] = useState<null | 'random' | 'fromRound' | 'cross'>(null);
+  const [modal, setModal] = useState<null | 'random' | 'cross'>(null);
   const [randomCount, setRandomCount] = useState('10');
-  const [srcGameId, setSrcGameId] = useState('');
-  const [srcRoundId, setSrcRoundId] = useState('');
+
+  // Источник «Плейлисты»: готовые плейлисты и туры прошлых игр (скрытые плейлисты игр)
+  const shared = p.playlists.filter(x => !x.game_id && x.id !== p.playlist.id);
+  const gameRounds = p.games.flatMap(g => g.rounds.map(r => ({ g, r, pl: p.playlists.find(x => x.id === r.playlistId) })))
+    .filter(x => x.pl && x.pl.game_id && x.pl.id !== p.playlist.id);
+  const srcPlaylist = p.playlists.find(x => x.id === srcPlaylistId);
 
   const presentArtists = useMemo(() => playlistArtistSet(p.playlist.tracks), [p.playlist.tracks]);
   const isBlocked = (t: Track) => sharesArtist(t.artist, presentArtists);
@@ -122,6 +129,11 @@ export default function PlaylistBuilder(p: Props) {
       return catalog.filter(t => !inPlaylist.has(String(t.id)) && !(hideBlocked && isBlocked(t)));
     }
     const q = query.trim().toLowerCase();
+    if (source === 'playlist') {
+      return (srcPlaylist?.tracks || []).filter(t =>
+        !inPlaylist.has(String(t.id)) && !(hideBlocked && isBlocked(t)) &&
+        (!q || t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q)));
+    }
     return p.dbTracks.filter(t => {
       if (inPlaylist.has(String(t.id))) return false;
       if (tag && !(t.tags || []).includes(tag)) return false;
@@ -130,7 +142,7 @@ export default function PlaylistBuilder(p: Props) {
       return t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, catalog, p.dbTracks, inPlaylist, query, tag, hideBlocked, presentArtists]);
+  }, [source, catalog, srcPlaylist, p.dbTracks, inPlaylist, query, tag, hideBlocked, presentArtists]);
 
   const pages = Math.max(1, Math.ceil(left.length / PAGE));
   const curPage = Math.min(page, pages - 1);
@@ -184,18 +196,10 @@ export default function PlaylistBuilder(p: Props) {
       : `Добавлено случайных песен: ${take.length}`, { sticky: take.length < n });
   };
 
-  const srcGame = p.games.find(g => g.id === srcGameId);
-  const loadFromRound = async () => {
-    const round = srcGame?.rounds.find(r => r.id === srcRoundId);
-    const pl = p.playlists.find(x => x.id === round?.playlistId);
-    if (!pl) return;
-    const { added, skipped } = addRespectingArtists(p.playlist.tracks, pl.tracks);
-    if (added.length) await p.onSave([...p.playlist.tracks, ...added]);
-    setModal(null);
-    report(added.length, skipped, `Из тура «${round?.name}» добавлено`);
-  };
 
-  const allLeftOnPage = leftPage.length > 0 && leftPage.every(t => leftSel.has(String(t.id)));
+  // В источнике «Плейлисты» галочка берёт весь выбранный плейлист — чтобы закинуть его целиком
+  const selectScope = source === 'playlist' ? left : leftPage;
+  const allLeftOnPage = selectScope.length > 0 && selectScope.every(t => leftSel.has(String(t.id)));
   const allRight = right.length > 0 && right.every(t => rightSel.has(String(t.id)));
 
   const renderRow = (t: Track, side: 'l' | 'r') => {
@@ -204,6 +208,7 @@ export default function PlaylistBuilder(p: Props) {
     const setSel = side === 'l' ? setLeftSel : setRightSel;
     const blocked = side === 'l' && isBlocked(t);
     const cross = wasInCross(t);
+    const label = p.labelFor?.(t) || null;
     const playing = p.playingTrackId === t.id && !p.isPaused;
     return (
       <label
@@ -234,7 +239,8 @@ export default function PlaylistBuilder(p: Props) {
           <span className={`truncate text-sm ${blocked ? 'text-pult-muted' : 'text-pult-text'}`}>{t.artist}</span>
           <span className="truncate text-sm text-pult-text2">{t.title}</span>
           {cross && <span className="ml-auto shrink-0 text-xs text-sky-300" title="Эта песня уже звучала на выбранной игре">было</span>}
-          {blocked && !cross && <span className="ml-auto shrink-0 text-xs text-pult-muted" title="Исполнитель уже есть в плейлисте">исполнитель есть</span>}
+          {label && !cross && <span className="ml-auto shrink-0 text-xs text-amber-300" title="Эта песня уже стоит в другом туре этой игры">{label}</span>}
+          {blocked && !cross && !label && <span className="ml-auto shrink-0 text-xs text-pult-muted" title="Исполнитель уже есть в плейлисте">исполнитель есть</span>}
         </span>
       </label>
     );
@@ -258,7 +264,6 @@ export default function PlaylistBuilder(p: Props) {
 
       {/* помощники */}
       <div className="flex flex-wrap items-center gap-2">
-        <button disabled={p.locked} onClick={() => setModal('fromRound')} className={btnQuiet}><Download size={16} /> Из другого тура</button>
         <button onClick={() => setModal('cross')} className={btnQuiet}><Layers size={16} /> Пересечение с игрой</button>
         <button disabled={p.locked} onClick={() => setModal('random')} className={btnQuiet}><Shuffle size={16} /> Случайные</button>
         {crossKeys && (
@@ -276,7 +281,7 @@ export default function PlaylistBuilder(p: Props) {
           <header className="p-4 pb-3 flex flex-col gap-3 border-b border-white/[0.06]">
             <div className="flex items-center justify-between">
               <div className="inline-flex rounded-lg bg-pult-raised p-0.5 border border-white/[0.06]">
-                {([['db', 'Моя база'], ['catalog', 'Каталог']] as const).map(([k, label]) => (
+                {([['db', 'Моя база'], ['catalog', 'Каталог'], ['playlist', 'Плейлисты']] as const).map(([k, label]) => (
                   <button key={k} type="button" onClick={() => switchSource(k)}
                     className={`h-8 px-3 rounded-md text-sm transition-colors ${source === k ? 'bg-pult-card text-pult-text' : 'text-pult-text2 hover:text-pult-text'}`}>
                     {label}
@@ -295,6 +300,26 @@ export default function PlaylistBuilder(p: Props) {
                   {catalogLoading ? <Loader2 size={16} className="animate-spin" /> : 'Найти'}
                 </button>
               </form>
+            ) : source === 'playlist' ? (
+              <div className="grid grid-cols-[1fr_1fr] gap-2">
+                <select value={srcPlaylistId} onChange={e => { setSrcPlaylistId(e.target.value); setPage(0); setLeftSel(new Set()); }} className={field}>
+                  <option value="">Выбери плейлист или тур</option>
+                  {shared.length > 0 && (
+                    <optgroup label="Плейлисты">
+                      {shared.map(x => <option key={x.id} value={x.id}>{x.name} · {x.tracks.length}</option>)}
+                    </optgroup>
+                  )}
+                  {gameRounds.length > 0 && (
+                    <optgroup label="Туры игр">
+                      {gameRounds.map(({ g, r, pl }) => <option key={pl!.id} value={pl!.id}>{g.name} — {r.name} · {pl!.tracks.length}</option>)}
+                    </optgroup>
+                  )}
+                </select>
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-pult-muted" />
+                  <input value={query} onChange={e => { setQuery(e.target.value); setPage(0); }} placeholder="Исполнитель или название" className={`${field} pl-8`} />
+                </div>
+              </div>
             ) : (
             <div className="grid grid-cols-[1fr_160px] gap-2">
               <div className="relative">
@@ -311,10 +336,10 @@ export default function PlaylistBuilder(p: Props) {
               <label className="inline-flex items-center gap-2 text-pult-text2 cursor-pointer">
                 <input type="checkbox" checked={allLeftOnPage} disabled={p.locked} onChange={() => {
                   const n = new Set(leftSel);
-                  leftPage.forEach(t => allLeftOnPage ? n.delete(String(t.id)) : n.add(String(t.id)));
+                  selectScope.forEach(t => allLeftOnPage ? n.delete(String(t.id)) : n.add(String(t.id)));
                   setLeftSel(n);
                 }} className="accent-lime w-4 h-4" />
-                Выбрать страницу
+                {source === 'playlist' ? 'Выбрать все' : 'Выбрать страницу'}
               </label>
               <label className="inline-flex items-center gap-2 text-pult-text2 cursor-pointer">
                 <input type="checkbox" checked={hideBlocked} onChange={e => { setHideBlocked(e.target.checked); setPage(0); }} className="accent-lime w-4 h-4" />
@@ -328,7 +353,9 @@ export default function PlaylistBuilder(p: Props) {
               <p className="p-6 text-center text-sm text-pult-muted">
                 {source === 'catalog' && !catalogSearched
                   ? 'Найди песни в общем каталоге — их можно добавить в плейлист сразу, без сохранения в базу'
-                  : 'Ничего не найдено'}
+                  : source === 'playlist' && !srcPlaylist
+                    ? 'Выбери готовый плейлист или тур прошлой игры — его песни можно перекинуть разом через «Выбрать все»'
+                    : 'Ничего не найдено'}
               </p>
             )}
           </div>
@@ -405,30 +432,6 @@ export default function PlaylistBuilder(p: Props) {
                   <button onClick={() => setModal(null)} className={btnQuiet}>Отмена</button>
                   <button onClick={addRandom} disabled={!(parseInt(randomCount, 10) > 0) || left.length === 0}
                     className={`${btn} bg-lime text-[#141415] hover:bg-[#d4ff63]`}>Добавить</button>
-                </div>
-              </>
-            )}
-
-            {modal === 'fromRound' && (
-              <>
-                <h3 className="text-lg font-medium text-pult-text mb-1">Песни из другого тура</h3>
-                <p className="text-sm text-pult-text2 mb-5">Добавятся песни плейлиста выбранного тура. Повторы исполнителей пропускаются</p>
-                <label className="block text-xs text-pult-muted mb-1.5">Игра</label>
-                <select value={srcGameId} onChange={e => { setSrcGameId(e.target.value); setSrcRoundId(''); }} className={`${field} h-10 mb-4`}>
-                  <option value="">Выбери игру</option>
-                  {p.games.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                </select>
-                <label className="block text-xs text-pult-muted mb-1.5">Тур</label>
-                <select value={srcRoundId} onChange={e => setSrcRoundId(e.target.value)} disabled={!srcGame} className={`${field} h-10 mb-6`}>
-                  <option value="">Выбери тур</option>
-                  {srcGame?.rounds.map(r => {
-                    const pl = p.playlists.find(x => x.id === r.playlistId);
-                    return <option key={r.id} value={r.id}>{r.name}{pl ? ` · ${pl.tracks.length} песен` : ''}</option>;
-                  })}
-                </select>
-                <div className="flex gap-2 justify-end">
-                  <button onClick={() => setModal(null)} className={btnQuiet}>Отмена</button>
-                  <button onClick={loadFromRound} disabled={!srcRoundId} className={`${btn} bg-lime text-[#141415] hover:bg-[#d4ff63]`}>Добавить</button>
                 </div>
               </>
             )}

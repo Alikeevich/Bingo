@@ -984,7 +984,7 @@ export default function App() {
       <main className="flex-1 overflow-hidden px-8 py-6 bg-pult-bg">
         <Routes>
           <Route index element={<Navigate to="games" replace />} />
-          <Route path="games" element={<GamesTab games={games} setGames={setGames} playlists={playlists} templates={templates} dbTracks={dbTracks} showToast={showToast} startHostSession={startHostSession} setPrintViewCards={setPrintViewCards} resolveTrackUrl={resolveTrackUrl} />} />
+          <Route path="games" element={<GamesTab games={games} setGames={setGames} playlists={playlists} setPlaylists={setPlaylists} dbTags={dbTags} togglePlay={togglePlay} playingTrackId={playingTrackId} isPaused={isPaused} templates={templates} dbTracks={dbTracks} showToast={showToast} startHostSession={startHostSession} setPrintViewCards={setPrintViewCards} resolveTrackUrl={resolveTrackUrl} />} />
           <Route path="mydatabase" element={<MyDatabaseTab
             dbTracks={dbTracks} dbTags={dbTags} playingTrackId={playingTrackId} isPaused={isPaused} togglePlay={togglePlay}
             setTrackToAdd={setTrackToAdd} deleteTrackFromDb={deleteTrackFromDb}
@@ -1193,10 +1193,10 @@ export default function App() {
           <div className="bg-pult-card border border-white/[0.08] rounded-2xl w-full max-w-md p-6">
             <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-medium">Добавить в плейлист</h3><button onClick={() => setTrackToAdd(null)} className="text-pult-text2 hover:text-white"><X size={24}/></button></div>
             <div className="flex items-center gap-4 mb-6 p-4 bg-pult-bg rounded-xl"><img src={trackToAdd.cover} className="w-12 h-12 rounded-md object-cover" alt="" /><div className="overflow-hidden"><p className="font-medium truncate">{trackToAdd.title}</p><p className="text-sm text-pult-text2">{trackToAdd.artist}</p></div></div>
-            {playlists.length === 0 ? (
+            {playlists.filter(p => !p.game_id).length === 0 ? (
                <div className="text-center py-6 text-pult-muted">Нет плейлистов. Создайте их во вкладке "Плейлисты".</div>
             ) : (
-              <div className="max-h-60 overflow-y-auto pr-2 flex flex-col gap-2 custom-scrollbar">{playlists.map(p => {
+              <div className="max-h-60 overflow-y-auto pr-2 flex flex-col gap-2 custom-scrollbar">{playlists.filter(p => !p.game_id).map(p => {
                 // Уникальность исполнителя считаем по ОТДЕЛЬНЫМ артистам (фиты тоже учитываются),
                 // иначе "Justin Bieber" и "Justin Bieber, Giveon" считались бы разными.
                 const present = playlistArtistSet(p.tracks);
