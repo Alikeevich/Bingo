@@ -62,9 +62,21 @@ async function loadAll(table, cols) {
   return rows;
 }
 
+// Сеть рвётся (ECONNRESET и т.п.) — повторяем с паузой, а не роняем весь перенос
+async function retry(fn, tries = 5) {
+  for (let i = 1; ; i++) {
+    try { return await fn(); } catch (e) {
+      if (i >= tries) throw e;
+      await new Promise(r => setTimeout(r, 2000 * i));
+    }
+  }
+}
+
 async function r2Size(url) {
-  const r = await fetch(url, { method: 'HEAD' });
-  return r.ok ? Number(r.headers.get('content-length') || 0) : -1;
+  return retry(async () => {
+    const r = await fetch(url, { method: 'HEAD' });
+    return r.ok ? Number(r.headers.get('content-length') || 0) : -1;
+  });
 }
 
 const files = await listAll();
@@ -82,13 +94,15 @@ if (APPLY) {
   for (const f of mp3) {
     const newUrl = map.get(oldPublic(f.name));
     if ((await r2Size(newUrl)) === f.size) { done++; continue; } // уже перенесён
-    const { data, error } = await supabase.storage.from(BUCKET).download(f.name);
-    if (error) throw new Error(`${f.name}: ${error.message}`);
-    const body = Buffer.from(await data.arrayBuffer());
-    await s3.send(new PutObjectCommand({
+    const body = await retry(async () => {
+      const { data, error } = await supabase.storage.from(BUCKET).download(f.name);
+      if (error) throw new Error(`${f.name}: ${error.message}`);
+      return Buffer.from(await data.arrayBuffer());
+    });
+    await retry(() => s3.send(new PutObjectCommand({
       Bucket: env.R2_BUCKET, Key: r2Key(f.name), Body: body,
       ContentType: 'audio/mpeg', CacheControl: 'public, max-age=31536000, immutable',
-    }));
+    })));
     const got = await r2Size(newUrl);
     if (got !== body.length) throw new Error(`${f.name}: в R2 ${got} байт вместо ${body.length} — останавливаюсь`);
     done++;
