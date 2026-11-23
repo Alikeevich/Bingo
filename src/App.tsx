@@ -8,7 +8,7 @@ import { Track, Playlist, Game, Round, Template, BingoCard, Tag } from './types'
 import { migrateTemplate } from './lib/migrateTemplate';
 import { loadHostSession, saveHostSession, clearHostSession } from './lib/hostSessionStorage';
 import { evaluateCard } from './lib/cardBuilder';
-import { uploadMp3ToR2, isMp3File } from './lib/r2Upload';
+import { uploadMp3ToR2, isMp3File, MP3_ONLY_MSG } from './lib/r2Upload';
 import { loadFadeSettings, saveFadeSettings, fadeInMs, fadeOutLeadSec, FadeSettings } from './lib/fade';
 import { playlistArtistSet, sharesArtist, buildPlayQueue, buildCellMatcher } from './utils';
 import AudioTrimmer from './components/AudioTrimmer';
@@ -720,6 +720,7 @@ export default function App() {
 
   // --- ЗАГРУЗКА И ПАРСИНГ КАСТОМНОГО ФАЙЛА ---
   const handleUploadCustomFile = (file: File) => {
+    if (!isMp3File(file)) { showToast(MP3_ONLY_MSG); return; }
     const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
     const parts = nameWithoutExt.split(' - ');
     let artist = 'Свой трек';

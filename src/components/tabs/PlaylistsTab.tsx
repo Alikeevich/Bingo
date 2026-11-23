@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../../supabase';
-import { uploadMp3ToR2, isMp3File } from '../../lib/r2Upload';
+import { uploadMp3ToR2, isMp3File, MP3_ONLY_MSG, MP3_ACCEPT } from '../../lib/r2Upload';
 import { Game, Playlist, Tag, Track } from '../../types';
 import { ChevronLeft, UploadCloud, HardDriveDownload, Loader2, PauseCircle, PlayCircle, Trash2, FolderPlus, Shuffle, Search, X, SearchCheck, GripVertical, Lock } from 'lucide-react';
 import { splitArtists } from '../../utils';
@@ -120,6 +120,7 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
     let newTracks = [...playlist.tracks];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      if (!isMp3File(file)) { showToast(`${file.name}: ${MP3_ONLY_MSG}`); continue; }
       const ext = file.name.split('.').pop() || 'mp3';
       const safeName = `custom_${Date.now()}_${i}.${ext}`;
       try {
@@ -257,7 +258,7 @@ export default function PlaylistsTab({ playlists, setPlaylists, playingTrackId, 
             <label className={`${quietBtn} cursor-pointer ${locked ? 'pointer-events-none opacity-40' : ''}`}>
               {isUploadingMp3 ? <Loader2 size={16} className="animate-spin" /> : <UploadCloud size={16} />}
               Свои MP3
-              <input type="file" multiple accept="audio/mpeg,audio/mp3,audio/wav" className="hidden" onChange={e => uploadCustomTracks(e, currentPlaylist.id)} disabled={isUploadingMp3 || locked} />
+              <input type="file" multiple accept={MP3_ACCEPT} className="hidden" onChange={e => uploadCustomTracks(e, currentPlaylist.id)} disabled={isUploadingMp3 || locked} />
             </label>
             <button onClick={() => shufflePlaylist(currentPlaylist.id)} disabled={locked || currentPlaylist.tracks.length < 2} title="Перемешать порядок песен" className={quietBtn}>
               <Shuffle size={16} /> Перемешать

@@ -32,4 +32,8 @@ export async function uploadMp3ToR2(blob: Blob, trackId: string): Promise<string
   return publicUrl;
 }
 
+// Загружать можно только MP3: так файл гарантированно ляжет в R2 и сыграет в любом браузере.
+// Новые форматы добавляем осознанно, по просьбе ведущих.
 export const isMp3File = (f: File) => /\.mp3$/i.test(f.name) || f.type === 'audio/mpeg';
+export const MP3_ONLY_MSG = 'Можно загружать только MP3. Другие форматы пока не поддерживаются';
+export const MP3_ACCEPT = '.mp3,audio/mpeg';

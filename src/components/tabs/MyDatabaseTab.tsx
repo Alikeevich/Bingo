@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Track, Tag } from '../../types';
+import { MP3_ACCEPT } from '../../lib/r2Upload';
 import { PlayCircle, PauseCircle, Plus, Trash2, Tags, Search, Edit3, UploadCloud, X } from 'lucide-react';
 
 interface MyDatabaseTabProps {
@@ -55,7 +56,7 @@ export default function MyDatabaseTab({
           <UploadCloud size={16} /> Загрузить свой MP3
           <input
             type="file"
-            accept="audio/mpeg,audio/mp3,audio/wav"
+            accept={MP3_ACCEPT}
             className="hidden"
             onChange={e => {
               const file = e.target.files?.[0];
